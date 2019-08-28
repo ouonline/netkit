@@ -1,0 +1,6 @@
+[submodule "deps/utils"]
+	path = deps/utils
+	url = https://github.com/ouonline/utils.git
+[submodule "deps/threadpool"]
+	path = deps/threadpool
+	url = https://github.com/ouonline/threadpool.git
