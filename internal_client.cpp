@@ -13,6 +13,7 @@ InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& facto
                                ThreadPool* tp)
     : m_fd(fd), m_bytes_needed(0), m_tp(tp), m_conn(fd), m_factory(factory) {
     m_processor = CreateProcessor();
+    factory->OnClientConnected(&m_conn);
 }
 
 StatusCode InternalClient::ReadData() {
@@ -107,8 +108,7 @@ StatusCode InternalClient::In() {
 }
 
 void InternalClient::Error() {
-    const ConnectionInfo& info = m_conn.GetConnectionInfo();
-    log_info("client[%s:%u] disconnected.", info.addr.c_str(), info.port);
+    m_factory->OnClientDisconnected(&m_conn);
 }
 
 }}}

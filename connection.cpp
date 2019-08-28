@@ -11,16 +11,23 @@ using namespace std;
 
 namespace utils { namespace net {
 
-Connection::Connection(int fd)
-    : m_fd(fd) {
+Connection::Connection(int fd) {
+    m_fd = fd;
     pthread_mutex_init(&m_lock, nullptr);
 
     struct sockaddr_in addr;
     socklen_t len = sizeof(addr);
     int ret = getpeername(fd, (struct sockaddr*)&addr, &len);
     if (ret == 0) {
-        m_info.addr = inet_ntoa(addr.sin_addr);
-        m_info.port = addr.sin_port;
+        m_info.remote_addr = inet_ntoa(addr.sin_addr);
+        m_info.remote_port = addr.sin_port;
+    }
+
+    len = sizeof(addr);
+    ret = getsockname(fd, (struct sockaddr*)&addr, &len);
+    if (ret == 0) {
+        m_info.local_addr = inet_ntoa(addr.sin_addr);
+        m_info.local_port = addr.sin_port;
     }
 }
 

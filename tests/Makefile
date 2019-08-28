@@ -12,7 +12,7 @@ LIBS := ../libnetkit.a ../deps/threadpool/cpp/libthreadpool.a -lpthread
 
 OBJS := $(patsubst %.cpp, %.o, $(wildcard *.cpp))
 
-TARGET := test-server
+TARGET := echo-server-and-client
 
 .PHONY: all clean pre-process post-clean
 

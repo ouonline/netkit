@@ -9,8 +9,10 @@
 namespace utils { namespace net {
 
 struct ConnectionInfo {
-    uint16_t port = 0;
-    std::string addr;
+    uint16_t local_port = 0;
+    uint16_t remote_port = 0;
+    std::string local_addr;
+    std::string remote_addr;
 };
 
 class Connection final {
@@ -28,6 +30,10 @@ private:
     int m_fd;
     ConnectionInfo m_info;
     pthread_mutex_t m_lock;
+
+private:
+    Connection(const Connection&);
+    Connection& operator=(const Connection&);
 };
 
 }}

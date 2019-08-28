@@ -54,7 +54,6 @@ StatusCode InternalServer::In() {
         goto err1;
     }
 
-    log_info("client (%d) connected.", fd);
     return SC_OK;
 
 err1:

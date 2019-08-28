@@ -1,20 +1,21 @@
-#ifndef __TCP_SERVER_MANAGER_H__
-#define __TCP_SERVER_MANAGER_H__
+#ifndef __TCP_PROCESSOR_MANAGER_H__
+#define __TCP_PROCESSOR_MANAGER_H__
 
 #include "deps/threadpool/cpp/thread_pool.hpp"
 #include "status_code.h"
 #include "processor_factory.h"
-#include "server_manager.h"
 #include <stdint.h>
 
 namespace utils { namespace net { namespace tcp {
 
-class ServerManager final {
+class ProcessorManager final {
 
 public:
-    virtual ~ServerManager() {}
+    virtual ~ProcessorManager() {}
     StatusCode Init();
     StatusCode AddServer(const char* addr, uint16_t port,
+                         const std::shared_ptr<ProcessorFactory>& factory);
+    StatusCode AddClient(const char* addr, uint16_t port,
                          const std::shared_ptr<ProcessorFactory>& factory);
     StatusCode Run();
 
@@ -26,6 +27,8 @@ private:
     StatusCode SetRecvTimeout(int fd, uint32_t ms);
     StatusCode SetReuseAddr(int fd);
     int CreateServerFd(const char* addr, uint16_t port);
+    int CreateClientFd(const char* host, uint16_t port);
+    StatusCode SetNonBlocking(int fd);
 
 private:
     int m_epfd;

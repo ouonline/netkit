@@ -1,9 +1,10 @@
-#include "server_manager.h"
+#include "processor_manager.h"
 #include "internal_server.h"
+#include "internal_client.h"
 #include "logger.h"
 #include <cstring>
 #include <sys/epoll.h>
-#include <sys/ioctl.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 using namespace std;
@@ -14,7 +15,7 @@ namespace utils { namespace net { namespace tcp {
 
 #define MAX_EVENTS 64
 
-StatusCode ServerManager::Init() {
+StatusCode ProcessorManager::Init() {
     if (m_epfd > 0) {
         return SC_OK;
     }
@@ -30,8 +31,8 @@ StatusCode ServerManager::Init() {
     return SC_OK;
 }
 
-StatusCode ServerManager::GetHostInfo(const char* host, uint16_t port,
-                                      struct addrinfo** svr) {
+StatusCode ProcessorManager::GetHostInfo(const char* host, uint16_t port,
+                                         struct addrinfo** svr) {
     int err;
     char buf[8];
     struct addrinfo hints;
@@ -44,14 +45,14 @@ StatusCode ServerManager::GetHostInfo(const char* host, uint16_t port,
 
     err = getaddrinfo(host, buf, &hints, svr);
     if (err) {
-        log_error("getaddrinfo() failed: %s.", strerror(errno));
+        log_error("getaddrinfo() failed: %s.", gai_strerror(err));
         return SC_INTERNAL_NET_ERR;
     }
 
     return SC_OK;
 }
 
-void ServerManager::Time2Timeval(uint32_t ms, struct timeval* t) {
+void ProcessorManager::Time2Timeval(uint32_t ms, struct timeval* t) {
     if (ms >= 1000) {
         t->tv_sec = ms / 1000;
         t->tv_usec = (ms % 1000) * 1000;
@@ -61,7 +62,7 @@ void ServerManager::Time2Timeval(uint32_t ms, struct timeval* t) {
     }
 }
 
-StatusCode ServerManager::SetSendTimeout(int fd, uint32_t ms) {
+StatusCode ProcessorManager::SetSendTimeout(int fd, uint32_t ms) {
     struct timeval t;
     Time2Timeval(ms, &t);
 
@@ -73,7 +74,7 @@ StatusCode ServerManager::SetSendTimeout(int fd, uint32_t ms) {
     return SC_OK;
 }
 
-StatusCode ServerManager::SetRecvTimeout(int fd, uint32_t ms) {
+StatusCode ProcessorManager::SetRecvTimeout(int fd, uint32_t ms) {
     struct timeval t;
     Time2Timeval(ms, &t);
 
@@ -85,7 +86,7 @@ StatusCode ServerManager::SetRecvTimeout(int fd, uint32_t ms) {
     return SC_OK;
 }
 
-StatusCode ServerManager::SetReuseAddr(int fd) {
+StatusCode ProcessorManager::SetReuseAddr(int fd) {
     int opt = 1;
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) != 0) {
         log_error("setsockopt failed: %s.", strerror(errno));
@@ -95,7 +96,7 @@ StatusCode ServerManager::SetReuseAddr(int fd) {
     return SC_OK;
 }
 
-int ServerManager::CreateServerFd(const char* host, uint16_t port) {
+int ProcessorManager::CreateServerFd(const char* host, uint16_t port) {
     int fd;
     StatusCode sc = SC_INTERNAL_NET_ERR;
     struct addrinfo* info = nullptr;
@@ -135,8 +136,54 @@ err:
     return -1;
 }
 
-StatusCode ServerManager::AddServer(const char* addr, uint16_t port,
-                                    const std::shared_ptr<ProcessorFactory>& factory) {
+// TODO set connect/send/recv timeout
+int ProcessorManager::CreateClientFd(const char* host, uint16_t port) {
+    struct addrinfo* info = nullptr;
+    if (GetHostInfo(host, port, &info) != SC_OK) {
+        return -1;
+    }
+
+    int fd = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
+    if (fd == -1) {
+        log_error("socket() failed: %s", strerror(errno));
+        goto err;
+    }
+
+    if (connect(fd, info->ai_addr, info->ai_addrlen) != 0) {
+        log_error("connect() failed: %s", strerror(errno));
+        goto err1;
+    }
+
+    freeaddrinfo(info);
+    return fd;
+
+err1:
+    close(fd);
+err:
+    freeaddrinfo(info);
+    return -1;
+}
+
+StatusCode ProcessorManager::SetNonBlocking(int fd) {
+    int opt;
+
+    opt = fcntl(fd, F_GETFL);
+    if (opt < 0) {
+        log_error("fcntl failed: %s.", strerror(errno));
+        return SC_INTERNAL_NET_ERR;
+    }
+
+    opt |= O_NONBLOCK;
+    if (fcntl(fd, F_SETFL, opt) == -1) {
+        log_error("fcntl failed: %s.", strerror(errno));
+        return SC_INTERNAL_NET_ERR;
+    }
+
+    return SC_OK;
+}
+
+StatusCode ProcessorManager::AddServer(const char* addr, uint16_t port,
+                                       const shared_ptr<ProcessorFactory>& factory) {
     int fd = CreateServerFd(addr, port);
     if (fd < 0) {
         log_error("create server failed.");
@@ -163,7 +210,44 @@ StatusCode ServerManager::AddServer(const char* addr, uint16_t port,
     return SC_OK;
 }
 
-StatusCode ServerManager::Run() {
+StatusCode ProcessorManager::AddClient(const char* addr, uint16_t port,
+                                       const shared_ptr<ProcessorFactory>& factory) {
+    InternalClient* client = nullptr;
+
+    int fd = CreateClientFd(addr, port);
+    if (fd < 0) {
+        log_error("create client failed.");
+        return SC_INTERNAL_NET_ERR;
+    }
+
+    if (SetNonBlocking(fd) != SC_OK) {
+        goto err;
+    }
+
+    client = new InternalClient(fd, factory, &m_thread_pool);
+    if (!client) {
+        log_error("allocate client failed.");
+        goto err;
+    }
+
+    struct epoll_event ev;
+    ev.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLET;
+    ev.data.ptr = client;
+    if (epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev) != 0) {
+        log_error("add client failed: %s.", strerror(errno));
+        goto err1;
+    }
+
+    return SC_OK;
+
+err1:
+    delete client;
+err:
+    close(fd);
+    return SC_INTERNAL_NET_ERR;
+}
+
+StatusCode ProcessorManager::Run() {
     struct epoll_event eventlist[MAX_EVENTS];
     while (true) {
         int i;
