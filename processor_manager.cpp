@@ -3,8 +3,6 @@
 #include "internal_client.h"
 #include "logger.h"
 #include <cstring>
-#include <sys/epoll.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 using namespace std;
@@ -13,22 +11,9 @@ namespace utils { namespace net { namespace tcp {
 
 #include <netdb.h>
 
-#define MAX_EVENTS 64
-
 StatusCode ProcessorManager::Init() {
-    if (m_epfd > 0) {
-        return SC_OK;
-    }
-
     m_thread_pool.AddThread(5);
-
-    m_epfd = epoll_create(MAX_EVENTS);
-    if (m_epfd < 0) {
-        log_error("create epoll failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
-    }
-
-    return SC_OK;
+    return m_event_mgr.Init();
 }
 
 StatusCode ProcessorManager::GetHostInfo(const char* host, uint16_t port,
@@ -136,7 +121,6 @@ err:
     return -1;
 }
 
-// TODO set connect/send/recv timeout
 int ProcessorManager::CreateClientFd(const char* host, uint16_t port) {
     struct addrinfo* info = nullptr;
     if (GetHostInfo(host, port, &info) != SC_OK) {
@@ -164,24 +148,6 @@ err:
     return -1;
 }
 
-StatusCode ProcessorManager::SetNonBlocking(int fd) {
-    int opt;
-
-    opt = fcntl(fd, F_GETFL);
-    if (opt < 0) {
-        log_error("fcntl failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
-    }
-
-    opt |= O_NONBLOCK;
-    if (fcntl(fd, F_SETFL, opt) == -1) {
-        log_error("fcntl failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
-    }
-
-    return SC_OK;
-}
-
 StatusCode ProcessorManager::AddServer(const char* addr, uint16_t port,
                                        const shared_ptr<ProcessorFactory>& factory) {
     int fd = CreateServerFd(addr, port);
@@ -190,17 +156,14 @@ StatusCode ProcessorManager::AddServer(const char* addr, uint16_t port,
         return SC_INTERNAL_NET_ERR;
     }
 
-    auto svr = new InternalServer(m_epfd, fd, factory, &m_thread_pool);
+    auto svr = new InternalServer(fd, factory, &m_event_mgr, &m_thread_pool);
     if (!svr) {
         log_error("allocate tcp server failed.");
         close(fd);
         return SC_NOMEM;
     }
 
-    struct epoll_event ev;
-    ev.events = EPOLLIN;
-    ev.data.ptr = svr;
-    if (epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev) != 0) {
+    if (m_event_mgr.AddServer(svr) != SC_OK) {
         log_error("add server[%s:%u] to epoll failed: %s.", addr, port, strerror(errno));
         close(fd);
         delete svr;
@@ -212,35 +175,24 @@ StatusCode ProcessorManager::AddServer(const char* addr, uint16_t port,
 
 StatusCode ProcessorManager::AddClient(const char* addr, uint16_t port,
                                        const shared_ptr<ProcessorFactory>& factory) {
-    InternalClient* client = nullptr;
-
     int fd = CreateClientFd(addr, port);
     if (fd < 0) {
         log_error("create client failed.");
         return SC_INTERNAL_NET_ERR;
     }
 
-    if (SetNonBlocking(fd) != SC_OK) {
-        goto err;
-    }
-
-    client = new InternalClient(fd, factory, &m_thread_pool);
+    auto client = new InternalClient(fd, factory, &m_thread_pool);
     if (!client) {
         log_error("allocate client failed.");
         goto err;
     }
 
-    struct epoll_event ev;
-    ev.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLET;
-    ev.data.ptr = client;
-    if (epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev) != 0) {
-        log_error("add client failed: %s.", strerror(errno));
-        goto err1;
+    if (m_event_mgr.AddClient(client) == SC_OK) {
+        return SC_OK;
     }
 
-    return SC_OK;
+    log_error("add client failed: %s.", strerror(errno));
 
-err1:
     delete client;
 err:
     close(fd);
@@ -248,51 +200,7 @@ err:
 }
 
 StatusCode ProcessorManager::Run() {
-    struct epoll_event eventlist[MAX_EVENTS];
-    while (true) {
-        int i;
-        int nfds = epoll_wait(m_epfd, eventlist, MAX_EVENTS, -1);
-        if (nfds < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-
-            log_error("epoll_wait failed: %s", strerror(errno));
-            return SC_INTERNAL_NET_ERR;
-        }
-
-        for (i = 0; i < nfds; ++i) {
-            uint32_t events = eventlist[i].events;
-            EventHandler* e = (EventHandler*)(eventlist[i].data.ptr);
-            StatusCode sc = SC_OK;
-
-            if ((events & EPOLLHUP) ||
-                (events & EPOLLRDHUP) ||
-                (events & EPOLLERR)) {
-                e->Error();
-                sc = SC_CLIENT_DISCONNECTED;
-            } else {
-                if (events & EPOLLIN) {
-                    sc = e->In();
-                }
-
-                if (events & EPOLLOUT) {
-                    if (sc == SC_OK) {
-                        sc = e->Out();
-                    }
-                }
-            }
-
-            if (sc != SC_OK) {
-                int fd = e->GetFd();
-                close(fd);
-                epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, nullptr);
-                delete e;
-            }
-        }
-    }
-
-    return SC_OK;
+    return m_event_mgr.Loop();
 }
 
 }}}

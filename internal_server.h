@@ -2,6 +2,7 @@
 #define __TCP_INTERNAL_SERVER_H__
 
 #include "event_handler.h"
+#include "event_manager.h"
 #include "processor_factory.h"
 #include "status_code.h"
 #include "deps/threadpool/cpp/thread_pool.hpp"
@@ -12,8 +13,9 @@ namespace utils { namespace net { namespace tcp {
 class InternalServer final : public EventHandler {
 
 public:
-    InternalServer(int epfd, int fd, const std::shared_ptr<ProcessorFactory>& factory, ThreadPool* tp)
-        : m_epfd(epfd), m_fd(fd), m_factory(factory), m_tp(tp) {}
+    InternalServer(int fd, const std::shared_ptr<ProcessorFactory>& factory,
+                   EventManager* event_mgr, ThreadPool* tp)
+        : m_fd(fd), m_event_mgr(event_mgr), m_factory(factory), m_tp(tp) {}
 
     int GetFd() const override { return m_fd; }
     StatusCode In() override;
@@ -21,11 +23,8 @@ public:
     void Error() override {}
 
 private:
-    StatusCode SetNonBlocking(int fd);
-
-private:
-    int m_epfd;
     int m_fd;
+    EventManager* m_event_mgr;
     std::shared_ptr<ProcessorFactory> m_factory;
     ThreadPool* m_tp;
 };

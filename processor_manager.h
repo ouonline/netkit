@@ -4,6 +4,7 @@
 #include "deps/threadpool/cpp/thread_pool.hpp"
 #include "status_code.h"
 #include "processor_factory.h"
+#include "event_manager.h"
 #include <stdint.h>
 
 namespace utils { namespace net { namespace tcp {
@@ -28,10 +29,9 @@ private:
     StatusCode SetReuseAddr(int fd);
     int CreateServerFd(const char* addr, uint16_t port);
     int CreateClientFd(const char* host, uint16_t port);
-    StatusCode SetNonBlocking(int fd);
 
 private:
-    int m_epfd;
+    EventManager m_event_mgr;
     ThreadPool m_thread_pool;
 };
 
