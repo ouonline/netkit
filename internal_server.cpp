@@ -1,6 +1,6 @@
 #include "internal_server.h"
 #include "internal_client.h"
-#include "logger.h"
+#include "deps/logger/global_logger.h"
 #include <cstring>
 #include <sys/socket.h>
 #include <unistd.h>

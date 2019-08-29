@@ -1,8 +1,8 @@
 #include "processor_manager.h"
-#include "logger.h"
 using namespace utils::net;
 using namespace utils::net::tcp;
 
+#include "deps/logger/global_logger.h"
 #include <unistd.h>
 #include <iostream>
 using namespace std;
@@ -73,6 +73,8 @@ public:
 
 int main(void) {
     ProcessorManager mgr;
+
+    log_init(nullptr, nullptr, 0, 0);
 
     if (mgr.Init() != SC_OK) {
         cerr << "init manager failed." << endl;

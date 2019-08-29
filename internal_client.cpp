@@ -1,6 +1,6 @@
 #include "internal_client.h"
 #include "processor_factory.h"
-#include "logger.h"
+#include "deps/logger/global_logger.h"
 #include <memory>
 #include <unistd.h>
 #include <sys/ioctl.h>

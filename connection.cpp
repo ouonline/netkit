@@ -1,5 +1,5 @@
 #include "connection.h"
-#include "logger.h"
+#include "deps/logger/global_logger.h"
 #include <sys/time.h>
 #include <errno.h>
 #include <string.h>

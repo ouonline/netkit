@@ -11,7 +11,7 @@ CXXFLAGS := $(CXXFLAGS) -Wall -Werror -Wextra -fPIC
 MODULE_NAME := netkit
 
 INCLUDE :=
-LIBS := ./deps/threadpool/cpp/libthreadpool.a -lpthread
+LIBS := ./deps/logger/liblogger.a ./deps/threadpool/cpp/libthreadpool.a -lpthread
 
 OBJS := $(patsubst %.cpp, %.o, $(wildcard *.cpp))
 
@@ -23,9 +23,11 @@ all: $(TARGET)
 
 pre-process:
 	$(MAKE) -C deps/threadpool/cpp
+	$(MAKE) -C deps/logger
 
 post-clean:
 	$(MAKE) clean -C deps/threadpool/cpp
+	$(MAKE) clean -C deps/logger
 
 lib$(MODULE_NAME).a: $(OBJS) | pre-process
 	$(AR) rc $@ $^

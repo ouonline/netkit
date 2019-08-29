@@ -8,7 +8,7 @@ endif
 CXXFLAGS := $(CXXFLAGS) -Wall -Werror -Wextra -fPIC
 
 INCLUDE := -I..
-LIBS := ../libnetkit.a ../deps/threadpool/cpp/libthreadpool.a -lpthread
+LIBS := ../libnetkit.a ../deps/logger/liblogger.a ../deps/threadpool/cpp/libthreadpool.a -lpthread
 
 OBJS := $(patsubst %.cpp, %.o, $(wildcard *.cpp))
 

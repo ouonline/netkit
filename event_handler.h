@@ -2,7 +2,6 @@
 #define __NET_EVENT_HANDLER_H__
 
 #include "status_code.h"
-#include <stdint.h>
 
 namespace utils { namespace net {
 
