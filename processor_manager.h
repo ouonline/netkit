@@ -21,12 +21,9 @@ public:
     StatusCode Run();
 
 private:
+    StatusCode SetReuseAddr(int fd);
     StatusCode GetHostInfo(const char* addr, uint16_t port,
                            struct addrinfo** svr);
-    void Time2Timeval(uint32_t ms, struct timeval* t);
-    StatusCode SetSendTimeout(int fd, uint32_t ms);
-    StatusCode SetRecvTimeout(int fd, uint32_t ms);
-    StatusCode SetReuseAddr(int fd);
     int CreateServerFd(const char* addr, uint16_t port);
     int CreateClientFd(const char* host, uint16_t port);
 

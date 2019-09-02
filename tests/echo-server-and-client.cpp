@@ -17,10 +17,8 @@ public:
     }
 
 protected:
-    bool ProcessPacket() override {
+    bool ProcessPacket(Connection* c) override {
         auto buf = GetPacket();
-
-        auto c = GetConnection();
         const ConnectionInfo &info = c->GetConnectionInfo();
 
         log_info("local[%s:%u]\t<=\tremote[%s:%u]\tdata[%s]",
@@ -81,12 +79,12 @@ int main(void) {
         return -1;
     }
 
-    if (mgr.AddServer("127.0.0.1", 12345, make_shared<EchoServerFactory>()) != SC_OK) {
+    if (mgr.AddServer("127.0.0.1", 54321, make_shared<EchoServerFactory>()) != SC_OK) {
         cerr << "add server failed." << endl;
         return -1;
     }
 
-    if (mgr.AddClient("127.0.0.1", 12345, make_shared<EchoClientFactory>()) != SC_OK) {
+    if (mgr.AddClient("127.0.0.1", 54321, make_shared<EchoClientFactory>()) != SC_OK) {
         cerr << "add client failed." << endl;
         return -1;
     }

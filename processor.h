@@ -16,22 +16,17 @@ public:
     virtual bool CheckPacket(uint32_t* expected_size) = 0;
 
     Buffer* GetPacket() { return &m_buf; }
-
     void SetConnection(Connection* c) { m_conn = c; }
-    Connection* GetConnection() { return m_conn; }
 
 protected:
-    virtual bool ProcessPacket() = 0;
+    virtual bool ProcessPacket(Connection*) = 0;
 
 private:
-    bool IsFinished() const final { return m_is_finished; }
-    void Process() final {
-        ProcessPacket();
-        m_is_finished = true;
+    void Run() override final {
+        ProcessPacket(m_conn);
     }
 
 private:
-    bool m_is_finished = false;
     Connection* m_conn = nullptr;
     Buffer m_buf;
 };

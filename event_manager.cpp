@@ -105,8 +105,8 @@ StatusCode EventManager::Loop() {
 
             if (sc != SC_OK) {
                 int fd = e->GetFd();
-                close(fd);
                 epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, nullptr);
+                close(fd);
                 delete e;
             }
         }

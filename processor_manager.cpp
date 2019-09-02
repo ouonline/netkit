@@ -37,40 +37,6 @@ StatusCode ProcessorManager::GetHostInfo(const char* host, uint16_t port,
     return SC_OK;
 }
 
-void ProcessorManager::Time2Timeval(uint32_t ms, struct timeval* t) {
-    if (ms >= 1000) {
-        t->tv_sec = ms / 1000;
-        t->tv_usec = (ms % 1000) * 1000;
-    } else {
-        t->tv_sec = 0;
-        t->tv_usec = ms * 1000;
-    }
-}
-
-StatusCode ProcessorManager::SetSendTimeout(int fd, uint32_t ms) {
-    struct timeval t;
-    Time2Timeval(ms, &t);
-
-    if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &t, sizeof(t)) != 0) {
-        log_error("setsockopt failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
-    }
-
-    return SC_OK;
-}
-
-StatusCode ProcessorManager::SetRecvTimeout(int fd, uint32_t ms) {
-    struct timeval t;
-    Time2Timeval(ms, &t);
-
-    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &t, sizeof(t)) != 0) {
-        log_error("setsockopt failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
-    }
-
-    return SC_OK;
-}
-
 StatusCode ProcessorManager::SetReuseAddr(int fd) {
     int opt = 1;
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) != 0) {
@@ -192,7 +158,6 @@ StatusCode ProcessorManager::AddClient(const char* addr, uint16_t port,
     }
 
     log_error("add client failed: %s.", strerror(errno));
-
     delete client;
 err:
     close(fd);
