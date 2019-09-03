@@ -1,7 +1,7 @@
 #ifndef __TCP_PROCESSOR_MANAGER_H__
 #define __TCP_PROCESSOR_MANAGER_H__
 
-#include "deps/threadpool/cpp/thread_pool.hpp"
+#include "threadpool/cpp/thread_pool.hpp"
 #include "status_code.h"
 #include "processor_factory.h"
 #include "event_manager.h"

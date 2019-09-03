@@ -2,7 +2,7 @@
 #define __NET_BUFFER_H__
 
 #include "status_code.h"
-#include "deps/utils/qbuf.h"
+#include "utils/qbuf.h"
 #include <stdint.h>
 
 namespace utils { namespace net {

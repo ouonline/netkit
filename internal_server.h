@@ -5,7 +5,7 @@
 #include "event_manager.h"
 #include "processor_factory.h"
 #include "status_code.h"
-#include "deps/threadpool/cpp/thread_pool.hpp"
+#include "threadpool/cpp/thread_pool.hpp"
 #include <string>
 
 namespace utils { namespace net { namespace tcp {

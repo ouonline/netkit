@@ -1,5 +1,5 @@
 #include "event_manager.h"
-#include "deps/logger/global_logger.h"
+#include "logger/global_logger.h"
 #include <sys/epoll.h>
 #include <fcntl.h>
 #include <unistd.h>

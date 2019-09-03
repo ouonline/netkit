@@ -7,8 +7,12 @@ else
 endif
 CXXFLAGS := $(CXXFLAGS) -Wall -Werror -Wextra -fPIC
 
-INCLUDE := -I..
-LIBS := ../libnetkit.a ../deps/logger/liblogger.a ../deps/threadpool/cpp/libthreadpool.a -lpthread
+ifndef DEPSDIR
+    DEPSDIR := $(shell pwd)/../..
+endif
+
+INCLUDE := -I.. -I$(DEPSDIR)
+LIBS := ../libnetkit.a $(DEPSDIR)/logger/liblogger.a $(DEPSDIR)/threadpool/cpp/libthreadpool.a -lpthread
 
 OBJS := $(patsubst %.cpp, %.o, $(wildcard *.cpp))
 
@@ -18,11 +22,13 @@ TARGET := echo-server-and-client
 
 all: $(TARGET)
 
+$(OBJS): | pre-process
+
 pre-process:
-	$(MAKE) -C ..
+	$(MAKE) DEPSDIR=$(DEPSDIR) -C ..
 
 post-clean:
-	$(MAKE) clean -C ..
+	$(MAKE) clean DEPSDIR=$(DEPSDIR) -C ..
 
 $(TARGET): $(OBJS) | pre-process
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)

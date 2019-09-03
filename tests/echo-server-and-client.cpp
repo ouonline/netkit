@@ -2,7 +2,7 @@
 using namespace utils::net;
 using namespace utils::net::tcp;
 
-#include "deps/logger/global_logger.h"
+#include "logger/global_logger.h"
 #include <unistd.h>
 #include <iostream>
 using namespace std;

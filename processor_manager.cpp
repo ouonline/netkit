@@ -1,7 +1,7 @@
 #include "processor_manager.h"
 #include "internal_server.h"
 #include "internal_client.h"
-#include "deps/logger/global_logger.h"
+#include "logger/global_logger.h"
 #include <cstring>
 #include <unistd.h>
 #include <errno.h>
