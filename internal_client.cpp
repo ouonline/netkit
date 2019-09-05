@@ -24,13 +24,14 @@ StatusCode InternalClient::ReadData() {
     }
 
     auto buf = m_processor->GetPacket();
-    StatusCode sc = buf->Reserve(buf->Size() + nbytes);
+    const uint32_t end_offset = buf->Size();
+    StatusCode sc = buf->Resize(buf->Size() + nbytes);
     if (sc != SC_OK) {
         logger_error(m_logger, "alloc mem failed: %u", sc);
         return sc;
     }
 
-    char* cursor = buf->Data() + buf->Size();
+    char* cursor = buf->Data() + end_offset;
     while (nbytes > 0) {
         int ret = read(m_fd, cursor, nbytes);
         if (ret == -1) {

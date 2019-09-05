@@ -29,7 +29,6 @@ $(OBJS): | pre-process
 
 pre-process:
 	d=$(DEPSDIR)/threadpool; if ! [ -d $$d ]; then git clone https://github.com/ouonline/threadpool.git $$d; fi
-	d=$(DEPSDIR)/utils; if ! [ -d $$d ]; then git clone https://github.com/ouonline/utils.git $$d; fi
 	$(MAKE) DEPSDIR=$(DEPSDIR) -C $(DEPSDIR)/threadpool/cpp
 
 post-clean:

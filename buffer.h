@@ -2,50 +2,31 @@
 #define __NET_BUFFER_H__
 
 #include "status_code.h"
-#include "utils/qbuf.h"
 #include <stdint.h>
+#include <vector>
 
 namespace utils { namespace net {
 
 class Buffer final {
 
 public:
-    Buffer() {
-        qbuf_init(&m_data);
-    }
-    ~Buffer() {
-        qbuf_destroy(&m_data);
-    }
     char* Data() {
-        return (char*)qbuf_data(&m_data);
+        return m_data.data();
     }
     uint32_t Size() const {
-        return qbuf_size(&m_data);
-    }
-    StatusCode Reserve(uint32_t new_size) {
-        if (qbuf_reserve(&m_data, new_size) == 0) {
-            return SC_OK;
-        }
-
-        return SC_NOMEM;
+        return m_data.size();
     }
     StatusCode Resize(uint32_t new_size) {
-        if (qbuf_resize(&m_data, new_size) == 0) {
-            return SC_OK;
-        }
-
-        return SC_NOMEM;
+        m_data.resize(new_size);
+        return ((m_data.size() == new_size) ? SC_OK : SC_NOMEM);
     }
     StatusCode Append(const char* data, uint32_t len) {
-        if (qbuf_append(&m_data, data, len) == 0) {
-            return SC_OK;
-        }
-
-        return SC_NOMEM;
+        m_data.insert(m_data.end(), data, data + len);
+        return SC_OK;
     }
 
 private:
-    struct qbuf m_data;
+    std::vector<char> m_data;
 };
 
 }}
