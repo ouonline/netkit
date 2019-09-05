@@ -2,14 +2,15 @@
 using namespace utils::net;
 using namespace utils::net::tcp;
 
-#include "logger/global_logger.h"
+#include "logger/stdio_logger.h"
 #include <unistd.h>
-#include <iostream>
 using namespace std;
 
 class EchoProcessor final : public Processor {
 
 public:
+    EchoProcessor(struct logger* logger) : m_logger(logger) {}
+
     bool CheckPacket(uint32_t* size) override {
         auto buf = GetPacket();
         *size = buf->Size();
@@ -21,75 +22,88 @@ protected:
         auto buf = GetPacket();
         const ConnectionInfo &info = c->GetConnectionInfo();
 
-        log_info("local[%s:%u]\t<=\tremote[%s:%u]\tdata[%s]",
-                 info.local_addr.c_str(), info.local_port,
-                 info.remote_addr.c_str(), info.remote_port,
-                 string(buf->Data(), buf->Size()).c_str());
+        logger_info(m_logger, "local[%s:%u]\t<=\tremote[%s:%u]\tdata[%s]",
+                    info.local_addr.c_str(), info.local_port,
+                    info.remote_addr.c_str(), info.remote_port,
+                    string(buf->Data(), buf->Size()).c_str());
         sleep(1);
 
         auto num = std::stol(string(buf->Data(), buf->Size()));
         const string content = std::to_string(num + 1);
         c->Send(content.data(), content.size());
 
-        log_info("local[%s:%u]\t=>\tremote[%s:%u]\tdata[%s]",
-                 info.local_addr.c_str(), info.local_port,
-                 info.remote_addr.c_str(), info.remote_port,
-                 content.c_str());
+        logger_info(m_logger, "local[%s:%u]\t=>\tremote[%s:%u]\tdata[%s]",
+                    info.local_addr.c_str(), info.local_port,
+                    info.remote_addr.c_str(), info.remote_port,
+                    content.c_str());
         return true;
     }
+
+private:
+    struct logger* m_logger;
 };
 
 class EchoServerFactory final : public ProcessorFactory {
 
 public:
+    EchoServerFactory(struct logger* logger) : m_logger(logger) {}
     void OnClientConnected(Connection*) override {}
     void OnClientDisconnected(Connection* c) override {
         const ConnectionInfo& info = c->GetConnectionInfo();
-        log_info("client[%s:%u] disconnected.",
-                 info.remote_addr.c_str(), info.remote_port);
+        logger_info(m_logger, "client[%s:%u] disconnected.",
+                    info.remote_addr.c_str(), info.remote_port);
     }
     shared_ptr<Processor> CreateProcessor() override {
-        return make_shared<EchoProcessor>();
+        return make_shared<EchoProcessor>(m_logger);
     }
+
+private:
+    struct logger* m_logger;
 };
 
 class EchoClientFactory final : public ProcessorFactory {
 
 public:
+    EchoClientFactory(struct logger* logger) : m_logger(logger) {}
     void OnClientConnected(Connection* c) override {
         c->Send("0", 1);
     }
     void OnClientDisconnected(Connection* c) override {
         const ConnectionInfo& info = c->GetConnectionInfo();
-        log_info("client[%s:%u] disconnected.",
-                 info.local_addr.c_str(), info.local_port);
+        logger_info(m_logger, "client[%s:%u] disconnected.",
+                    info.local_addr.c_str(), info.local_port);
     }
     shared_ptr<Processor> CreateProcessor() override {
-        return make_shared<EchoProcessor>();
+        return make_shared<EchoProcessor>(m_logger);
     }
+
+private:
+    struct logger* m_logger;
 };
 
 int main(void) {
-    ProcessorManager mgr;
+    struct logger logger;
+    stdio_logger_init(&logger);
 
-    log_init(nullptr, nullptr, 0, 0);
-
+    ProcessorManager mgr(&logger);
     if (mgr.Init() != SC_OK) {
-        cerr << "init manager failed." << endl;
+        logger_error(&logger, "init manager failed.");
         return -1;
     }
 
-    if (mgr.AddServer("127.0.0.1", 54321, make_shared<EchoServerFactory>()) != SC_OK) {
-        cerr << "add server failed." << endl;
+    if (mgr.AddServer("127.0.0.1", 54321, make_shared<EchoServerFactory>(&logger)) != SC_OK) {
+        logger_error(&logger, "add server failed.");
         return -1;
     }
 
-    if (mgr.AddClient("127.0.0.1", 54321, make_shared<EchoClientFactory>()) != SC_OK) {
-        cerr << "add client failed." << endl;
+    if (mgr.AddClient("127.0.0.1", 54321, make_shared<EchoClientFactory>(&logger)) != SC_OK) {
+        logger_error(&logger, "add client failed.");
         return -1;
     }
 
     mgr.Run();
+
+    stdio_logger_destroy(&logger);
 
     return 0;
 }

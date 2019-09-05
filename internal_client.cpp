@@ -1,6 +1,5 @@
 #include "internal_client.h"
 #include "processor_factory.h"
-#include "logger/global_logger.h"
 #include <memory>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -10,8 +9,9 @@ using namespace std;
 namespace utils { namespace net { namespace tcp {
 
 InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& factory,
-                               ThreadPool* tp)
-    : m_fd(fd), m_bytes_needed(0), m_tp(tp), m_conn(fd), m_factory(factory) {
+                               ThreadPool* tp, struct logger* logger)
+    : m_fd(fd), m_bytes_needed(0), m_tp(tp), m_conn(fd, logger), m_factory(factory) {
+    m_logger = logger;
     m_processor = CreateProcessor();
     factory->OnClientConnected(&m_conn);
 }
@@ -19,14 +19,14 @@ InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& facto
 StatusCode InternalClient::ReadData() {
     int nbytes = 0;
     if (ioctl(m_fd, FIONREAD, &nbytes) != 0) {
-        log_error("ioctl failed: %s", strerror(errno));
+        logger_error(m_logger, "ioctl failed: %s", strerror(errno));
         return SC_INTERNAL_NET_ERR;
     }
 
     auto buf = m_processor->GetPacket();
     StatusCode sc = buf->Reserve(buf->Size() + nbytes);
     if (sc != SC_OK) {
-        log_error("alloc mem failed: %u", sc);
+        logger_error(m_logger, "alloc mem failed: %u", sc);
         return sc;
     }
 
@@ -39,7 +39,7 @@ StatusCode InternalClient::ReadData() {
                 break;
             }
 
-            log_error("read failed: %s", strerror(errno));
+            logger_error(m_logger, "read failed: %s", strerror(errno));
             return SC_INTERNAL_NET_ERR;
         }
         if (ret == 0) {
@@ -76,7 +76,7 @@ StatusCode InternalClient::In() {
     while (true) {
         uint32_t bytes_needed = 0;
         if (!m_processor->CheckPacket(&bytes_needed)) {
-            log_error("check packet failed: %d", bytes_needed);
+            logger_error(m_logger, "check packet failed: %d", bytes_needed);
             return SC_REQ_PACKET_ERR;
         }
 

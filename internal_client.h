@@ -6,6 +6,7 @@
 #include "event_handler.h"
 #include "buffer.h"
 #include "threadpool/cpp/thread_pool.hpp"
+#include "logger/logger.h"
 #include <memory>
 
 namespace utils { namespace net { namespace tcp {
@@ -13,7 +14,8 @@ namespace utils { namespace net { namespace tcp {
 class InternalClient final : public EventHandler {
 
 public:
-    InternalClient(int fd, const std::shared_ptr<ProcessorFactory>& factory, ThreadPool* tp);
+    InternalClient(int fd, const std::shared_ptr<ProcessorFactory>& factory,
+                   ThreadPool* tp, struct logger*);
     virtual ~InternalClient() {}
 
     int GetFd() const override { return m_fd; }
@@ -28,6 +30,7 @@ private:
 private:
     int m_fd;
     uint32_t m_bytes_needed;
+    struct logger* m_logger;
     ThreadPool* m_tp;
     Connection m_conn;
     std::shared_ptr<ProcessorFactory> m_factory;

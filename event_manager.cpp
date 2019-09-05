@@ -1,5 +1,4 @@
 #include "event_manager.h"
-#include "logger/global_logger.h"
 #include <sys/epoll.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -14,7 +13,7 @@ namespace utils { namespace net {
 StatusCode EventManager::Init() {
     m_epfd = epoll_create(MAX_EVENTS);
     if (m_epfd < 0) {
-        log_error("create epoll failed: %s.", strerror(errno));
+        logger_error(m_logger, "create epoll failed: %s.", strerror(errno));
         return SC_INTERNAL_NET_ERR;
     }
 
@@ -26,13 +25,13 @@ StatusCode EventManager::SetNonBlocking(int fd) {
 
     opt = fcntl(fd, F_GETFL);
     if (opt < 0) {
-        log_error("fcntl failed: %s.", strerror(errno));
+        logger_error(m_logger, "fcntl failed: %s.", strerror(errno));
         return SC_INTERNAL_NET_ERR;
     }
 
     opt |= O_NONBLOCK;
     if (fcntl(fd, F_SETFL, opt) == -1) {
-        log_error("fcntl failed: %s.", strerror(errno));
+        logger_error(m_logger, "fcntl failed: %s.", strerror(errno));
         return SC_INTERNAL_NET_ERR;
     }
 
@@ -77,7 +76,7 @@ StatusCode EventManager::Loop() {
                 continue;
             }
 
-            log_error("epoll_wait failed: %s", strerror(errno));
+            logger_error(m_logger, "epoll_wait failed: %s", strerror(errno));
             return SC_INTERNAL_NET_ERR;
         }
 

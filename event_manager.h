@@ -3,13 +3,14 @@
 
 #include "status_code.h"
 #include "event_handler.h"
+#include "logger/logger.h"
 
 namespace utils { namespace net {
 
 class EventManager final {
 
 public:
-    EventManager() : m_epfd(-1) {}
+    EventManager(struct logger* logger) :m_epfd(-1), m_logger(logger) {}
     StatusCode Init();
     StatusCode AddServer(EventHandler* e);
     StatusCode AddClient(EventHandler* e);
@@ -20,6 +21,7 @@ private:
 
 private:
     int m_epfd;
+    struct logger* m_logger;
 
 private:
     EventManager(const EventManager&);

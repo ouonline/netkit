@@ -1,7 +1,6 @@
 #include "processor_manager.h"
 #include "internal_server.h"
 #include "internal_client.h"
-#include "logger/global_logger.h"
 #include <cstring>
 #include <unistd.h>
 #include <errno.h>
@@ -30,7 +29,7 @@ StatusCode ProcessorManager::GetHostInfo(const char* host, uint16_t port,
 
     err = getaddrinfo(host, buf, &hints, svr);
     if (err) {
-        log_error("getaddrinfo() failed: %s.", gai_strerror(err));
+        logger_error(m_logger, "getaddrinfo() failed: %s.", gai_strerror(err));
         return SC_INTERNAL_NET_ERR;
     }
 
@@ -40,7 +39,7 @@ StatusCode ProcessorManager::GetHostInfo(const char* host, uint16_t port,
 StatusCode ProcessorManager::SetReuseAddr(int fd) {
     int opt = 1;
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) != 0) {
-        log_error("setsockopt failed: %s.", strerror(errno));
+        logger_error(m_logger, "setsockopt failed: %s.", strerror(errno));
         return SC_INTERNAL_NET_ERR;
     }
 
@@ -59,7 +58,7 @@ int ProcessorManager::CreateServerFd(const char* host, uint16_t port) {
 
     fd = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (fd < 0) {
-        log_error("socket() failed: %s.", strerror(errno));
+        logger_error(m_logger, "socket() failed: %s.", strerror(errno));
         goto err;
     }
 
@@ -68,12 +67,12 @@ int ProcessorManager::CreateServerFd(const char* host, uint16_t port) {
     }
 
     if (bind(fd, info->ai_addr, info->ai_addrlen) != 0) {
-        log_error("bind failed: %s.", strerror(errno));
+        logger_error(m_logger, "bind failed: %s.", strerror(errno));
         goto err1;
     }
 
     if (listen(fd, 0) == -1) {
-        log_error("listen failed: %s.", strerror(errno));
+        logger_error(m_logger, "listen failed: %s.", strerror(errno));
         goto err1;
     }
 
@@ -95,12 +94,12 @@ int ProcessorManager::CreateClientFd(const char* host, uint16_t port) {
 
     int fd = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (fd == -1) {
-        log_error("socket() failed: %s", strerror(errno));
+        logger_error(m_logger, "socket() failed: %s", strerror(errno));
         goto err;
     }
 
     if (connect(fd, info->ai_addr, info->ai_addrlen) != 0) {
-        log_error("connect() failed: %s", strerror(errno));
+        logger_error(m_logger, "connect() failed: %s", strerror(errno));
         goto err1;
     }
 
@@ -118,19 +117,19 @@ StatusCode ProcessorManager::AddServer(const char* addr, uint16_t port,
                                        const shared_ptr<ProcessorFactory>& factory) {
     int fd = CreateServerFd(addr, port);
     if (fd < 0) {
-        log_error("create server failed.");
+        logger_error(m_logger, "create server failed.");
         return SC_INTERNAL_NET_ERR;
     }
 
-    auto svr = new InternalServer(fd, factory, &m_event_mgr, &m_thread_pool);
+    auto svr = new InternalServer(fd, factory, &m_event_mgr, &m_thread_pool, m_logger);
     if (!svr) {
-        log_error("allocate tcp server failed.");
+        logger_error(m_logger, "allocate tcp server failed.");
         close(fd);
         return SC_NOMEM;
     }
 
     if (m_event_mgr.AddServer(svr) != SC_OK) {
-        log_error("add server[%s:%u] to epoll failed: %s.", addr, port, strerror(errno));
+        logger_error(m_logger, "add server[%s:%u] to epoll failed: %s.", addr, port, strerror(errno));
         close(fd);
         delete svr;
         return SC_INTERNAL_NET_ERR;
@@ -143,13 +142,13 @@ StatusCode ProcessorManager::AddClient(const char* addr, uint16_t port,
                                        const shared_ptr<ProcessorFactory>& factory) {
     int fd = CreateClientFd(addr, port);
     if (fd < 0) {
-        log_error("create client failed.");
+        logger_error(m_logger, "create client failed.");
         return SC_INTERNAL_NET_ERR;
     }
 
-    auto client = new InternalClient(fd, factory, &m_thread_pool);
+    auto client = new InternalClient(fd, factory, &m_thread_pool, m_logger);
     if (!client) {
-        log_error("allocate client failed.");
+        logger_error(m_logger, "allocate client failed.");
         goto err;
     }
 
@@ -157,7 +156,7 @@ StatusCode ProcessorManager::AddClient(const char* addr, uint16_t port,
         return SC_OK;
     }
 
-    log_error("add client failed: %s.", strerror(errno));
+    logger_error(m_logger, "add client failed: %s.", strerror(errno));
     delete client;
 err:
     close(fd);

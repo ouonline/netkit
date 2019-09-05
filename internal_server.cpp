@@ -1,6 +1,5 @@
 #include "internal_server.h"
 #include "internal_client.h"
-#include "logger/global_logger.h"
 #include <cstring>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -10,13 +9,13 @@ namespace utils { namespace net { namespace tcp {
 StatusCode InternalServer::In() {
     int fd = accept(m_fd, nullptr, nullptr);
     if (fd == -1) {
-        log_error("accept failed: %s.", strerror(errno));
+        logger_error(m_logger, "accept failed: %s.", strerror(errno));
         return SC_INTERNAL_NET_ERR;
     }
 
-    auto client = new InternalClient(fd, m_factory, m_tp);
+    auto client = new InternalClient(fd, m_factory, m_tp, m_logger);
     if (!client) {
-        log_error("allocate client failed.");
+        logger_error(m_logger, "allocate client failed.");
         goto err;
     }
 
@@ -24,7 +23,7 @@ StatusCode InternalServer::In() {
         return SC_OK;
     }
 
-    log_error("add client failed: %s.", strerror(errno));
+    logger_error(m_logger, "add client failed: %s.", strerror(errno));
     delete client;
 err:
     close(fd);

@@ -14,8 +14,9 @@ class InternalServer final : public EventHandler {
 
 public:
     InternalServer(int fd, const std::shared_ptr<ProcessorFactory>& factory,
-                   EventManager* event_mgr, ThreadPool* tp)
-        : m_fd(fd), m_event_mgr(event_mgr), m_factory(factory), m_tp(tp) {}
+                   EventManager* event_mgr, ThreadPool* tp, struct logger* logger)
+        : m_fd(fd), m_logger(logger), m_event_mgr(event_mgr)
+        , m_factory(factory), m_tp(tp) {}
 
     int GetFd() const override { return m_fd; }
     StatusCode In() override;
@@ -24,6 +25,7 @@ public:
 
 private:
     int m_fd;
+    struct logger* m_logger;
     EventManager* m_event_mgr;
     std::shared_ptr<ProcessorFactory> m_factory;
     ThreadPool* m_tp;

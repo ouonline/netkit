@@ -1,5 +1,4 @@
 #include "connection.h"
-#include "logger/global_logger.h"
 #include <sys/time.h>
 #include <errno.h>
 #include <string.h>
@@ -11,8 +10,10 @@ using namespace std;
 
 namespace utils { namespace net {
 
-Connection::Connection(int fd) {
+Connection::Connection(int fd, struct logger* logger) {
     m_fd = fd;
+    m_logger = logger;
+    m_send_timeout = 0;
     pthread_mutex_init(&m_lock, nullptr);
 
     struct sockaddr_in addr;
@@ -54,11 +55,15 @@ StatusCode Connection::RealSetSendTimeout(uint32_t ms) {
     Time2Timeval(ms, &t);
 
     if (setsockopt(m_fd, SOL_SOCKET, SO_SNDTIMEO, &t, sizeof(t)) != 0) {
-        log_error("set send timeout failed: %s", strerror(errno));
+        logger_error(m_logger, "set send timeout failed: %s", strerror(errno));
         return SC_INTERNAL_NET_ERR;
     }
 
     return SC_OK;
+}
+
+void Connection::SetSendTimeout(uint32_t ms) {
+    m_send_timeout = ms;
 }
 
 static inline uint64_t DiffTimeMs(struct timeval end, const struct timeval& begin) {
@@ -86,12 +91,12 @@ private:
     pthread_mutex_t* m_lock;
 };
 
-int Connection::Send(const char* data, int size, uint32_t timeout_ms) {
+int Connection::Send(const char* data, int size) {
     LockGuard lg(&m_lock);
 
     struct timeval begin;
-    if (timeout_ms > 0) {
-        if (RealSetSendTimeout(timeout_ms) != SC_OK) {
+    if (m_send_timeout > 0) {
+        if (RealSetSendTimeout(m_send_timeout) != SC_OK) {
             return SC_INTERNAL_NET_ERR;
         }
 
@@ -114,16 +119,16 @@ int Connection::Send(const char* data, int size, uint32_t timeout_ms) {
             cursor += nbytes;
         }
 
-        if (timeout_ms > 0) {
+        if (m_send_timeout > 0) {
             struct timeval end;
             gettimeofday(&end, NULL);
 
             uint32_t time_cost = DiffTimeMs(end, begin);
-            if (time_cost >= timeout_ms) {
+            if (time_cost >= m_send_timeout) {
                 break;
             }
 
-            if (RealSetSendTimeout(timeout_ms - time_cost) != SC_OK) {
+            if (RealSetSendTimeout(m_send_timeout - time_cost) != SC_OK) {
                 break;
             }
         }

@@ -12,7 +12,11 @@ ifndef DEPSDIR
 endif
 
 INCLUDE := -I.. -I$(DEPSDIR)
-LIBS := ../libnetkit.a $(DEPSDIR)/logger/liblogger.a $(DEPSDIR)/threadpool/cpp/libthreadpool.a -lpthread
+LIBS := ../libnetkit.a \
+        $(DEPSDIR)/logger/liblogger.a \
+        $(DEPSDIR)/threadpool/cpp/libthreadpool.a \
+        $(DEPSDIR)/utils/libutils.a \
+        -lpthread
 
 OBJS := $(patsubst %.cpp, %.o, $(wildcard *.cpp))
 
@@ -25,10 +29,13 @@ all: $(TARGET)
 $(OBJS): | pre-process
 
 pre-process:
+	d=$(DEPSDIR)/logger; if ! [ -d $$d ]; then git clone https://github.com/ouonline/logger.git $$d; fi
+	$(MAKE) DEPSDIR=$(DEPSDIR) -C $(DEPSDIR)/logger
 	$(MAKE) DEPSDIR=$(DEPSDIR) -C ..
 
 post-clean:
 	$(MAKE) clean DEPSDIR=$(DEPSDIR) -C ..
+	$(MAKE) clean DEPSDIR=$(DEPSDIR) -C $(DEPSDIR)/logger
 
 $(TARGET): $(OBJS) | pre-process
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)

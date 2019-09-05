@@ -2,6 +2,7 @@
 #define __NET_CONNECTION_H__
 
 #include "status_code.h"
+#include "logger/logger.h"
 #include <string>
 #include <stdint.h>
 #include <pthread.h>
@@ -18,9 +19,10 @@ struct ConnectionInfo {
 class Connection final {
 
 public:
-    Connection(int fd);
+    Connection(int fd, struct logger* logger);
     ~Connection();
-    int Send(const char* data, int size, uint32_t timeout_ms = 0);
+    void SetSendTimeout(uint32_t ms);
+    int Send(const char* data, int size);
     const ConnectionInfo& GetConnectionInfo() const { return m_info; }
 
 private:
@@ -28,6 +30,8 @@ private:
 
 private:
     int m_fd;
+    uint32_t m_send_timeout;
+    struct logger* m_logger;
     ConnectionInfo m_info;
     pthread_mutex_t m_lock;
 
