@@ -24,6 +24,9 @@ public:
     void Error() override {}
 
 private:
+    StatusCode SetNonBlocking(int fd);
+
+private:
     int m_fd;
     struct logger* m_logger;
     EventManager* m_event_mgr;

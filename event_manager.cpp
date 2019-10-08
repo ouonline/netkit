@@ -1,6 +1,5 @@
 #include "event_manager.h"
 #include <sys/epoll.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include <cstring>
@@ -20,44 +19,10 @@ StatusCode EventManager::Init() {
     return SC_OK;
 }
 
-StatusCode EventManager::SetNonBlocking(int fd) {
-    int opt;
-
-    opt = fcntl(fd, F_GETFL);
-    if (opt < 0) {
-        logger_error(m_logger, "fcntl failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
-    }
-
-    opt |= O_NONBLOCK;
-    if (fcntl(fd, F_SETFL, opt) == -1) {
-        logger_error(m_logger, "fcntl failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
-    }
-
-    return SC_OK;
-}
-
-StatusCode EventManager::AddClient(EventHandler* e) {
-    int fd = e->GetFd();
-    if (SetNonBlocking(fd) != SC_OK) {
-        return SC_INTERNAL_NET_ERR;
-    }
-
-    struct epoll_event ev;
-    ev.events = EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLET;
-    ev.data.ptr = e;
-    if (epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev) != 0) {
-        return SC_INTERNAL_NET_ERR;
-    }
-
-    return SC_OK;
-}
-
-StatusCode EventManager::AddServer(EventHandler* e) {
+StatusCode EventManager::AddHandler(EventHandler* e, unsigned int event) {
     int fd = e->GetFd();
     struct epoll_event ev;
-    ev.events = EPOLLIN;
+    ev.events = event;
     ev.data.ptr = e;
     if (epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev) != 0) {
         return SC_INTERNAL_NET_ERR;

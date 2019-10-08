@@ -128,7 +128,7 @@ StatusCode ProcessorManager::AddServer(const char* addr, uint16_t port,
         return SC_NOMEM;
     }
 
-    if (m_event_mgr.AddServer(svr) != SC_OK) {
+    if (m_event_mgr.AddHandler(svr, EPOLLIN) != SC_OK) {
         logger_error(m_logger, "add server[%s:%u] to epoll failed: %s.", addr, port, strerror(errno));
         close(fd);
         delete svr;
@@ -152,7 +152,7 @@ StatusCode ProcessorManager::AddClient(const char* addr, uint16_t port,
         goto err;
     }
 
-    if (m_event_mgr.AddClient(client) == SC_OK) {
+    if (m_event_mgr.AddHandler(client, EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLET) == SC_OK) {
         return SC_OK;
     }
 

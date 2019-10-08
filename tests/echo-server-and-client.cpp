@@ -103,7 +103,5 @@ int main(void) {
 
     mgr.Run();
 
-    stdio_logger_destroy(&logger);
-
     return 0;
 }
