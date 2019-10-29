@@ -5,7 +5,7 @@
 #include "processor_factory.h"
 #include "event_handler.h"
 #include "buffer.h"
-#include "threadpool/cpp/thread_pool.hpp"
+#include "threadpool/cpp/threadpool.h"
 #include "logger/logger.h"
 #include <memory>
 

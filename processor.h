@@ -3,7 +3,7 @@
 
 #include "buffer.h"
 #include "connection.h"
-#include "threadpool/cpp/thread_pool.hpp"
+#include "threadpool/cpp/threadpool.h"
 
 namespace utils { namespace net {
 
