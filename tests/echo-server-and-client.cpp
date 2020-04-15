@@ -1,4 +1,4 @@
-#include "processor_manager.h"
+#include "netkit/processor_manager.h"
 using namespace utils::net;
 using namespace utils::net::tcp;
 
@@ -53,8 +53,11 @@ public:
         logger_info(m_logger, "client[%s:%u] disconnected.",
                     info.remote_addr.c_str(), info.remote_port);
     }
-    shared_ptr<Processor> CreateProcessor() override {
-        return make_shared<EchoProcessor>(m_logger);
+    Processor* CreateProcessor() override {
+        return new EchoProcessor(m_logger);
+    }
+    void DestroyProcessor(Processor* p) override {
+        delete p;
     }
 
 private:
@@ -73,8 +76,11 @@ public:
         logger_info(m_logger, "client[%s:%u] disconnected.",
                     info.local_addr.c_str(), info.local_port);
     }
-    shared_ptr<Processor> CreateProcessor() override {
-        return make_shared<EchoProcessor>(m_logger);
+    Processor* CreateProcessor() override {
+        return new EchoProcessor(m_logger);
+    }
+    void DestroyProcessor(Processor* p) override {
+        delete p;
     }
 
 private:

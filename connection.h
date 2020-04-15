@@ -22,7 +22,7 @@ public:
     Connection(int fd, struct logger* logger);
     ~Connection();
     void SetSendTimeout(uint32_t ms);
-    int Send(const char* data, int size);
+    int Send(const void* data, uint32_t size);
     const ConnectionInfo& GetConnectionInfo() const { return m_info; }
 
 private:

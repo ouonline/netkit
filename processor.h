@@ -3,7 +3,7 @@
 
 #include "buffer.h"
 #include "connection.h"
-#include "threadpool/cpp/threadpool.h"
+#include "threadkit/threadpool.h"
 
 namespace utils { namespace net {
 
@@ -22,8 +22,9 @@ protected:
     virtual bool ProcessPacket(Connection*) = 0;
 
 private:
-    void Run() override final {
+    ThreadTaskInfo Run() override final {
         ProcessPacket(m_conn);
+        return ThreadTaskInfo();
     }
 
 private:

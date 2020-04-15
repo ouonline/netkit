@@ -4,9 +4,11 @@
 #include "event_handler.h"
 #include "event_manager.h"
 #include "processor_factory.h"
+#include "processor_destructor.h"
 #include "status_code.h"
-#include "threadpool/cpp/threadpool.h"
+#include "threadkit/threadpool.h"
 #include <string>
+#include <memory>
 
 namespace utils { namespace net { namespace tcp {
 
@@ -16,7 +18,9 @@ public:
     InternalServer(int fd, const std::shared_ptr<ProcessorFactory>& factory,
                    EventManager* event_mgr, ThreadPool* tp, struct logger* logger)
         : m_fd(fd), m_logger(logger), m_event_mgr(event_mgr)
-        , m_factory(factory), m_tp(tp) {}
+        , m_factory(factory), m_tp(tp) {
+        m_destructor.SetFactory(factory.get());
+    }
 
     int GetFd() const override { return m_fd; }
     StatusCode In() override;
@@ -32,6 +36,7 @@ private:
     EventManager* m_event_mgr;
     std::shared_ptr<ProcessorFactory> m_factory;
     ThreadPool* m_tp;
+    ProcessorDestructor m_destructor;
 };
 
 }}}

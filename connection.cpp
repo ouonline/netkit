@@ -91,7 +91,7 @@ private:
     pthread_mutex_t* m_lock;
 };
 
-int Connection::Send(const char* data, int size) {
+int Connection::Send(const void* data, uint32_t size) {
     LockGuard lg(&m_lock);
 
     struct timeval begin;

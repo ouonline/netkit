@@ -1,12 +1,14 @@
 #ifndef __TCP_PROCESSOR_MANAGER_H__
 #define __TCP_PROCESSOR_MANAGER_H__
 
-#include "threadpool/cpp/threadpool.h"
+#include "threadkit/threadpool.h"
+#include "processor_destructor.h"
 #include "status_code.h"
 #include "processor_factory.h"
 #include "event_manager.h"
 #include "logger/logger.h"
 #include <stdint.h>
+#include <memory>
 
 namespace utils { namespace net { namespace tcp {
 

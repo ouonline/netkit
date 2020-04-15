@@ -3,9 +3,10 @@
 
 #include "processor.h"
 #include "processor_factory.h"
+#include "processor_destructor.h"
 #include "event_handler.h"
 #include "buffer.h"
-#include "threadpool/cpp/threadpool.h"
+#include "threadkit/threadpool.h"
 #include "logger/logger.h"
 #include <memory>
 
@@ -25,16 +26,17 @@ public:
 
 private:
     StatusCode ReadData();
-    std::shared_ptr<Processor> CreateProcessor();
+    Processor* CreateProcessor();
 
 private:
     int m_fd;
     uint32_t m_bytes_needed;
     struct logger* m_logger;
     ThreadPool* m_tp;
-    Connection m_conn;
+    Processor* m_processor;
+    ProcessorDestructor m_destructor;
     std::shared_ptr<ProcessorFactory> m_factory;
-    std::shared_ptr<Processor> m_processor;
+    Connection m_conn;
 };
 
 }}}
