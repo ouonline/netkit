@@ -6,7 +6,7 @@
 #include <cstring> // strerror
 using namespace std;
 
-namespace utils { namespace net { namespace tcp {
+namespace outils { namespace net { namespace tcp {
 
 InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& factory,
                                ThreadPool* tp, struct logger* logger)

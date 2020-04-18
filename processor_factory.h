@@ -4,7 +4,7 @@
 #include "processor.h"
 #include "connection.h"
 
-namespace utils { namespace net {
+namespace outils { namespace net {
 
 class ProcessorFactory {
 

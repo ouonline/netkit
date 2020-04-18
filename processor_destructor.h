@@ -4,7 +4,7 @@
 #include "threadkit/threadpool.h"
 #include "processor_factory.h"
 
-namespace utils { namespace net { namespace tcp {
+namespace outils { namespace net { namespace tcp {
 
 class ProcessorDestructor : public ThreadTaskDestructor {
 public:

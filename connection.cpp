@@ -8,7 +8,7 @@
 #include <arpa/inet.h>
 using namespace std;
 
-namespace utils { namespace net {
+namespace outils { namespace net {
 
 Connection::Connection(int fd, struct logger* logger) {
     m_fd = fd;

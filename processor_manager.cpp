@@ -6,7 +6,7 @@
 #include <errno.h>
 using namespace std;
 
-namespace utils { namespace net { namespace tcp {
+namespace outils { namespace net { namespace tcp {
 
 #include <netdb.h>
 

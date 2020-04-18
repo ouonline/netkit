@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <memory>
 
-namespace utils { namespace net { namespace tcp {
+namespace outils { namespace net { namespace tcp {
 
 class ProcessorManager final {
 

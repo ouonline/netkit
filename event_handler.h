@@ -3,7 +3,7 @@
 
 #include "status_code.h"
 
-namespace utils { namespace net {
+namespace outils { namespace net {
 
 class EventHandler {
 

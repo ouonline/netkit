@@ -6,7 +6,7 @@
 #include "logger/logger.h"
 #include <sys/epoll.h> // event definitions
 
-namespace utils { namespace net {
+namespace outils { namespace net {
 
 class EventManager final {
 

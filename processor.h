@@ -5,7 +5,7 @@
 #include "connection.h"
 #include "threadkit/threadpool.h"
 
-namespace utils { namespace net {
+namespace outils { namespace net {
 
 class Processor : public ThreadTask {
 

@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <vector>
 
-namespace utils { namespace net {
+namespace outils { namespace net {
 
 class Buffer final {
 

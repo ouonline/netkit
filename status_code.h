@@ -1,7 +1,7 @@
 #ifndef __NET_STATUS_CODE_H__
 #define __NET_STATUS_CODE_H__
 
-namespace utils { namespace net {
+namespace outils { namespace net {
 
 enum StatusCode {
     SC_OK = 0,

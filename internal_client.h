@@ -10,7 +10,7 @@
 #include "logger/logger.h"
 #include <memory>
 
-namespace utils { namespace net { namespace tcp {
+namespace outils { namespace net { namespace tcp {
 
 class InternalClient final : public EventHandler {
 

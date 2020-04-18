@@ -7,7 +7,7 @@ using namespace std;
 
 #define MAX_EVENTS 64
 
-namespace utils { namespace net {
+namespace outils { namespace net {
 
 StatusCode EventManager::Init() {
     m_epfd = epoll_create(MAX_EVENTS);

@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <pthread.h>
 
-namespace utils { namespace net {
+namespace outils { namespace net {
 
 struct ConnectionInfo {
     uint16_t local_port = 0;

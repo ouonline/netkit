@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-namespace utils { namespace net { namespace tcp {
+namespace outils { namespace net { namespace tcp {
 
 StatusCode InternalServer::SetNonBlocking(int fd) {
     int opt;

@@ -10,7 +10,7 @@
 #include <string>
 #include <memory>
 
-namespace utils { namespace net { namespace tcp {
+namespace outils { namespace net { namespace tcp {
 
 class InternalServer final : public EventHandler {
 
