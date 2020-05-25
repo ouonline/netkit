@@ -10,6 +10,7 @@ namespace outils { namespace net {
 class Processor : public ThreadTask {
 
 public:
+    Processor() : m_conn(nullptr) {}
     virtual ~Processor() {}
 
     // sets `expected_size` to total length of request packet or 0 to recv data
@@ -28,8 +29,12 @@ private:
     }
 
 private:
-    Connection* m_conn = nullptr;
+    Connection* m_conn;
     Buffer m_buf;
+
+private:
+    Processor(const Processor&);
+    Processor& operator=(const Processor&);
 };
 
 }}

@@ -35,6 +35,10 @@ private:
     struct logger* m_logger;
     EventManager m_event_mgr;
     ThreadPool m_thread_pool;
+
+private:
+    ProcessorManager(const ProcessorManager&);
+    ProcessorManager& operator=(const ProcessorManager&);
 };
 
 }}}

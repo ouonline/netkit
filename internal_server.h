@@ -37,6 +37,10 @@ private:
     std::shared_ptr<ProcessorFactory> m_factory;
     ThreadPool* m_tp;
     ProcessorDestructor m_destructor;
+
+private:
+    InternalServer(const InternalServer&);
+    InternalServer& operator=(const InternalServer&);
 };
 
 }}}

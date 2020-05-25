@@ -37,6 +37,10 @@ private:
     ProcessorDestructor m_destructor;
     std::shared_ptr<ProcessorFactory> m_factory;
     Connection m_conn;
+
+private:
+    InternalClient(const InternalClient&);
+    InternalClient& operator=(const InternalClient&);
 };
 
 }}}
