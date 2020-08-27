@@ -6,9 +6,8 @@
 
 namespace outils { namespace net { namespace tcp {
 
-class ProcessorDestructor : public ThreadTaskDestructor {
+class ProcessorDestructor final : public ThreadTaskDestructor {
 public:
-    virtual ~ProcessorDestructor() {}
     void SetFactory(ProcessorFactory* f) {
         m_factory = f;
     }

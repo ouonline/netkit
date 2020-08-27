@@ -1,29 +1,10 @@
 #include "internal_server.h"
 #include "internal_client.h"
-#include <cstring>
-#include <fcntl.h>
+#include "utils.h"
 #include <sys/socket.h>
 #include <unistd.h>
 
 namespace outils { namespace net { namespace tcp {
-
-StatusCode InternalServer::SetNonBlocking(int fd) {
-    int opt;
-
-    opt = fcntl(fd, F_GETFL);
-    if (opt < 0) {
-        logger_error(m_logger, "fcntl failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
-    }
-
-    opt |= O_NONBLOCK;
-    if (fcntl(fd, F_SETFL, opt) == -1) {
-        logger_error(m_logger, "fcntl failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
-    }
-
-    return SC_OK;
-}
 
 StatusCode InternalServer::In() {
     int fd = accept(m_fd, nullptr, nullptr);
@@ -31,7 +12,7 @@ StatusCode InternalServer::In() {
         logger_error(m_logger, "accept failed: %s.", strerror(errno));
         return SC_INTERNAL_NET_ERR;
     }
-    if (SetNonBlocking(fd) != SC_OK) {
+    if (SetNonBlocking(fd, m_logger) != SC_OK) {
         close(fd);
         return SC_INTERNAL_NET_ERR;
     }

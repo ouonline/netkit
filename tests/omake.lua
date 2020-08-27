@@ -1,11 +1,9 @@
-project = CreateProject()
+project = Project()
 
-dep = project:CreateDependency()
-dep:AddSourceFiles("*.cpp")
-dep:AddFlags("-Wall", "-Werror", "-Wextra")
-dep:AddStaticLibrary("..", "netkit_static")
-
-target = project:CreateBinary("echo_server_and_client")
-target:AddDependencies(dep)
+project:CreateBinary("echo_server_and_client"):AddDependencies(
+    project:CreateDependency()
+        :AddSourceFiles("*.cpp")
+        :AddFlags({"-Wall", "-Werror", "-Wextra"})
+        :AddStaticLibraries("..", "netkit_static"))
 
 return project

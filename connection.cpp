@@ -10,7 +10,7 @@ using namespace std;
 
 namespace outils { namespace net {
 
-Connection::Connection(int fd, struct logger* logger) {
+Connection::Connection(int fd, Logger* logger) {
     m_fd = fd;
     m_logger = logger;
     m_send_timeout = 0;

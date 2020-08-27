@@ -19,7 +19,7 @@ struct ConnectionInfo {
 class Connection final {
 
 public:
-    Connection(int fd, struct logger* logger);
+    Connection(int fd, Logger* logger);
     ~Connection();
     void SetSendTimeout(uint32_t ms);
     int Send(const void* data, uint32_t size);
@@ -31,7 +31,7 @@ private:
 private:
     int m_fd;
     uint32_t m_send_timeout;
-    struct logger* m_logger;
+    Logger* m_logger;
     ConnectionInfo m_info;
     pthread_mutex_t m_lock;
 

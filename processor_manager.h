@@ -15,7 +15,7 @@ namespace outils { namespace net { namespace tcp {
 class ProcessorManager final {
 
 public:
-    ProcessorManager(struct logger* logger) : m_logger(logger), m_event_mgr(logger) {}
+    ProcessorManager(Logger* logger) : m_logger(logger), m_event_mgr(logger) {}
     virtual ~ProcessorManager() {}
     StatusCode Init();
     StatusCode AddServer(const char* addr, uint16_t port,
@@ -32,7 +32,7 @@ private:
     int CreateClientFd(const char* host, uint16_t port);
 
 private:
-    struct logger* m_logger;
+    Logger* m_logger;
     EventManager m_event_mgr;
     ThreadPool m_thread_pool;
 

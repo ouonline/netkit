@@ -1,6 +1,7 @@
 #include "processor_manager.h"
 #include "internal_server.h"
 #include "internal_client.h"
+#include "utils.h"
 #include <cstring>
 #include <unistd.h>
 #include <errno.h>
@@ -129,7 +130,8 @@ StatusCode ProcessorManager::AddServer(const char* addr, uint16_t port,
     }
 
     if (m_event_mgr.AddHandler(svr, EPOLLIN) != SC_OK) {
-        logger_error(m_logger, "add server[%s:%u] to epoll failed: %s.", addr, port, strerror(errno));
+        logger_error(m_logger, "add server[%s:%u] to epoll failed: %s.",
+                     addr, port, strerror(errno));
         close(fd);
         delete svr;
         return SC_INTERNAL_NET_ERR;
@@ -143,6 +145,10 @@ StatusCode ProcessorManager::AddClient(const char* addr, uint16_t port,
     int fd = CreateClientFd(addr, port);
     if (fd < 0) {
         logger_error(m_logger, "create client failed.");
+        return SC_INTERNAL_NET_ERR;
+    }
+    if (SetNonBlocking(fd, m_logger) != SC_OK) {
+        close(fd);
         return SC_INTERNAL_NET_ERR;
     }
 

@@ -9,7 +9,7 @@ using namespace std;
 namespace outils { namespace net { namespace tcp {
 
 InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& factory,
-                               ThreadPool* tp, struct logger* logger)
+                               ThreadPool* tp, Logger* logger)
     : m_fd(fd), m_bytes_needed(0), m_logger(logger), m_tp(tp)
     , m_factory(factory), m_conn(fd, logger) {
     m_destructor.SetFactory(factory.get());

@@ -6,10 +6,10 @@ using namespace outils::net::tcp;
 #include <unistd.h>
 using namespace std;
 
-class EchoProcessor final : public Processor {
+class EchoServerProcessor final : public Processor {
 
 public:
-    EchoProcessor(struct logger* logger) : m_logger(logger) {}
+    EchoServerProcessor(Logger* logger) : m_logger(logger) {}
 
     bool CheckPacket(uint32_t* size) override {
         auto buf = GetPacket();
@@ -22,7 +22,38 @@ protected:
         auto buf = GetPacket();
         const ConnectionInfo &info = c->GetConnectionInfo();
 
-        logger_info(m_logger, "local[%s:%u]\t<=\tremote[%s:%u]\tdata[%s]",
+        auto num = std::stol(string(buf->Data(), buf->Size()));
+        const string content = std::to_string(num);
+
+        logger_info(m_logger, "server[%s:%u] <= client[%s:%u] data[%s]",
+                    info.local_addr.c_str(), info.local_port,
+                    info.remote_addr.c_str(), info.remote_port,
+                    content.c_str());
+        c->Send(content.data(), content.size());
+        return true;
+    }
+
+private:
+    Logger* m_logger;
+};
+
+class EchoClientProcessor final : public Processor {
+
+public:
+    EchoClientProcessor(Logger* logger) : m_logger(logger) {}
+
+    bool CheckPacket(uint32_t* size) override {
+        auto buf = GetPacket();
+        *size = buf->Size();
+        return true;
+    }
+
+protected:
+    bool ProcessPacket(Connection* c) override {
+        auto buf = GetPacket();
+        const ConnectionInfo &info = c->GetConnectionInfo();
+
+        logger_info(m_logger, "client[%s:%u] <= server[%s:%u] data[%s]",
                     info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port,
                     string(buf->Data(), buf->Size()).c_str());
@@ -31,22 +62,17 @@ protected:
         auto num = std::stol(string(buf->Data(), buf->Size()));
         const string content = std::to_string(num + 1);
         c->Send(content.data(), content.size());
-
-        logger_info(m_logger, "local[%s:%u]\t=>\tremote[%s:%u]\tdata[%s]",
-                    info.local_addr.c_str(), info.local_port,
-                    info.remote_addr.c_str(), info.remote_port,
-                    content.c_str());
         return true;
     }
 
 private:
-    struct logger* m_logger;
+    Logger* m_logger;
 };
 
 class EchoServerFactory final : public ProcessorFactory {
 
 public:
-    EchoServerFactory(struct logger* logger) : m_logger(logger) {}
+    EchoServerFactory(Logger* logger) : m_logger(logger) {}
     void OnClientConnected(Connection*) override {}
     void OnClientDisconnected(Connection* c) override {
         const ConnectionInfo& info = c->GetConnectionInfo();
@@ -54,20 +80,20 @@ public:
                     info.remote_addr.c_str(), info.remote_port);
     }
     Processor* CreateProcessor() override {
-        return new EchoProcessor(m_logger);
+        return new EchoServerProcessor(m_logger);
     }
     void DestroyProcessor(Processor* p) override {
         delete p;
     }
 
 private:
-    struct logger* m_logger;
+    Logger* m_logger;
 };
 
 class EchoClientFactory final : public ProcessorFactory {
 
 public:
-    EchoClientFactory(struct logger* logger) : m_logger(logger) {}
+    EchoClientFactory(Logger* logger) : m_logger(logger) {}
     void OnClientConnected(Connection* c) override {
         c->Send("0", 1);
     }
@@ -77,18 +103,18 @@ public:
                     info.local_addr.c_str(), info.local_port);
     }
     Processor* CreateProcessor() override {
-        return new EchoProcessor(m_logger);
+        return new EchoClientProcessor(m_logger);
     }
     void DestroyProcessor(Processor* p) override {
         delete p;
     }
 
 private:
-    struct logger* m_logger;
+    Logger* m_logger;
 };
 
 int main(void) {
-    struct logger logger;
+    Logger logger;
     stdio_logger_init(&logger);
 
     ProcessorManager mgr(&logger);

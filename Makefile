@@ -26,13 +26,10 @@ omake_phony_1:
 
 omake_dep_0_INCLUDE := -I..
 
-omake_dep_0.event_manager.cpp.o: event_manager.cpp
-	$(CXX) $(CXXFLAGS) -Wall -Werror -Wextra -fPIC $(omake_dep_0_INCLUDE) -c $< -o $@
-
-omake_dep_0.processor_manager.cpp.o: processor_manager.cpp
-	$(CXX) $(CXXFLAGS) -Wall -Werror -Wextra -fPIC $(omake_dep_0_INCLUDE) -c $< -o $@
-
 omake_dep_0.connection.cpp.o: connection.cpp
+	$(CXX) $(CXXFLAGS) -Wall -Werror -Wextra -fPIC $(omake_dep_0_INCLUDE) -c $< -o $@
+
+omake_dep_0.event_manager.cpp.o: event_manager.cpp
 	$(CXX) $(CXXFLAGS) -Wall -Werror -Wextra -fPIC $(omake_dep_0_INCLUDE) -c $< -o $@
 
 omake_dep_0.internal_client.cpp.o: internal_client.cpp
@@ -41,14 +38,17 @@ omake_dep_0.internal_client.cpp.o: internal_client.cpp
 omake_dep_0.internal_server.cpp.o: internal_server.cpp
 	$(CXX) $(CXXFLAGS) -Wall -Werror -Wextra -fPIC $(omake_dep_0_INCLUDE) -c $< -o $@
 
-netkit_shared_OBJS := omake_dep_0.internal_server.cpp.o omake_dep_0.internal_client.cpp.o omake_dep_0.connection.cpp.o omake_dep_0.processor_manager.cpp.o omake_dep_0.event_manager.cpp.o
+omake_dep_0.processor_manager.cpp.o: processor_manager.cpp
+	$(CXX) $(CXXFLAGS) -Wall -Werror -Wextra -fPIC $(omake_dep_0_INCLUDE) -c $< -o $@
+
+netkit_shared_OBJS := omake_dep_0.internal_server.cpp.o omake_dep_0.internal_client.cpp.o omake_dep_0.processor_manager.cpp.o omake_dep_0.event_manager.cpp.o omake_dep_0.connection.cpp.o
 
 netkit_shared_LIBS := ../threadkit/libthreadkit_static.a ../logger/liblogger_static.a ../utils/libutils_static.a -lpthread
 
 libnetkit_shared.so: $(netkit_shared_OBJS) | omake_phony_1 omake_phony_0
-	$(CXX) $(CXXFLAGS) -fPIC -Wextra -Werror -Wall -shared -o $@ $^ $(netkit_shared_LIBS)
+	$(CXX) $(CXXFLAGS) -Wall -Werror -Wextra -fPIC -shared -o $@ $^ $(netkit_shared_LIBS)
 
-netkit_static_OBJS := omake_dep_0.internal_server.cpp.o omake_dep_0.internal_client.cpp.o omake_dep_0.connection.cpp.o omake_dep_0.processor_manager.cpp.o omake_dep_0.event_manager.cpp.o
+netkit_static_OBJS := omake_dep_0.internal_server.cpp.o omake_dep_0.internal_client.cpp.o omake_dep_0.processor_manager.cpp.o omake_dep_0.event_manager.cpp.o omake_dep_0.connection.cpp.o
 
 libnetkit_static.a: $(netkit_static_OBJS) | omake_phony_1 omake_phony_0
 	$(AR) rc $@ $^

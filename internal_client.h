@@ -16,8 +16,7 @@ class InternalClient final : public EventHandler {
 
 public:
     InternalClient(int fd, const std::shared_ptr<ProcessorFactory>& factory,
-                   ThreadPool* tp, struct logger*);
-    virtual ~InternalClient() {}
+                   ThreadPool* tp, Logger*);
 
     int GetFd() const override { return m_fd; }
     StatusCode In() override;
@@ -31,7 +30,7 @@ private:
 private:
     int m_fd;
     uint32_t m_bytes_needed;
-    struct logger* m_logger;
+    Logger* m_logger;
     ThreadPool* m_tp;
     Processor* m_processor;
     ProcessorDestructor m_destructor;

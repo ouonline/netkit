@@ -16,10 +16,9 @@ class InternalServer final : public EventHandler {
 
 public:
     InternalServer(int fd, const std::shared_ptr<ProcessorFactory>& factory,
-                   EventManager* event_mgr, ThreadPool* tp, struct logger* logger)
+                   EventManager* event_mgr, ThreadPool* tp, Logger* logger)
         : m_fd(fd), m_logger(logger), m_event_mgr(event_mgr)
         , m_factory(factory), m_tp(tp) {
-        m_destructor.SetFactory(factory.get());
     }
 
     int GetFd() const override { return m_fd; }
@@ -28,15 +27,11 @@ public:
     void Error() override {}
 
 private:
-    StatusCode SetNonBlocking(int fd);
-
-private:
     int m_fd;
-    struct logger* m_logger;
+    Logger* m_logger;
     EventManager* m_event_mgr;
     std::shared_ptr<ProcessorFactory> m_factory;
     ThreadPool* m_tp;
-    ProcessorDestructor m_destructor;
 
 private:
     InternalServer(const InternalServer&);

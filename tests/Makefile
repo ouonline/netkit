@@ -28,7 +28,7 @@ echo_server_and_client_OBJS := omake_dep_0.echo-server-and-client.cpp.o
 echo_server_and_client_LIBS := ../libnetkit_static.a ../../threadkit/libthreadkit_static.a ../../logger/liblogger_static.a ../../utils/libutils_static.a -lpthread
 
 echo_server_and_client: $(echo_server_and_client_OBJS) | omake_phony_0
-	$(CXX) $(CXXFLAGS) -Wextra -Werror -Wall -o $@ $^ $(echo_server_and_client_LIBS)
+	$(CXX) $(CXXFLAGS) -Wall -Werror -Wextra -o $@ $^ $(echo_server_and_client_LIBS)
 
 clean:
 	rm -f $(TARGET) $(echo_server_and_client_OBJS)
