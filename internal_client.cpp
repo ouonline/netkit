@@ -12,7 +12,6 @@ InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& facto
                                ThreadPool* tp, Logger* logger)
     : m_fd(fd), m_bytes_needed(0), m_logger(logger), m_tp(tp)
     , m_factory(factory), m_conn(fd, logger) {
-    m_destructor.SetFactory(factory.get());
     m_processor = CreateProcessor();
     factory->OnClientConnected(&m_conn);
 }
@@ -96,14 +95,18 @@ StatusCode InternalClient::In() {
         m_processor = CreateProcessor();
 
         if (buf->Size() == bytes_needed) {
-            m_tp->AddTask(ThreadTaskInfo(last_req, &m_destructor));
+            m_tp->AddTask(shared_ptr<Processor>(last_req, [this] (Processor* t) -> void {
+                m_factory->DestroyProcessor(t);
+            }));
             return SC_OK;
         }
 
         auto new_buf = m_processor->GetPacket();
         new_buf->Append(buf->Data() + bytes_needed, buf->Size() - bytes_needed);
         buf->Resize(bytes_needed);
-        m_tp->AddTask(ThreadTaskInfo(last_req, &m_destructor));
+        m_tp->AddTask(shared_ptr<Processor>(last_req, [this] (Processor* t) -> void {
+            m_factory->DestroyProcessor(t);
+        }));
     }
 
     return SC_OK;

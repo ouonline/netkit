@@ -3,7 +3,6 @@
 
 #include "processor.h"
 #include "processor_factory.h"
-#include "processor_destructor.h"
 #include "event_handler.h"
 #include "buffer.h"
 #include "threadkit/threadpool.h"
@@ -33,7 +32,6 @@ private:
     Logger* m_logger;
     ThreadPool* m_tp;
     Processor* m_processor;
-    ProcessorDestructor m_destructor;
     std::shared_ptr<ProcessorFactory> m_factory;
     Connection m_conn;
 

@@ -23,9 +23,9 @@ protected:
     virtual bool ProcessPacket(Connection*) = 0;
 
 private:
-    ThreadTaskInfo Run() override final {
+    std::shared_ptr<ThreadTask> Run() override final {
         ProcessPacket(m_conn);
-        return ThreadTaskInfo();
+        return std::shared_ptr<ThreadTask>();
     }
 
 private:

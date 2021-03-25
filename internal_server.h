@@ -4,7 +4,6 @@
 #include "event_handler.h"
 #include "event_manager.h"
 #include "processor_factory.h"
-#include "processor_destructor.h"
 #include "status_code.h"
 #include "threadkit/threadpool.h"
 #include <string>

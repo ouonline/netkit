@@ -2,7 +2,6 @@
 #define __TCP_PROCESSOR_MANAGER_H__
 
 #include "threadkit/threadpool.h"
-#include "processor_destructor.h"
 #include "status_code.h"
 #include "processor_factory.h"
 #include "event_manager.h"
