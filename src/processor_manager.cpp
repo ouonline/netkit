@@ -1,7 +1,7 @@
 #include "netkit/processor_manager.h"
-#include "netkit/internal_server.h"
-#include "netkit/internal_client.h"
-#include "netkit/utils.h"
+#include "internal_server.h"
+#include "internal_client.h"
+#include "utils.h"
 #include <cstring>
 #include <unistd.h>
 #include <errno.h>

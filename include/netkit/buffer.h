@@ -1,5 +1,5 @@
-#ifndef __NET_BUFFER_H__
-#define __NET_BUFFER_H__
+#ifndef __NETKIT_BUFFER_H__
+#define __NETKIT_BUFFER_H__
 
 #include "status_code.h"
 #include <stdint.h>

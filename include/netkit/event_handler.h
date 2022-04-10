@@ -1,5 +1,5 @@
-#ifndef __NET_EVENT_HANDLER_H__
-#define __NET_EVENT_HANDLER_H__
+#ifndef __NETKIT_EVENT_HANDLER_H__
+#define __NETKIT_EVENT_HANDLER_H__
 
 #include "status_code.h"
 

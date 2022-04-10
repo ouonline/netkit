@@ -1,6 +1,6 @@
-#include "netkit/internal_server.h"
-#include "netkit/internal_client.h"
-#include "netkit/utils.h"
+#include "internal_server.h"
+#include "internal_client.h"
+#include "utils.h"
 #include <sys/socket.h>
 #include <unistd.h>
 

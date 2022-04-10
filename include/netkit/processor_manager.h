@@ -1,5 +1,5 @@
-#ifndef __TCP_PROCESSOR_MANAGER_H__
-#define __TCP_PROCESSOR_MANAGER_H__
+#ifndef __NETKIT_PROCESSOR_MANAGER_H__
+#define __NETKIT_PROCESSOR_MANAGER_H__
 
 #include "threadkit/threadpool.h"
 #include "status_code.h"

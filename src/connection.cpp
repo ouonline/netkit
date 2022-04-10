@@ -14,7 +14,6 @@ Connection::Connection(int fd, Logger* logger) {
     m_fd = fd;
     m_logger = logger;
     m_send_timeout = 0;
-    pthread_mutex_init(&m_lock, nullptr);
 
     struct sockaddr_in addr;
     socklen_t len = sizeof(addr);
@@ -30,10 +29,6 @@ Connection::Connection(int fd, Logger* logger) {
         m_info.local_addr = inet_ntoa(addr.sin_addr);
         m_info.local_port = addr.sin_port;
     }
-}
-
-Connection::~Connection() {
-    pthread_mutex_destroy(&m_lock);
 }
 
 static inline void Time2Timeval(uint32_t ms, struct timeval* t) {
@@ -75,22 +70,8 @@ static inline uint64_t DiffTimeMs(struct timeval end, const struct timeval& begi
     return (end.tv_sec - begin.tv_sec) * 1000 + (end.tv_usec - begin.tv_usec) / 1000;
 }
 
-class LockGuard final {
-public:
-    LockGuard(pthread_mutex_t* lock) {
-        m_lock = lock;
-        pthread_mutex_lock(lock);
-    }
-    ~LockGuard() {
-        pthread_mutex_unlock(m_lock);
-    }
-
-private:
-    pthread_mutex_t* m_lock;
-};
-
 int Connection::Send(const void* data, uint32_t size) {
-    LockGuard lg(&m_lock);
+    std::unique_lock<std::mutex> __guard(m_lock);
 
     struct timeval begin;
     if (m_send_timeout > 0) {

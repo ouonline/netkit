@@ -1,5 +1,5 @@
-#ifndef __NET_PROCESSOR_H__
-#define __NET_PROCESSOR_H__
+#ifndef __NETKIT_PROCESSOR_H__
+#define __NETKIT_PROCESSOR_H__
 
 #include "buffer.h"
 #include "connection.h"

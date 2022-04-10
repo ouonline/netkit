@@ -1,4 +1,4 @@
-#include "netkit/internal_client.h"
+#include "internal_client.h"
 #include "netkit/processor_factory.h"
 #include <memory>
 #include <unistd.h>

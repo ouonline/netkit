@@ -1,10 +1,10 @@
-#ifndef __TCP_INTERNAL_SERVER_H__
-#define __TCP_INTERNAL_SERVER_H__
+#ifndef __NETKIT_INTERNAL_SERVER_H__
+#define __NETKIT_INTERNAL_SERVER_H__
 
-#include "event_handler.h"
-#include "event_manager.h"
-#include "processor_factory.h"
-#include "status_code.h"
+#include "netkit/event_handler.h"
+#include "netkit/event_manager.h"
+#include "netkit/processor_factory.h"
+#include "netkit/status_code.h"
 #include "threadkit/threadpool.h"
 #include <string>
 #include <memory>

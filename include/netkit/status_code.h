@@ -1,5 +1,5 @@
-#ifndef __NET_STATUS_CODE_H__
-#define __NET_STATUS_CODE_H__
+#ifndef __NETKIT_STATUS_CODE_H__
+#define __NETKIT_STATUS_CODE_H__
 
 #include <stdint.h>
 
