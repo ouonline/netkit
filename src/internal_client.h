@@ -9,11 +9,11 @@
 #include "logger/logger.h"
 #include <memory>
 
-namespace outils { namespace net { namespace tcp {
+namespace netkit { namespace tcp {
 
 class InternalClient final : public EventHandler {
 public:
-    InternalClient(int fd, const std::shared_ptr<ProcessorFactory>& factory, ThreadPool* tp, Logger*);
+    InternalClient(int fd, const std::shared_ptr<ProcessorFactory>& factory, threadkit::ThreadPool* tp, Logger*);
 
     int GetFd() const override {
         return m_fd;
@@ -32,7 +32,7 @@ private:
     int m_fd;
     uint32_t m_bytes_needed;
     Logger* m_logger;
-    ThreadPool* m_tp;
+    threadkit::ThreadPool* m_tp;
     Processor* m_processor;
     std::shared_ptr<ProcessorFactory> m_factory;
     Connection m_conn;
@@ -42,6 +42,6 @@ private:
     InternalClient& operator=(const InternalClient&);
 };
 
-}}} // namespace outils::net::tcp
+}} // namespace netkit::tcp
 
 #endif

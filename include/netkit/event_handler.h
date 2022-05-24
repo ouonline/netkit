@@ -3,7 +3,7 @@
 
 #include "status_code.h"
 
-namespace outils { namespace net {
+namespace netkit {
 
 class EventHandler {
 public:
@@ -14,6 +14,6 @@ public:
     virtual void Error() = 0;
 };
 
-}} // namespace outils::net
+} // namespace netkit
 
 #endif

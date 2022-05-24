@@ -4,7 +4,7 @@
 #include "processor.h"
 #include "connection.h"
 
-namespace outils { namespace net {
+namespace netkit {
 
 class ProcessorFactory {
 public:
@@ -15,6 +15,6 @@ public:
     virtual void DestroyProcessor(Processor*) = 0;
 };
 
-}} // namespace outils::net
+} // namespace netkit
 
 #endif

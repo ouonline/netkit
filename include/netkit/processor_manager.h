@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <memory>
 
-namespace outils { namespace net { namespace tcp {
+namespace netkit { namespace tcp {
 
 class ProcessorManager final {
 public:
@@ -29,13 +29,13 @@ private:
 private:
     Logger* m_logger;
     EventManager m_event_mgr;
-    ThreadPool m_thread_pool;
+    threadkit::ThreadPool m_thread_pool;
 
 private:
     ProcessorManager(const ProcessorManager&);
     ProcessorManager& operator=(const ProcessorManager&);
 };
 
-}}} // namespace outils::net::tcp
+}} // namespace netkit::tcp
 
 #endif

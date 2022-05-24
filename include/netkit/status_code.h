@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-namespace outils { namespace net {
+namespace netkit {
 
 enum {
     SC_OK = 0,
@@ -15,6 +15,6 @@ enum {
 
 typedef uint32_t StatusCode;
 
-}} // namespace outils::net
+} // namespace netkit
 
 #endif

@@ -6,7 +6,7 @@
 #include "logger/logger.h"
 #include <sys/epoll.h> // event definitions
 
-namespace outils { namespace net {
+namespace netkit {
 
 class EventManager final {
 public:
@@ -24,6 +24,6 @@ private:
     EventManager& operator=(const EventManager&);
 };
 
-}} // namespace outils::net
+} // namespace netkit
 
 #endif

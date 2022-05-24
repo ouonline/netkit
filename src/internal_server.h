@@ -9,12 +9,12 @@
 #include <string>
 #include <memory>
 
-namespace outils { namespace net { namespace tcp {
+namespace netkit { namespace tcp {
 
 class InternalServer final : public EventHandler {
 public:
-    InternalServer(int fd, const std::shared_ptr<ProcessorFactory>& factory, EventManager* event_mgr, ThreadPool* tp,
-                   Logger* logger)
+    InternalServer(int fd, const std::shared_ptr<ProcessorFactory>& factory, EventManager* event_mgr,
+                   threadkit::ThreadPool* tp, Logger* logger)
         : m_fd(fd), m_logger(logger), m_event_mgr(event_mgr), m_factory(factory), m_tp(tp) {}
 
     int GetFd() const override {
@@ -31,13 +31,13 @@ private:
     Logger* m_logger;
     EventManager* m_event_mgr;
     std::shared_ptr<ProcessorFactory> m_factory;
-    ThreadPool* m_tp;
+    threadkit::ThreadPool* m_tp;
 
 private:
     InternalServer(const InternalServer&);
     InternalServer& operator=(const InternalServer&);
 };
 
-}}} // namespace outils::net::tcp
+}} // namespace netkit::tcp
 
 #endif

@@ -5,9 +5,9 @@
 #include <fcntl.h>
 #include <cstring>
 
-namespace outils { namespace net { namespace tcp {
+namespace netkit { namespace tcp {
 
-static StatusCode SetNonBlocking(int fd, Logger* logger) {
+inline StatusCode SetNonBlocking(int fd, Logger* logger) {
     int opt;
 
     opt = fcntl(fd, F_GETFL);
@@ -25,6 +25,6 @@ static StatusCode SetNonBlocking(int fd, Logger* logger) {
     return SC_OK;
 }
 
-}}} // namespace outils::net::tcp
+}} // namespace netkit::tcp
 
 #endif

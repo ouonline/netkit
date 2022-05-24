@@ -16,7 +16,7 @@ target_include_directories(netkit_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/incl
 
 if(NOT NETKIT_DEPS_DIR)
     set(NETKIT_DEPS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/..)
-    message(WARNING "`NETKIT_DEPS_DIR` is not set. set `NETKIT_DEPS_DIR` to ${NETKIT_DEPS_DIR}")
+    message(WARNING "`NETKIT_DEPS_DIR` is not set. set `NETKIT_DEPS_DIR` to `${NETKIT_DEPS_DIR}`.")
 endif()
 
 if(NOT TARGET logger_static)

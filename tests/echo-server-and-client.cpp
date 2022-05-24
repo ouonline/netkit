@@ -1,6 +1,6 @@
 #include "netkit/processor_manager.h"
-using namespace outils::net;
-using namespace outils::net::tcp;
+using namespace netkit;
+using namespace netkit::tcp;
 
 #include "logger/stdio_logger.h"
 #include <unistd.h>

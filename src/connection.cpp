@@ -8,7 +8,7 @@
 #include <arpa/inet.h>
 using namespace std;
 
-namespace outils { namespace net {
+namespace netkit {
 
 Connection::Connection(int fd, Logger* logger) {
     m_fd = fd;
@@ -116,4 +116,4 @@ int Connection::Send(const void* data, uint32_t size) {
     return (size - bytes_to_send);
 }
 
-}} // namespace outils::net
+} // namespace netkit

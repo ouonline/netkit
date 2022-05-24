@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <vector>
 
-namespace outils { namespace net {
+namespace netkit {
 
 class Buffer final {
 public:
@@ -28,6 +28,6 @@ private:
     std::vector<char> m_data;
 };
 
-}} // namespace outils::net
+} // namespace netkit
 
 #endif

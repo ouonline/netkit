@@ -7,7 +7,7 @@
 #include <errno.h>
 using namespace std;
 
-namespace outils { namespace net { namespace tcp {
+namespace netkit { namespace tcp {
 
 #include <netdb.h>
 
@@ -169,4 +169,4 @@ StatusCode ProcessorManager::Run() {
     return m_event_mgr.Loop();
 }
 
-}}} // namespace outils::net::tcp
+}} // namespace netkit::tcp

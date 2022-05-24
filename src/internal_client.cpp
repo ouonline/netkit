@@ -6,9 +6,9 @@
 #include <cstring> // strerror
 using namespace std;
 
-namespace outils { namespace net { namespace tcp {
+namespace netkit { namespace tcp {
 
-InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& factory, ThreadPool* tp, Logger* logger)
+InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& factory, threadkit::ThreadPool* tp, Logger* logger)
     : m_fd(fd), m_bytes_needed(0), m_logger(logger), m_tp(tp), m_factory(factory), m_conn(fd, logger) {
     m_processor = CreateProcessor();
     factory->OnClientConnected(&m_conn);
@@ -114,4 +114,4 @@ void InternalClient::Error() {
     m_factory->OnClientDisconnected(&m_conn);
 }
 
-}}} // namespace outils::net::tcp
+}} // namespace netkit::tcp

@@ -4,7 +4,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-namespace outils { namespace net { namespace tcp {
+namespace netkit { namespace tcp {
 
 StatusCode InternalServer::In() {
     int fd = accept(m_fd, nullptr, nullptr);
@@ -34,4 +34,4 @@ err:
     return SC_INTERNAL_NET_ERR;
 }
 
-}}} // namespace outils::net::tcp
+}} // namespace netkit::tcp

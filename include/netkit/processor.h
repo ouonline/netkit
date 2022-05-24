@@ -5,9 +5,9 @@
 #include "connection.h"
 #include "threadkit/threadpool.h"
 
-namespace outils { namespace net {
+namespace netkit {
 
-class Processor : public ThreadTask {
+class Processor : public threadkit::ThreadTask {
 public:
     Processor() : m_conn(nullptr) {}
     virtual ~Processor() {}
@@ -26,9 +26,9 @@ protected:
     virtual bool ProcessPacket(Connection*) = 0;
 
 private:
-    std::shared_ptr<ThreadTask> Run() override final {
+    std::shared_ptr<threadkit::ThreadTask> Run() override final {
         ProcessPacket(m_conn);
-        return std::shared_ptr<ThreadTask>();
+        return std::shared_ptr<threadkit::ThreadTask>();
     }
 
 private:
@@ -40,6 +40,6 @@ private:
     Processor& operator=(const Processor&);
 };
 
-}} // namespace outils::net
+} // namespace netkit
 
 #endif

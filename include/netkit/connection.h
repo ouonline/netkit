@@ -7,7 +7,7 @@
 #include <string>
 #include <stdint.h>
 
-namespace outils { namespace net {
+namespace netkit {
 
 struct ConnectionInfo final {
     uint16_t local_port = 0;
@@ -40,6 +40,6 @@ private:
     Connection& operator=(const Connection&);
 };
 
-}} // namespace outils::net
+} // namespace netkit
 
 #endif
