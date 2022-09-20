@@ -8,10 +8,18 @@ using namespace std;
 
 namespace netkit { namespace tcp {
 
+static shared_ptr<Processor> CreateProcessor(const shared_ptr<ProcessorFactory>& factory, Connection* conn) {
+    auto p = factory->CreateProcessor();
+    p->SetConnection(conn);
+    return shared_ptr<Processor>(p, [f = factory](Processor* t) -> void {
+        f->DestroyProcessor(t);
+    });
+}
+
 InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& factory, threadkit::ThreadPool* tp, Logger* logger)
     : m_fd(fd), m_bytes_needed(0), m_logger(logger), m_tp(tp), m_factory(factory), m_conn(fd, logger) {
-    m_processor = CreateProcessor();
-    factory->OnClientConnected(&m_conn);
+    m_processor = CreateProcessor(factory, &m_conn);
+    m_processor->OnConnected(&m_conn);
 }
 
 StatusCode InternalClient::ReadData() {
@@ -22,19 +30,19 @@ StatusCode InternalClient::ReadData() {
     }
 
     auto buf = m_processor->GetPacket();
-    const uint32_t end_offset = buf->Size();
-    StatusCode sc = buf->Resize(buf->Size() + nbytes);
+    const uint32_t end_offset = buf->GetSize();
+    StatusCode sc = buf->Resize(buf->GetSize() + nbytes);
     if (sc != SC_OK) {
         logger_error(m_logger, "alloc mem failed: %u", sc);
         return sc;
     }
 
-    char* cursor = buf->Data() + end_offset;
+    char* cursor = buf->GetData() + end_offset;
     while (nbytes > 0) {
         int ret = read(m_fd, cursor, nbytes);
         if (ret == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                buf->Resize(cursor - buf->Data());
+                buf->Resize(cursor - buf->GetData());
                 break;
             }
 
@@ -49,14 +57,8 @@ StatusCode InternalClient::ReadData() {
         cursor += ret;
     }
 
-    buf->Resize(cursor - buf->Data());
+    buf->Resize(cursor - buf->GetData());
     return SC_OK;
-}
-
-Processor* InternalClient::CreateProcessor() {
-    auto p = m_factory->CreateProcessor();
-    p->SetConnection(&m_conn);
-    return p;
 }
 
 StatusCode InternalClient::In() {
@@ -66,7 +68,7 @@ StatusCode InternalClient::In() {
     }
 
     auto pkt = m_processor->GetPacket();
-    if (m_bytes_needed > 0 && pkt->Size() < m_bytes_needed) {
+    if (m_bytes_needed > 0 && pkt->GetSize() < m_bytes_needed) {
         return SC_OK;
     }
 
@@ -84,34 +86,30 @@ StatusCode InternalClient::In() {
         }
 
         auto buf = m_processor->GetPacket();
-        if (buf->Size() < bytes_needed) {
+        if (buf->GetSize() < bytes_needed) {
             m_bytes_needed = bytes_needed;
             return SC_OK;
         }
 
         auto last_req = m_processor;
-        m_processor = CreateProcessor();
+        m_processor = CreateProcessor(m_factory, &m_conn);
 
-        if (buf->Size() == bytes_needed) {
-            m_tp->AddTask(shared_ptr<Processor>(last_req, [this](Processor* t) -> void {
-                m_factory->DestroyProcessor(t);
-            }));
+        if (buf->GetSize() == bytes_needed) {
+            m_tp->AddTask(last_req);
             return SC_OK;
         }
 
         auto new_buf = m_processor->GetPacket();
-        new_buf->Append(buf->Data() + bytes_needed, buf->Size() - bytes_needed);
+        new_buf->Append(buf->GetData() + bytes_needed, buf->GetSize() - bytes_needed);
         buf->Resize(bytes_needed);
-        m_tp->AddTask(shared_ptr<Processor>(last_req, [this](Processor* t) -> void {
-            m_factory->DestroyProcessor(t);
-        }));
+        m_tp->AddTask(last_req);
     }
 
     return SC_OK;
 }
 
 void InternalClient::Error() {
-    m_factory->OnClientDisconnected(&m_conn);
+    m_processor->OnDisconnected(&m_conn);
 }
 
 }} // namespace netkit::tcp

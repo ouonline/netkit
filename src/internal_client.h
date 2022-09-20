@@ -26,16 +26,18 @@ public:
 
 private:
     StatusCode ReadData();
-    Processor* CreateProcessor();
 
 private:
     int m_fd;
     uint32_t m_bytes_needed;
+    Connection m_conn;
+    std::shared_ptr<Processor> m_processor;
+
+    // ----- shared data ----- //
+
     Logger* m_logger;
     threadkit::ThreadPool* m_tp;
-    Processor* m_processor;
     std::shared_ptr<ProcessorFactory> m_factory;
-    Connection m_conn;
 
 private:
     InternalClient(const InternalClient&);

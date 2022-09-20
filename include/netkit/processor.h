@@ -22,6 +22,9 @@ public:
         m_conn = c;
     }
 
+    virtual void OnConnected(Connection*) = 0;
+    virtual void OnDisconnected(Connection*) = 0;
+
 protected:
     virtual bool ProcessPacket(Connection*) = 0;
 

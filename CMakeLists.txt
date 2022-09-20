@@ -11,7 +11,7 @@ option(NETKIT_INSTALL "install headers and libs" ON)
 file(GLOB NETKIT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 add_library(netkit_static STATIC ${NETKIT_SRC})
 target_include_directories(netkit_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_compile_features(netkit_static PUBLIC cxx_std_11)
+target_compile_features(netkit_static PRIVATE cxx_std_14)
 
 # ----- dependencies ----- #
 

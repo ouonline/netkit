@@ -9,8 +9,6 @@ namespace netkit {
 class ProcessorFactory {
 public:
     virtual ~ProcessorFactory() {}
-    virtual void OnClientConnected(Connection*) = 0;
-    virtual void OnClientDisconnected(Connection*) = 0;
     virtual Processor* CreateProcessor() = 0;
     virtual void DestroyProcessor(Processor*) = 0;
 };

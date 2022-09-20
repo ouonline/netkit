@@ -9,10 +9,10 @@ namespace netkit {
 
 class Buffer final {
 public:
-    char* Data() {
+    char* GetData() {
         return m_data.data();
     }
-    uint32_t Size() const {
+    uint32_t GetSize() const {
         return m_data.size();
     }
     StatusCode Resize(uint32_t new_size) {

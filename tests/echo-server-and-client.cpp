@@ -12,8 +12,18 @@ public:
 
     bool CheckPacket(uint32_t* size) override {
         auto buf = GetPacket();
-        *size = buf->Size();
+        *size = buf->GetSize();
         return true;
+    }
+
+    void OnConnected(Connection* c) override {
+        const ConnectionInfo& info = c->GetConnectionInfo();
+        logger_info(m_logger, "accepts client[%s:%u].", info.remote_addr.c_str(), info.remote_port);
+    }
+
+    void OnDisconnected(Connection* c) override {
+        const ConnectionInfo& info = c->GetConnectionInfo();
+        logger_info(m_logger, "client[%s:%u] disconnected.", info.remote_addr.c_str(), info.remote_port);
     }
 
 protected:
@@ -21,12 +31,9 @@ protected:
         auto buf = GetPacket();
         const ConnectionInfo& info = c->GetConnectionInfo();
 
-        auto num = std::stol(string(buf->Data(), buf->Size()));
-        const string content = std::to_string(num);
-
         logger_info(m_logger, "server[%s:%u] <= client[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
-                    info.remote_addr.c_str(), info.remote_port, content.c_str());
-        c->Send(content.data(), content.size());
+                    info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
+        c->Send(buf->GetData(), buf->GetSize());
         return true;
     }
 
@@ -40,8 +47,17 @@ public:
 
     bool CheckPacket(uint32_t* size) override {
         auto buf = GetPacket();
-        *size = buf->Size();
+        *size = buf->GetSize();
         return true;
+    }
+
+    void OnConnected(Connection* c) override {
+        c->Send("0", 1);
+    }
+
+    void OnDisconnected(Connection* c) override {
+        const ConnectionInfo& info = c->GetConnectionInfo();
+        logger_info(m_logger, "client[%s:%u] disconnected.", info.local_addr.c_str(), info.local_port);
     }
 
 protected:
@@ -50,10 +66,10 @@ protected:
         const ConnectionInfo& info = c->GetConnectionInfo();
 
         logger_info(m_logger, "client[%s:%u] <= server[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
-                    info.remote_addr.c_str(), info.remote_port, string(buf->Data(), buf->Size()).c_str());
+                    info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
         sleep(1);
 
-        auto num = std::stol(string(buf->Data(), buf->Size()));
+        auto num = std::stol(string(buf->GetData(), buf->GetSize()));
         const string content = std::to_string(num + 1);
         c->Send(content.data(), content.size());
         return true;
@@ -66,14 +82,6 @@ private:
 class EchoServerFactory final : public ProcessorFactory {
 public:
     EchoServerFactory(Logger* logger) : m_logger(logger) {}
-    void OnClientConnected(Connection* c) override {
-        const ConnectionInfo& info = c->GetConnectionInfo();
-        logger_info(m_logger, "accepts client[%s:%u].", info.remote_addr.c_str(), info.remote_port);
-    }
-    void OnClientDisconnected(Connection* c) override {
-        const ConnectionInfo& info = c->GetConnectionInfo();
-        logger_info(m_logger, "client[%s:%u] disconnected.", info.remote_addr.c_str(), info.remote_port);
-    }
     Processor* CreateProcessor() override {
         return new EchoServerProcessor(m_logger);
     }
@@ -88,13 +96,6 @@ private:
 class EchoClientFactory final : public ProcessorFactory {
 public:
     EchoClientFactory(Logger* logger) : m_logger(logger) {}
-    void OnClientConnected(Connection* c) override {
-        c->Send("0", 1);
-    }
-    void OnClientDisconnected(Connection* c) override {
-        const ConnectionInfo& info = c->GetConnectionInfo();
-        logger_info(m_logger, "client[%s:%u] disconnected.", info.local_addr.c_str(), info.local_port);
-    }
     Processor* CreateProcessor() override {
         return new EchoClientProcessor(m_logger);
     }
