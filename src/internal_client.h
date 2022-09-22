@@ -18,18 +18,15 @@ public:
     int GetFd() const override {
         return m_fd;
     }
-    StatusCode In() override;
-    StatusCode Out() override {
-        return SC_OK;
+    RetCode In() override;
+    RetCode Out() override {
+        return RC_SUCCESS;
     }
     void Error() override;
 
 private:
-    StatusCode ReadData();
-
-private:
     int m_fd;
-    uint32_t m_bytes_needed;
+    uint32_t m_packet_bytes;
     Connection m_conn;
     std::shared_ptr<Processor> m_processor;
 

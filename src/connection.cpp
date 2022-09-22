@@ -31,7 +31,7 @@ Connection::Connection(int fd, Logger* logger) {
     }
 }
 
-static inline void Time2Timeval(uint32_t ms, struct timeval* t) {
+static void Time2Timeval(uint32_t ms, struct timeval* t) {
     if (ms >= 1000) {
         t->tv_sec = ms / 1000;
         t->tv_usec = (ms % 1000) * 1000;
@@ -41,27 +41,27 @@ static inline void Time2Timeval(uint32_t ms, struct timeval* t) {
     }
 }
 
-StatusCode Connection::RealSetSendTimeout(uint32_t ms) {
+static RetCode RealSetSendTimeout(int fd, uint32_t ms, Logger* logger) {
     if (ms == 0) {
-        return SC_OK;
+        return RC_SUCCESS;
     }
 
     struct timeval t;
     Time2Timeval(ms, &t);
 
-    if (setsockopt(m_fd, SOL_SOCKET, SO_SNDTIMEO, &t, sizeof(t)) != 0) {
-        logger_error(m_logger, "set send timeout failed: %s", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
+    if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &t, sizeof(t)) != 0) {
+        logger_error(logger, "set send timeout failed: %s", strerror(errno));
+        return RC_INTERNAL_NET_ERR;
     }
 
-    return SC_OK;
+    return RC_SUCCESS;
 }
 
 void Connection::SetSendTimeout(uint32_t ms) {
     m_send_timeout = ms;
 }
 
-static inline uint64_t DiffTimeMs(struct timeval end, const struct timeval& begin) {
+static uint64_t DiffTimeMs(struct timeval end, const struct timeval& begin) {
     if (end.tv_usec < begin.tv_usec) {
         --end.tv_sec;
         end.tv_usec += 1000000;
@@ -75,8 +75,8 @@ int Connection::Send(const void* data, uint32_t size) {
 
     struct timeval begin;
     if (m_send_timeout > 0) {
-        if (RealSetSendTimeout(m_send_timeout) != SC_OK) {
-            return SC_INTERNAL_NET_ERR;
+        if (RealSetSendTimeout(m_fd, m_send_timeout, m_logger) != RC_SUCCESS) {
+            return RC_INTERNAL_NET_ERR;
         }
 
         gettimeofday(&begin, NULL);
@@ -89,7 +89,7 @@ int Connection::Send(const void* data, uint32_t size) {
         int nbytes = send(m_fd, cursor, bytes_to_send, 0);
         if (nbytes < 0) {
             if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                return SC_INTERNAL_NET_ERR;
+                return RC_INTERNAL_NET_ERR;
             }
 
             usleep(1000);
@@ -107,7 +107,7 @@ int Connection::Send(const void* data, uint32_t size) {
                 break;
             }
 
-            if (RealSetSendTimeout(m_send_timeout - time_cost) != SC_OK) {
+            if (RealSetSendTimeout(m_fd, m_send_timeout - time_cost, m_logger) != RC_SUCCESS) {
                 break;
             }
         }

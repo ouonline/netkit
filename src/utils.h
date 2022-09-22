@@ -1,28 +1,28 @@
 #ifndef __NETKIT_UTILS_H__
 #define __NETKIT_UTILS_H__
 
-#include "netkit/status_code.h"
+#include "netkit/retcode.h"
 #include <fcntl.h>
 #include <cstring>
 
 namespace netkit { namespace tcp {
 
-inline StatusCode SetNonBlocking(int fd, Logger* logger) {
+inline RetCode SetNonBlocking(int fd, Logger* logger) {
     int opt;
 
     opt = fcntl(fd, F_GETFL);
     if (opt < 0) {
         logger_error(logger, "fcntl failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
+        return RC_INTERNAL_NET_ERR;
     }
 
     opt |= O_NONBLOCK;
     if (fcntl(fd, F_SETFL, opt) == -1) {
         logger_error(logger, "fcntl failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
+        return RC_INTERNAL_NET_ERR;
     }
 
-    return SC_OK;
+    return RC_SUCCESS;
 }
 
 }} // namespace netkit::tcp

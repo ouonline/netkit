@@ -6,14 +6,14 @@
 namespace netkit {
 
 enum {
-    SC_OK = 0,
-    SC_NOMEM,
-    SC_CLIENT_DISCONNECTED,
-    SC_INTERNAL_NET_ERR,
-    SC_REQ_PACKET_ERR,
+    RC_SUCCESS = 0,
+    RC_NOMEM,
+    RC_CLIENT_DISCONNECTED,
+    RC_INTERNAL_NET_ERR,
+    RC_REQ_PACKET_ERR,
 };
 
-typedef uint32_t StatusCode;
+typedef uint32_t RetCode;
 
 } // namespace netkit
 

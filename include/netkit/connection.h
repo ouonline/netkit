@@ -1,7 +1,7 @@
 #ifndef __NETKIT_CONNECTION_H__
 #define __NETKIT_CONNECTION_H__
 
-#include "status_code.h"
+#include "retcode.h"
 #include "logger/logger.h"
 #include <mutex>
 #include <string>
@@ -26,14 +26,11 @@ public:
     }
 
 private:
-    StatusCode RealSetSendTimeout(uint32_t ms);
-
-private:
     int m_fd;
     uint32_t m_send_timeout;
-    Logger* m_logger;
     ConnectionInfo m_info;
     std::mutex m_lock;
+    Logger* m_logger;
 
 private:
     Connection(const Connection&);

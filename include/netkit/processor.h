@@ -12,8 +12,8 @@ public:
     Processor() : m_conn(nullptr) {}
     virtual ~Processor() {}
 
-    // sets `expected_size` to total length of request packet or 0 to recv data
-    virtual bool CheckPacket(uint32_t* expected_size) = 0;
+    // sets `total_packet_bytes` to total length of current request
+    virtual bool CheckPacket(uint32_t* total_packet_bytes) = 0;
 
     Buffer* GetPacket() {
         return &m_buf;

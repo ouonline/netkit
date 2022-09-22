@@ -11,12 +11,12 @@ namespace netkit { namespace tcp {
 
 #include <netdb.h>
 
-StatusCode ProcessorManager::Init() {
+RetCode ProcessorManager::Init() {
     m_thread_pool.AddThread(5);
     return m_event_mgr.Init();
 }
 
-StatusCode ProcessorManager::GetHostInfo(const char* host, uint16_t port, struct addrinfo** svr) {
+RetCode ProcessorManager::GetHostInfo(const char* host, uint16_t port, struct addrinfo** svr) {
     int err;
     char buf[8];
     struct addrinfo hints;
@@ -30,29 +30,29 @@ StatusCode ProcessorManager::GetHostInfo(const char* host, uint16_t port, struct
     err = getaddrinfo(host, buf, &hints, svr);
     if (err) {
         logger_error(m_logger, "getaddrinfo() failed: %s.", gai_strerror(err));
-        return SC_INTERNAL_NET_ERR;
+        return RC_INTERNAL_NET_ERR;
     }
 
-    return SC_OK;
+    return RC_SUCCESS;
 }
 
-StatusCode ProcessorManager::SetReuseAddr(int fd) {
+RetCode ProcessorManager::SetReuseAddr(int fd) {
     int opt = 1;
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) != 0) {
         logger_error(m_logger, "setsockopt failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
+        return RC_INTERNAL_NET_ERR;
     }
 
-    return SC_OK;
+    return RC_SUCCESS;
 }
 
 int ProcessorManager::CreateServerFd(const char* host, uint16_t port) {
     int fd;
-    StatusCode sc = SC_INTERNAL_NET_ERR;
+    RetCode sc = RC_INTERNAL_NET_ERR;
     struct addrinfo* info = nullptr;
 
     sc = GetHostInfo(host, port, &info);
-    if (sc != SC_OK) {
+    if (sc != RC_SUCCESS) {
         return -1;
     }
 
@@ -62,7 +62,7 @@ int ProcessorManager::CreateServerFd(const char* host, uint16_t port) {
         goto err;
     }
 
-    if (SetReuseAddr(fd) != SC_OK) {
+    if (SetReuseAddr(fd) != RC_SUCCESS) {
         goto err1;
     }
 
@@ -88,7 +88,7 @@ err:
 
 int ProcessorManager::CreateClientFd(const char* host, uint16_t port) {
     struct addrinfo* info = nullptr;
-    if (GetHostInfo(host, port, &info) != SC_OK) {
+    if (GetHostInfo(host, port, &info) != RC_SUCCESS) {
         return -1;
     }
 
@@ -113,39 +113,39 @@ err:
     return -1;
 }
 
-StatusCode ProcessorManager::AddServer(const char* addr, uint16_t port, const shared_ptr<ProcessorFactory>& factory) {
+RetCode ProcessorManager::AddServer(const char* addr, uint16_t port, const shared_ptr<ProcessorFactory>& factory) {
     int fd = CreateServerFd(addr, port);
     if (fd < 0) {
         logger_error(m_logger, "create server failed.");
-        return SC_INTERNAL_NET_ERR;
+        return RC_INTERNAL_NET_ERR;
     }
 
     auto svr = new InternalServer(fd, factory, &m_event_mgr, &m_thread_pool, m_logger);
     if (!svr) {
         logger_error(m_logger, "allocate tcp server failed.");
         close(fd);
-        return SC_NOMEM;
+        return RC_NOMEM;
     }
 
-    if (m_event_mgr.AddHandler(svr, EPOLLIN) != SC_OK) {
+    if (m_event_mgr.AddHandler(svr, EPOLLIN) != RC_SUCCESS) {
         logger_error(m_logger, "add server[%s:%u] to epoll failed: %s.", addr, port, strerror(errno));
         close(fd);
         delete svr;
-        return SC_INTERNAL_NET_ERR;
+        return RC_INTERNAL_NET_ERR;
     }
 
-    return SC_OK;
+    return RC_SUCCESS;
 }
 
-StatusCode ProcessorManager::AddClient(const char* addr, uint16_t port, const shared_ptr<ProcessorFactory>& factory) {
+RetCode ProcessorManager::AddClient(const char* addr, uint16_t port, const shared_ptr<ProcessorFactory>& factory) {
     int fd = CreateClientFd(addr, port);
     if (fd < 0) {
         logger_error(m_logger, "create client failed.");
-        return SC_INTERNAL_NET_ERR;
+        return RC_INTERNAL_NET_ERR;
     }
-    if (SetNonBlocking(fd, m_logger) != SC_OK) {
+    if (SetNonBlocking(fd, m_logger) != RC_SUCCESS) {
         close(fd);
-        return SC_INTERNAL_NET_ERR;
+        return RC_INTERNAL_NET_ERR;
     }
 
     auto client = new InternalClient(fd, factory, &m_thread_pool, m_logger);
@@ -154,18 +154,18 @@ StatusCode ProcessorManager::AddClient(const char* addr, uint16_t port, const sh
         goto err;
     }
 
-    if (m_event_mgr.AddHandler(client, EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLET) == SC_OK) {
-        return SC_OK;
+    if (m_event_mgr.AddHandler(client, EPOLLIN | EPOLLHUP | EPOLLRDHUP | EPOLLET) == RC_SUCCESS) {
+        return RC_SUCCESS;
     }
 
     logger_error(m_logger, "add client failed: %s.", strerror(errno));
     delete client;
 err:
     close(fd);
-    return SC_INTERNAL_NET_ERR;
+    return RC_INTERNAL_NET_ERR;
 }
 
-StatusCode ProcessorManager::Run() {
+RetCode ProcessorManager::Run() {
     return m_event_mgr.Loop();
 }
 

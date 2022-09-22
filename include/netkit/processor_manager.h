@@ -2,7 +2,7 @@
 #define __NETKIT_PROCESSOR_MANAGER_H__
 
 #include "threadkit/threadpool.h"
-#include "status_code.h"
+#include "retcode.h"
 #include "processor_factory.h"
 #include "event_manager.h"
 #include "logger/logger.h"
@@ -15,14 +15,14 @@ class ProcessorManager final {
 public:
     ProcessorManager(Logger* logger) : m_logger(logger), m_event_mgr(logger) {}
     virtual ~ProcessorManager() {}
-    StatusCode Init();
-    StatusCode AddServer(const char* addr, uint16_t port, const std::shared_ptr<ProcessorFactory>& factory);
-    StatusCode AddClient(const char* addr, uint16_t port, const std::shared_ptr<ProcessorFactory>& factory);
-    StatusCode Run();
+    RetCode Init();
+    RetCode AddServer(const char* addr, uint16_t port, const std::shared_ptr<ProcessorFactory>& factory);
+    RetCode AddClient(const char* addr, uint16_t port, const std::shared_ptr<ProcessorFactory>& factory);
+    RetCode Run();
 
 private:
-    StatusCode SetReuseAddr(int fd);
-    StatusCode GetHostInfo(const char* addr, uint16_t port, struct addrinfo** svr);
+    RetCode SetReuseAddr(int fd);
+    RetCode GetHostInfo(const char* addr, uint16_t port, struct addrinfo** svr);
     int CreateServerFd(const char* addr, uint16_t port);
     int CreateClientFd(const char* host, uint16_t port);
 

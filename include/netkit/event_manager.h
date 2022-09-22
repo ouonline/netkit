@@ -1,7 +1,7 @@
 #ifndef __NETKIT_EVENT_MANAGER_H__
 #define __NETKIT_EVENT_MANAGER_H__
 
-#include "status_code.h"
+#include "retcode.h"
 #include "event_handler.h"
 #include "logger/logger.h"
 #include <sys/epoll.h> // event definitions
@@ -11,9 +11,9 @@ namespace netkit {
 class EventManager final {
 public:
     EventManager(Logger* logger) : m_epfd(-1), m_logger(logger) {}
-    StatusCode Init();
-    StatusCode AddHandler(EventHandler* e, unsigned int event);
-    StatusCode Loop();
+    RetCode Init();
+    RetCode AddHandler(EventHandler* e, unsigned int event);
+    RetCode Loop();
 
 private:
     int m_epfd;

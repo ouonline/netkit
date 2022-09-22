@@ -9,29 +9,29 @@ using namespace std;
 
 namespace netkit {
 
-StatusCode EventManager::Init() {
+RetCode EventManager::Init() {
     m_epfd = epoll_create(MAX_EVENTS);
     if (m_epfd < 0) {
         logger_error(m_logger, "create epoll failed: %s.", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
+        return RC_INTERNAL_NET_ERR;
     }
 
-    return SC_OK;
+    return RC_SUCCESS;
 }
 
-StatusCode EventManager::AddHandler(EventHandler* e, unsigned int event) {
+RetCode EventManager::AddHandler(EventHandler* e, unsigned int event) {
     int fd = e->GetFd();
     struct epoll_event ev;
     ev.events = event;
     ev.data.ptr = e;
     if (epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev) != 0) {
-        return SC_INTERNAL_NET_ERR;
+        return RC_INTERNAL_NET_ERR;
     }
 
-    return SC_OK;
+    return RC_SUCCESS;
 }
 
-StatusCode EventManager::Loop() {
+RetCode EventManager::Loop() {
     struct epoll_event eventlist[MAX_EVENTS];
     while (true) {
         int i;
@@ -42,30 +42,30 @@ StatusCode EventManager::Loop() {
             }
 
             logger_error(m_logger, "epoll_wait failed: %s", strerror(errno));
-            return SC_INTERNAL_NET_ERR;
+            return RC_INTERNAL_NET_ERR;
         }
 
         for (i = 0; i < nfds; ++i) {
             uint32_t events = eventlist[i].events;
             EventHandler* e = (EventHandler*)(eventlist[i].data.ptr);
-            StatusCode sc = SC_OK;
+            RetCode sc = RC_SUCCESS;
 
             if ((events & EPOLLHUP) || (events & EPOLLRDHUP) || (events & EPOLLERR)) {
                 e->Error();
-                sc = SC_CLIENT_DISCONNECTED;
+                sc = RC_CLIENT_DISCONNECTED;
             } else {
                 if (events & EPOLLIN) {
                     sc = e->In();
                 }
 
                 if (events & EPOLLOUT) {
-                    if (sc == SC_OK) {
+                    if (sc == RC_SUCCESS) {
                         sc = e->Out();
                     }
                 }
             }
 
-            if (sc != SC_OK) {
+            if (sc != RC_SUCCESS) {
                 int fd = e->GetFd();
                 epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, nullptr);
                 close(fd);
@@ -74,7 +74,7 @@ StatusCode EventManager::Loop() {
         }
     }
 
-    return SC_OK;
+    return RC_SUCCESS;
 }
 
 } // namespace netkit

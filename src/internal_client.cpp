@@ -16,41 +16,40 @@ static shared_ptr<Processor> CreateProcessor(const shared_ptr<ProcessorFactory>&
     });
 }
 
-InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& factory, threadkit::ThreadPool* tp, Logger* logger)
-    : m_fd(fd), m_bytes_needed(0), m_logger(logger), m_tp(tp), m_factory(factory), m_conn(fd, logger) {
+InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& factory, threadkit::ThreadPool* tp,
+                               Logger* logger)
+    : m_fd(fd), m_packet_bytes(0), m_logger(logger), m_tp(tp), m_factory(factory), m_conn(fd, logger) {
     m_processor = CreateProcessor(factory, &m_conn);
     m_processor->OnConnected(&m_conn);
 }
 
-StatusCode InternalClient::ReadData() {
+static RetCode ReadData(int fd, Buffer* buf, Logger* logger) {
     int nbytes = 0;
-    if (ioctl(m_fd, FIONREAD, &nbytes) != 0) {
-        logger_error(m_logger, "ioctl failed: %s", strerror(errno));
-        return SC_INTERNAL_NET_ERR;
+    if (ioctl(fd, FIONREAD, &nbytes) != 0) {
+        logger_error(logger, "ioctl failed: %s", strerror(errno));
+        return RC_INTERNAL_NET_ERR;
     }
 
-    auto buf = m_processor->GetPacket();
     const uint32_t end_offset = buf->GetSize();
-    StatusCode sc = buf->Resize(buf->GetSize() + nbytes);
-    if (sc != SC_OK) {
-        logger_error(m_logger, "alloc mem failed: %u", sc);
+    RetCode sc = buf->Resize(buf->GetSize() + nbytes);
+    if (sc != RC_SUCCESS) {
+        logger_error(logger, "resize buffer failed: %u", sc);
         return sc;
     }
 
     char* cursor = buf->GetData() + end_offset;
     while (nbytes > 0) {
-        int ret = read(m_fd, cursor, nbytes);
+        int ret = read(fd, cursor, nbytes);
         if (ret == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                buf->Resize(cursor - buf->GetData());
                 break;
             }
 
-            logger_error(m_logger, "read failed: %s", strerror(errno));
-            return SC_INTERNAL_NET_ERR;
+            logger_error(logger, "read failed: %s", strerror(errno));
+            return RC_INTERNAL_NET_ERR;
         }
         if (ret == 0) {
-            return SC_CLIENT_DISCONNECTED;
+            return RC_CLIENT_DISCONNECTED;
         }
 
         nbytes -= ret;
@@ -58,54 +57,47 @@ StatusCode InternalClient::ReadData() {
     }
 
     buf->Resize(cursor - buf->GetData());
-    return SC_OK;
+    return RC_SUCCESS;
 }
 
-StatusCode InternalClient::In() {
-    StatusCode sc = ReadData();
-    if (sc != SC_OK) {
+RetCode InternalClient::In() {
+    RetCode sc = ReadData(m_fd, m_processor->GetPacket(), m_logger);
+    if (sc != RC_SUCCESS) {
         return sc;
     }
 
     auto pkt = m_processor->GetPacket();
-    if (m_bytes_needed > 0 && pkt->GetSize() < m_bytes_needed) {
-        return SC_OK;
+    if (pkt->GetSize() < m_packet_bytes) {
+        return RC_SUCCESS;
     }
 
-    m_bytes_needed = 0;
-
     while (true) {
-        uint32_t bytes_needed = 0;
-        if (!m_processor->CheckPacket(&bytes_needed)) {
-            logger_error(m_logger, "check packet failed: %d", bytes_needed);
-            return SC_REQ_PACKET_ERR;
-        }
-
-        if (bytes_needed == 0) {
-            return SC_OK;
+        if (!m_processor->CheckPacket(&m_packet_bytes)) {
+            logger_error(m_logger, "check packet failed: %u", m_packet_bytes);
+            return RC_REQ_PACKET_ERR;
         }
 
         auto buf = m_processor->GetPacket();
-        if (buf->GetSize() < bytes_needed) {
-            m_bytes_needed = bytes_needed;
-            return SC_OK;
+        if (buf->GetSize() < m_packet_bytes) {
+            return RC_SUCCESS;
         }
 
         auto last_req = m_processor;
         m_processor = CreateProcessor(m_factory, &m_conn);
 
-        if (buf->GetSize() == bytes_needed) {
+        if (buf->GetSize() == m_packet_bytes) {
             m_tp->AddTask(last_req);
-            return SC_OK;
+            m_packet_bytes = 0; // clear m_packet_bytes because we don't know the size of next request
+            return RC_SUCCESS;
         }
 
         auto new_buf = m_processor->GetPacket();
-        new_buf->Append(buf->GetData() + bytes_needed, buf->GetSize() - bytes_needed);
-        buf->Resize(bytes_needed);
+        new_buf->Append(buf->GetData() + m_packet_bytes, buf->GetSize() - m_packet_bytes);
+        buf->Resize(m_packet_bytes);
         m_tp->AddTask(last_req);
     }
 
-    return SC_OK;
+    return RC_SUCCESS;
 }
 
 void InternalClient::Error() {

@@ -4,7 +4,7 @@
 #include "netkit/event_handler.h"
 #include "netkit/event_manager.h"
 #include "netkit/processor_factory.h"
-#include "netkit/status_code.h"
+#include "netkit/retcode.h"
 #include "threadkit/threadpool.h"
 #include <string>
 #include <memory>
@@ -20,9 +20,9 @@ public:
     int GetFd() const override {
         return m_fd;
     }
-    StatusCode In() override;
-    StatusCode Out() override {
-        return SC_OK;
+    RetCode In() override;
+    RetCode Out() override {
+        return RC_SUCCESS;
     }
     void Error() override {}
 

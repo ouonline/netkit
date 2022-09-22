@@ -30,11 +30,24 @@ protected:
     bool ProcessPacket(Connection* c) override {
         auto buf = GetPacket();
         const ConnectionInfo& info = c->GetConnectionInfo();
-
         logger_info(m_logger, "server[%s:%u] <= client[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
         c->Send(buf->GetData(), buf->GetSize());
         return true;
+    }
+
+private:
+    Logger* m_logger;
+};
+
+class EchoServerFactory final : public ProcessorFactory {
+public:
+    EchoServerFactory(Logger* logger) : m_logger(logger) {}
+    Processor* CreateProcessor() override {
+        return new EchoServerProcessor(m_logger);
+    }
+    void DestroyProcessor(Processor* p) override {
+        delete p;
     }
 
 private:
@@ -52,6 +65,8 @@ public:
     }
 
     void OnConnected(Connection* c) override {
+        const ConnectionInfo& info = c->GetConnectionInfo();
+        logger_info(m_logger, "client[%s:%u] connected.", info.local_addr.c_str(), info.local_port);
         c->Send("0", 1);
     }
 
@@ -79,20 +94,6 @@ private:
     Logger* m_logger;
 };
 
-class EchoServerFactory final : public ProcessorFactory {
-public:
-    EchoServerFactory(Logger* logger) : m_logger(logger) {}
-    Processor* CreateProcessor() override {
-        return new EchoServerProcessor(m_logger);
-    }
-    void DestroyProcessor(Processor* p) override {
-        delete p;
-    }
-
-private:
-    Logger* m_logger;
-};
-
 class EchoClientFactory final : public ProcessorFactory {
 public:
     EchoClientFactory(Logger* logger) : m_logger(logger) {}
@@ -112,17 +113,17 @@ int main(void) {
     stdio_logger_init(&logger);
 
     ProcessorManager mgr(&logger);
-    if (mgr.Init() != SC_OK) {
+    if (mgr.Init() != RC_SUCCESS) {
         logger_error(&logger, "init manager failed.");
         return -1;
     }
 
-    if (mgr.AddServer("127.0.0.1", 54321, make_shared<EchoServerFactory>(&logger)) != SC_OK) {
+    if (mgr.AddServer("127.0.0.1", 54321, make_shared<EchoServerFactory>(&logger)) != RC_SUCCESS) {
         logger_error(&logger, "add server failed.");
         return -1;
     }
 
-    if (mgr.AddClient("127.0.0.1", 54321, make_shared<EchoClientFactory>(&logger)) != SC_OK) {
+    if (mgr.AddClient("127.0.0.1", 54321, make_shared<EchoClientFactory>(&logger)) != RC_SUCCESS) {
         logger_error(&logger, "add client failed.");
         return -1;
     }
