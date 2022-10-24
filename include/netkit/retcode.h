@@ -11,6 +11,7 @@ enum {
     RC_CLIENT_DISCONNECTED,
     RC_INTERNAL_NET_ERR,
     RC_REQ_PACKET_ERR,
+    RC_TIMEOUT,
 };
 
 typedef uint32_t RetCode;

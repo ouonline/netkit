@@ -13,7 +13,6 @@ namespace netkit {
 Connection::Connection(int fd, Logger* logger) {
     m_fd = fd;
     m_logger = logger;
-    m_send_timeout = 0;
 
     struct sockaddr_in addr;
     socklen_t len = sizeof(addr);
@@ -41,24 +40,18 @@ static void Time2Timeval(uint32_t ms, struct timeval* t) {
     }
 }
 
-static RetCode RealSetSendTimeout(int fd, uint32_t ms, Logger* logger) {
-    if (ms == 0) {
-        return RC_SUCCESS;
-    }
+RetCode Connection::SetSendTimeout(uint32_t ms) {
+    if (ms > 0) {
+        struct timeval t;
+        Time2Timeval(ms, &t);
 
-    struct timeval t;
-    Time2Timeval(ms, &t);
-
-    if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &t, sizeof(t)) != 0) {
-        logger_error(logger, "set send timeout failed: %s", strerror(errno));
-        return RC_INTERNAL_NET_ERR;
+        if (setsockopt(m_fd, SOL_SOCKET, SO_SNDTIMEO, &t, sizeof(t)) != 0) {
+            logger_error(m_logger, "set send timeout failed: %s.", strerror(errno));
+            return RC_INTERNAL_NET_ERR;
+        }
     }
 
     return RC_SUCCESS;
-}
-
-void Connection::SetSendTimeout(uint32_t ms) {
-    m_send_timeout = ms;
 }
 
 static uint64_t DiffTimeMs(struct timeval end, const struct timeval& begin) {
@@ -70,50 +63,39 @@ static uint64_t DiffTimeMs(struct timeval end, const struct timeval& begin) {
     return (end.tv_sec - begin.tv_sec) * 1000 + (end.tv_usec - begin.tv_usec) / 1000;
 }
 
-int Connection::Send(const void* data, uint32_t size) {
-    std::unique_lock<std::mutex> __guard(m_lock);
+RetCode Connection::Send(const void* data, uint32_t size, uint32_t* bytes_left) {
+    if (size > 0) {
+        std::unique_lock<std::mutex> __guard(m_lock);
 
-    struct timeval begin;
-    if (m_send_timeout > 0) {
-        if (RealSetSendTimeout(m_fd, m_send_timeout, m_logger) != RC_SUCCESS) {
+        int nbytes = send(m_fd, data, size, 0);
+        if (nbytes == -1) {
+            if (bytes_left) {
+                *bytes_left = size;
+            }
+
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                logger_error(m_logger, "send timeout. nothing is sent.");
+                return RC_TIMEOUT;
+            }
+
+            logger_error(m_logger, "send [%u] bytes failed: %s.", size, strerror(errno));
             return RC_INTERNAL_NET_ERR;
         }
 
-        gettimeofday(&begin, NULL);
-    }
-
-    const char* cursor = (const char*)data;
-    uint32_t bytes_to_send = size;
-
-    while (bytes_to_send > 0) {
-        int nbytes = send(m_fd, cursor, bytes_to_send, 0);
-        if (nbytes < 0) {
-            if (errno != EAGAIN && errno != EWOULDBLOCK) {
-                return RC_INTERNAL_NET_ERR;
+        if (nbytes < size) {
+            if (bytes_left) {
+                *bytes_left = size - nbytes;
             }
-
-            usleep(1000);
-        } else {
-            bytes_to_send -= nbytes;
-            cursor += nbytes;
-        }
-
-        if (m_send_timeout > 0) {
-            struct timeval end;
-            gettimeofday(&end, NULL);
-
-            uint32_t time_cost = DiffTimeMs(end, begin);
-            if (time_cost >= m_send_timeout) {
-                break;
-            }
-
-            if (RealSetSendTimeout(m_fd, m_send_timeout - time_cost, m_logger) != RC_SUCCESS) {
-                break;
-            }
+            logger_error(m_logger, "send timeout. [%u] of [%u] bytes are sent.", nbytes, size);
+            return RC_TIMEOUT;
         }
     }
 
-    return (size - bytes_to_send);
+    if (bytes_left) {
+        *bytes_left = 0;
+    }
+
+    return RC_SUCCESS;
 }
 
 } // namespace netkit

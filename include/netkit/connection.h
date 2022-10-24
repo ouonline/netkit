@@ -19,15 +19,14 @@ struct ConnectionInfo final {
 class Connection final {
 public:
     Connection(int fd, Logger* logger);
-    void SetSendTimeout(uint32_t ms);
-    int Send(const void* data, uint32_t size);
+    RetCode SetSendTimeout(uint32_t ms);
+    RetCode Send(const void* data, uint32_t  size, uint32_t* bytes_left = nullptr);
     const ConnectionInfo& GetConnectionInfo() const {
         return m_info;
     }
 
 private:
     int m_fd;
-    uint32_t m_send_timeout;
     ConnectionInfo m_info;
     std::mutex m_lock;
     Logger* m_logger;
