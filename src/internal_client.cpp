@@ -18,7 +18,7 @@ static shared_ptr<Processor> CreateProcessor(const shared_ptr<ProcessorFactory>&
 
 InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& factory, threadkit::ThreadPool* tp,
                                Logger* logger)
-    : m_fd(fd), m_packet_bytes(0), m_logger(logger), m_tp(tp), m_factory(factory), m_conn(fd, logger) {
+    : m_fd(fd), m_logger(logger), m_tp(tp), m_factory(factory), m_conn(fd, logger) {
     m_processor = CreateProcessor(factory, &m_conn);
     m_processor->OnConnected(&m_conn);
 }
@@ -66,34 +66,33 @@ RetCode InternalClient::In() {
         return sc;
     }
 
-    auto pkt = m_processor->GetPacket();
-    if (pkt->GetSize() < m_packet_bytes) {
-        return RC_SUCCESS;
-    }
-
     while (true) {
-        if (!m_processor->CheckPacket(&m_packet_bytes)) {
-            logger_error(m_logger, "check packet failed: %u", m_packet_bytes);
+        uint64_t packet_bytes = 0;
+        int ret = m_processor->CheckPacket(&packet_bytes);
+        if (ret == Processor::PACKET_INVALID) {
+            logger_error(m_logger, "check packet failed.");
             return RC_REQ_PACKET_ERR;
         }
-
-        auto buf = m_processor->GetPacket();
-        if (buf->GetSize() < m_packet_bytes) {
+        if (ret == Processor::PACKET_MORE_DATA) {
             return RC_SUCCESS;
+        }
+        if (ret != Processor::PACKET_SUCCESS) {
+            logger_error(m_logger, "unknown packet state: [%d]", ret);
+            return RC_REQ_PACKET_ERR;
         }
 
         auto last_req = m_processor;
         m_processor = CreateProcessor(m_factory, &m_conn);
 
-        if (buf->GetSize() == m_packet_bytes) {
+        auto buf = last_req->GetPacket();
+        if (buf->GetSize() == packet_bytes) {
             m_tp->AddTask(last_req);
-            m_packet_bytes = 0; // clear m_packet_bytes because we don't know the size of next request
             return RC_SUCCESS;
         }
 
         auto new_buf = m_processor->GetPacket();
-        new_buf->Append(buf->GetData() + m_packet_bytes, buf->GetSize() - m_packet_bytes);
-        buf->Resize(m_packet_bytes);
+        new_buf->Append(buf->GetData() + packet_bytes, buf->GetSize() - packet_bytes);
+        buf->Resize(packet_bytes);
         m_tp->AddTask(last_req);
     }
 

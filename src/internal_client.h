@@ -26,7 +26,6 @@ public:
 
 private:
     int m_fd;
-    uint32_t m_packet_bytes;
     Connection m_conn;
     std::shared_ptr<Processor> m_processor;
 

@@ -9,11 +9,18 @@ namespace netkit {
 
 class Processor : public threadkit::ThreadTask {
 public:
+public:
     Processor() : m_conn(nullptr) {}
     virtual ~Processor() {}
 
-    // sets `total_packet_bytes` to total length of current request
-    virtual bool CheckPacket(uint32_t* total_packet_bytes) = 0;
+    /** returned values of CheckPacket() */
+    enum PacketState {
+        PACKET_INVALID = -1, /* invalid packet */
+        PACKET_SUCCESS = 0, /* ok, and `packet_bytes` is set */
+        PACKET_MORE_DATA = 1, /* more data required. `packet_bytes` is ignored */
+    };
+
+    virtual PacketState CheckPacket(uint64_t* packet_bytes) = 0;
 
     Buffer* GetPacket() {
         return &m_buf;

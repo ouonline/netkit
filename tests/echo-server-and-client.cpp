@@ -10,10 +10,10 @@ class EchoServerProcessor final : public Processor {
 public:
     EchoServerProcessor(Logger* logger) : m_logger(logger) {}
 
-    bool CheckPacket(uint32_t* size) override {
+    PacketState CheckPacket(uint64_t* size) override {
         auto buf = GetPacket();
         *size = buf->GetSize();
-        return true;
+        return Processor::PACKET_SUCCESS;
     }
 
     void OnConnected(Connection* c) override {
@@ -58,10 +58,10 @@ class EchoClientProcessor final : public Processor {
 public:
     EchoClientProcessor(Logger* logger) : m_logger(logger) {}
 
-    bool CheckPacket(uint32_t* size) override {
+    PacketState CheckPacket(uint64_t* size) override {
         auto buf = GetPacket();
         *size = buf->GetSize();
-        return true;
+        return Processor::PACKET_SUCCESS;
     }
 
     void OnConnected(Connection* c) override {
