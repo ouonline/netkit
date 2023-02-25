@@ -51,7 +51,6 @@ RetCode EventManager::Loop() {
             RetCode sc = RC_SUCCESS;
 
             if ((events & EPOLLHUP) || (events & EPOLLRDHUP) || (events & EPOLLERR)) {
-                e->Error();
                 sc = RC_CLIENT_DISCONNECTED;
             } else {
                 if (events & EPOLLIN) {
@@ -66,6 +65,7 @@ RetCode EventManager::Loop() {
             }
 
             if (sc != RC_SUCCESS) {
+                e->ShutDown();
                 int fd = e->GetFd();
                 epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, nullptr);
                 close(fd);

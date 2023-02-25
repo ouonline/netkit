@@ -18,19 +18,19 @@ public:
 
     void OnConnected(Connection* c) override {
         const ConnectionInfo& info = c->GetConnectionInfo();
-        logger_info(m_logger, "accepts client[%s:%u].", info.remote_addr.c_str(), info.remote_port);
+        logger_info(m_logger, "[server] accepts client[%s:%u].", info.remote_addr.c_str(), info.remote_port);
     }
 
     void OnDisconnected(Connection* c) override {
         const ConnectionInfo& info = c->GetConnectionInfo();
-        logger_info(m_logger, "client[%s:%u] disconnected.", info.remote_addr.c_str(), info.remote_port);
+        logger_info(m_logger, "[server] client[%s:%u] disconnected.", info.remote_addr.c_str(), info.remote_port);
     }
 
 protected:
     bool ProcessPacket(Connection* c) override {
         auto buf = GetPacket();
         const ConnectionInfo& info = c->GetConnectionInfo();
-        logger_info(m_logger, "server[%s:%u] <= client[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
+        logger_info(m_logger, "[server] server[%s:%u] <= client[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
         c->Send(buf->GetData(), buf->GetSize());
         return true;
@@ -57,6 +57,9 @@ private:
 class EchoClientProcessor final : public Processor {
 public:
     EchoClientProcessor(Logger* logger) : m_logger(logger) {}
+    ~EchoClientProcessor() {
+        logger_info(m_logger, "[client] client instance destroyed.");
+    }
 
     PacketState CheckPacket(uint64_t* size) override {
         auto buf = GetPacket();
@@ -66,13 +69,13 @@ public:
 
     void OnConnected(Connection* c) override {
         const ConnectionInfo& info = c->GetConnectionInfo();
-        logger_info(m_logger, "client[%s:%u] connected.", info.local_addr.c_str(), info.local_port);
+        logger_info(m_logger, "[client] client[%s:%u] connected.", info.local_addr.c_str(), info.local_port);
         c->Send("0", 1);
     }
 
     void OnDisconnected(Connection* c) override {
         const ConnectionInfo& info = c->GetConnectionInfo();
-        logger_info(m_logger, "client[%s:%u] disconnected.", info.local_addr.c_str(), info.local_port);
+        logger_info(m_logger, "[client] client[%s:%u] disconnected.", info.local_addr.c_str(), info.local_port);
     }
 
 protected:
@@ -80,7 +83,7 @@ protected:
         auto buf = GetPacket();
         const ConnectionInfo& info = c->GetConnectionInfo();
 
-        logger_info(m_logger, "client[%s:%u] <= server[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
+        logger_info(m_logger, "[client] client[%s:%u] <= server[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
         sleep(1);
 
@@ -97,6 +100,9 @@ private:
 class EchoClientFactory final : public ProcessorFactory {
 public:
     EchoClientFactory(Logger* logger) : m_logger(logger) {}
+    ~EchoClientFactory() {
+        logger_info(m_logger, "[client] client factory destroyed.");
+    }
     Processor* CreateProcessor() override {
         return new EchoClientProcessor(m_logger);
     }

@@ -99,7 +99,7 @@ RetCode InternalClient::In() {
     return RC_SUCCESS;
 }
 
-void InternalClient::Error() {
+void InternalClient::ShutDown() {
     m_processor->OnDisconnected(&m_conn);
 }
 

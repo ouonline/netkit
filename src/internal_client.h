@@ -20,9 +20,9 @@ public:
     }
     RetCode In() override;
     RetCode Out() override {
-        return RC_SUCCESS;
+        return RC_NOT_IMPLEMENTED;
     }
-    void Error() override;
+    void ShutDown() override;
 
 private:
     int m_fd;

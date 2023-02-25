@@ -8,6 +8,7 @@ namespace netkit {
 enum {
     RC_SUCCESS = 0,
     RC_NOMEM,
+    RC_NOT_IMPLEMENTED,
     RC_CLIENT_DISCONNECTED,
     RC_INTERNAL_NET_ERR,
     RC_REQ_PACKET_ERR,

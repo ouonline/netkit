@@ -11,7 +11,7 @@ public:
     virtual int GetFd() const = 0;
     virtual RetCode In() = 0;
     virtual RetCode Out() = 0;
-    virtual void Error() = 0;
+    virtual void ShutDown() = 0;
 };
 
 } // namespace netkit
