@@ -30,7 +30,7 @@ protected:
     bool ProcessPacket(Connection* c) override {
         auto buf = GetPacket();
         const ConnectionInfo& info = c->GetConnectionInfo();
-        logger_info(m_logger, "[server] server[%s:%u] <= client[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
+        logger_info(m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
         c->Send(buf->GetData(), buf->GetSize());
         return true;
@@ -83,7 +83,7 @@ protected:
         auto buf = GetPacket();
         const ConnectionInfo& info = c->GetConnectionInfo();
 
-        logger_info(m_logger, "[client] client[%s:%u] <= server[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
+        logger_info(m_logger, "[client] server[%s:%u] ==> client[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
         sleep(1);
 
@@ -115,26 +115,28 @@ private:
 };
 
 int main(void) {
-    Logger logger;
+    StdioLogger logger;
     stdio_logger_init(&logger);
 
-    ProcessorManager mgr(&logger);
+    ProcessorManager mgr(&logger.l);
     if (mgr.Init() != RC_SUCCESS) {
-        logger_error(&logger, "init manager failed.");
+        logger_error(&logger.l, "init manager failed.");
         return -1;
     }
 
-    if (mgr.AddServer("127.0.0.1", 54321, make_shared<EchoServerFactory>(&logger)) != RC_SUCCESS) {
-        logger_error(&logger, "add server failed.");
+    if (mgr.AddServer("127.0.0.1", 54321, make_shared<EchoServerFactory>(&logger.l)) != RC_SUCCESS) {
+        logger_error(&logger.l, "add server failed.");
         return -1;
     }
 
-    if (mgr.AddClient("127.0.0.1", 54321, make_shared<EchoClientFactory>(&logger)) != RC_SUCCESS) {
-        logger_error(&logger, "add client failed.");
+    if (mgr.AddClient("127.0.0.1", 54321, make_shared<EchoClientFactory>(&logger.l)) != RC_SUCCESS) {
+        logger_error(&logger.l, "add client failed.");
         return -1;
     }
 
     mgr.Run();
+
+    stdio_logger_destroy(&logger);
 
     return 0;
 }
