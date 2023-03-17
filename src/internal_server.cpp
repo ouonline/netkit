@@ -3,6 +3,7 @@
 #include "utils.h"
 #include <sys/socket.h>
 #include <unistd.h>
+using namespace std;
 
 namespace netkit { namespace tcp {
 
@@ -17,7 +18,11 @@ RetCode InternalServer::In() {
         return RC_INTERNAL_NET_ERR;
     }
 
-    auto client = new InternalClient(fd, m_factory, m_tp, m_logger);
+    auto processor = shared_ptr<Processor>(m_factory->CreateProcessor(), [f = m_factory](Processor* t) -> void {
+        f->DestroyProcessor(t);
+    });
+
+    auto client = new InternalClient(fd, processor, m_tp, m_logger);
     if (!client) {
         logger_error(m_logger, "allocate client failed.");
         goto err;

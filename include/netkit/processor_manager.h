@@ -17,7 +17,7 @@ public:
     virtual ~ProcessorManager() {}
     RetCode Init();
     RetCode AddServer(const char* addr, uint16_t port, const std::shared_ptr<ProcessorFactory>& factory);
-    RetCode AddClient(const char* addr, uint16_t port, const std::shared_ptr<ProcessorFactory>& factory);
+    RetCode AddClient(const char* addr, uint16_t port, const std::shared_ptr<Processor>&);
     RetCode Run();
 
 private:

@@ -3,16 +3,11 @@
 
 #include "buffer.h"
 #include "connection.h"
-#include "threadkit/threadpool.h"
 
 namespace netkit {
 
-class Processor : public threadkit::ThreadTask {
+class Processor {
 public:
-public:
-    Processor() : m_conn(nullptr) {}
-    virtual ~Processor() {}
-
     /** returned values of CheckPacket() */
     enum PacketState {
         PACKET_INVALID = -1, /* invalid packet */
@@ -20,34 +15,14 @@ public:
         PACKET_MORE_DATA = 1, /* more data required. `packet_bytes` is ignored */
     };
 
-    virtual PacketState CheckPacket(uint64_t* packet_bytes) = 0;
-
-    Buffer* GetPacket() {
-        return &m_buf;
-    }
-    void SetConnection(Connection* c) {
-        m_conn = c;
-    }
+public:
+    virtual ~Processor() {}
 
     virtual void OnConnected(Connection*) = 0;
     virtual void OnDisconnected(Connection*) = 0;
 
-protected:
-    virtual bool ProcessPacket(Connection*) = 0;
-
-private:
-    std::shared_ptr<threadkit::ThreadTask> Run() override final {
-        ProcessPacket(m_conn);
-        return std::shared_ptr<threadkit::ThreadTask>();
-    }
-
-private:
-    Connection* m_conn;
-    Buffer m_buf;
-
-private:
-    Processor(const Processor&);
-    Processor& operator=(const Processor&);
+    virtual PacketState CheckPacket(Buffer*, uint64_t* packet_bytes) = 0;
+    virtual bool ProcessPacket(Buffer*, Connection*) = 0;
 };
 
 } // namespace netkit

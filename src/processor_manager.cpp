@@ -137,7 +137,7 @@ RetCode ProcessorManager::AddServer(const char* addr, uint16_t port, const share
     return RC_SUCCESS;
 }
 
-RetCode ProcessorManager::AddClient(const char* addr, uint16_t port, const shared_ptr<ProcessorFactory>& factory) {
+RetCode ProcessorManager::AddClient(const char* addr, uint16_t port, const shared_ptr<Processor>& processor) {
     int fd = CreateClientFd(addr, port);
     if (fd < 0) {
         logger_error(m_logger, "create client failed.");
@@ -148,7 +148,7 @@ RetCode ProcessorManager::AddClient(const char* addr, uint16_t port, const share
         return RC_INTERNAL_NET_ERR;
     }
 
-    auto client = new InternalClient(fd, factory, &m_thread_pool, m_logger);
+    auto client = new InternalClient(fd, processor, &m_thread_pool, m_logger);
     if (!client) {
         logger_error(m_logger, "allocate client failed.");
         goto err;

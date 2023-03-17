@@ -8,19 +8,10 @@ using namespace std;
 
 namespace netkit { namespace tcp {
 
-static shared_ptr<Processor> CreateProcessor(const shared_ptr<ProcessorFactory>& factory, Connection* conn) {
-    auto p = factory->CreateProcessor();
-    p->SetConnection(conn);
-    return shared_ptr<Processor>(p, [f = factory](Processor* t) -> void {
-        f->DestroyProcessor(t);
-    });
-}
-
-InternalClient::InternalClient(int fd, const shared_ptr<ProcessorFactory>& factory, threadkit::ThreadPool* tp,
-                               Logger* logger)
-    : m_fd(fd), m_logger(logger), m_tp(tp), m_factory(factory), m_conn(fd, logger) {
-    m_processor = CreateProcessor(factory, &m_conn);
+InternalClient::InternalClient(int fd, const shared_ptr<Processor>& p, threadkit::ThreadPool* tp, Logger* logger)
+    : m_fd(fd), m_conn(fd, logger), m_processor(p), m_logger(logger), m_tp(tp) {
     m_processor->OnConnected(&m_conn);
+    m_task = make_shared<ProcessorTask>(m_processor, &m_conn);
 }
 
 static RetCode ReadData(int fd, Buffer* buf, Logger* logger) {
@@ -61,14 +52,14 @@ static RetCode ReadData(int fd, Buffer* buf, Logger* logger) {
 }
 
 RetCode InternalClient::In() {
-    RetCode sc = ReadData(m_fd, m_processor->GetPacket(), m_logger);
+    RetCode sc = ReadData(m_fd, m_task->GetBuffer(), m_logger);
     if (sc != RC_SUCCESS) {
         return sc;
     }
 
     while (true) {
         uint64_t packet_bytes = 0;
-        int ret = m_processor->CheckPacket(&packet_bytes);
+        int ret = m_processor->CheckPacket(m_task->GetBuffer(), &packet_bytes);
         if (ret == Processor::PACKET_INVALID) {
             logger_error(m_logger, "check packet failed.");
             return RC_REQ_PACKET_ERR;
@@ -81,16 +72,16 @@ RetCode InternalClient::In() {
             return RC_REQ_PACKET_ERR;
         }
 
-        auto last_req = m_processor;
-        m_processor = CreateProcessor(m_factory, &m_conn);
+        auto last_req = m_task;
+        m_task = make_shared<ProcessorTask>(m_processor, &m_conn);
 
-        auto buf = last_req->GetPacket();
+        auto buf = last_req->GetBuffer();
         if (buf->GetSize() == packet_bytes) {
             m_tp->AddTask(last_req);
             return RC_SUCCESS;
         }
 
-        auto new_buf = m_processor->GetPacket();
+        auto new_buf = m_task->GetBuffer();
         new_buf->Append(buf->GetData() + packet_bytes, buf->GetSize() - packet_bytes);
         buf->Resize(packet_bytes);
         m_tp->AddTask(last_req);

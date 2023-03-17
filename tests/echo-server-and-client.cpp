@@ -9,9 +9,11 @@ using namespace std;
 class EchoServerProcessor final : public Processor {
 public:
     EchoServerProcessor(Logger* logger) : m_logger(logger) {}
+    ~EchoServerProcessor() {
+        logger_info(m_logger, "[server] server processor destroyed.");
+    }
 
-    PacketState CheckPacket(uint64_t* size) override {
-        auto buf = GetPacket();
+    PacketState CheckPacket(Buffer* buf, uint64_t* size) override {
         *size = buf->GetSize();
         return Processor::PACKET_SUCCESS;
     }
@@ -26,9 +28,7 @@ public:
         logger_info(m_logger, "[server] client[%s:%u] disconnected.", info.remote_addr.c_str(), info.remote_port);
     }
 
-protected:
-    bool ProcessPacket(Connection* c) override {
-        auto buf = GetPacket();
+    bool ProcessPacket(Buffer* buf, Connection* c) override {
         const ConnectionInfo& info = c->GetConnectionInfo();
         logger_info(m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
@@ -61,8 +61,7 @@ public:
         logger_info(m_logger, "[client] client instance destroyed.");
     }
 
-    PacketState CheckPacket(uint64_t* size) override {
-        auto buf = GetPacket();
+    PacketState CheckPacket(Buffer* buf, uint64_t* size) override {
         *size = buf->GetSize();
         return Processor::PACKET_SUCCESS;
     }
@@ -78,9 +77,7 @@ public:
         logger_info(m_logger, "[client] client[%s:%u] disconnected.", info.local_addr.c_str(), info.local_port);
     }
 
-protected:
-    bool ProcessPacket(Connection* c) override {
-        auto buf = GetPacket();
+    bool ProcessPacket(Buffer* buf, Connection* c) override {
         const ConnectionInfo& info = c->GetConnectionInfo();
 
         logger_info(m_logger, "[client] server[%s:%u] ==> client[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
@@ -91,23 +88,6 @@ protected:
         const string content = std::to_string(num + 1);
         c->Send(content.data(), content.size());
         return true;
-    }
-
-private:
-    Logger* m_logger;
-};
-
-class EchoClientFactory final : public ProcessorFactory {
-public:
-    EchoClientFactory(Logger* logger) : m_logger(logger) {}
-    ~EchoClientFactory() {
-        logger_info(m_logger, "[client] client factory destroyed.");
-    }
-    Processor* CreateProcessor() override {
-        return new EchoClientProcessor(m_logger);
-    }
-    void DestroyProcessor(Processor* p) override {
-        delete p;
     }
 
 private:
@@ -129,7 +109,7 @@ int main(void) {
         return -1;
     }
 
-    if (mgr.AddClient("127.0.0.1", 54321, make_shared<EchoClientFactory>(&logger.l)) != RC_SUCCESS) {
+    if (mgr.AddClient("127.0.0.1", 54321, make_shared<EchoClientProcessor>(&logger.l)) != RC_SUCCESS) {
         logger_error(&logger.l, "add client failed.");
         return -1;
     }

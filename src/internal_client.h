@@ -11,9 +11,26 @@
 
 namespace netkit { namespace tcp {
 
+class ProcessorTask final : public threadkit::ThreadTask {
+public:
+    ProcessorTask(const std::shared_ptr<Processor>& p, Connection* c) : m_processor(p), m_conn(c) {}
+    Buffer* GetBuffer() {
+        return &m_buf;
+    }
+    std::shared_ptr<threadkit::ThreadTask> Run() override {
+        m_processor->ProcessPacket(&m_buf, m_conn);
+        return std::shared_ptr<threadkit::ThreadTask>();
+    }
+
+private:
+    Connection* m_conn;
+    std::shared_ptr<Processor> m_processor;
+    Buffer m_buf;
+};
+
 class InternalClient final : public EventHandler {
 public:
-    InternalClient(int fd, const std::shared_ptr<ProcessorFactory>& factory, threadkit::ThreadPool* tp, Logger*);
+    InternalClient(int fd, const std::shared_ptr<Processor>& p, threadkit::ThreadPool* tp, Logger*);
 
     int GetFd() const override {
         return m_fd;
@@ -27,13 +44,13 @@ public:
 private:
     int m_fd;
     Connection m_conn;
+    std::shared_ptr<ProcessorTask> m_task;
     std::shared_ptr<Processor> m_processor;
 
     // ----- shared data ----- //
 
     Logger* m_logger;
     threadkit::ThreadPool* m_tp;
-    std::shared_ptr<ProcessorFactory> m_factory;
 
 private:
     InternalClient(const InternalClient&);
