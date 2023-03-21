@@ -3,7 +3,7 @@
 
 #include "retcode.h"
 #include "logger/logger.h"
-#include <mutex>
+#include <pthread.h>
 #include <string>
 #include <stdint.h>
 
@@ -19,6 +19,7 @@ struct ConnectionInfo final {
 class Connection final {
 public:
     Connection(int fd, Logger* logger);
+    ~Connection();
     RetCode SetSendTimeout(uint32_t ms);
     RetCode Send(const void* data, uint32_t  size, uint32_t* bytes_left = nullptr);
     const ConnectionInfo& GetConnectionInfo() const {
@@ -28,7 +29,7 @@ public:
 private:
     int m_fd;
     ConnectionInfo m_info;
-    std::mutex m_lock;
+    pthread_mutex_t m_lock;
     Logger* m_logger;
 
 private:

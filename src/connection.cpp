@@ -6,6 +6,8 @@
 
 #include <sys/socket.h>
 #include <arpa/inet.h>
+
+#include <memory>
 using namespace std;
 
 namespace netkit {
@@ -13,6 +15,7 @@ namespace netkit {
 Connection::Connection(int fd, Logger* logger) {
     m_fd = fd;
     m_logger = logger;
+    pthread_mutex_init(&m_lock, nullptr);
 
     struct sockaddr_in addr;
     socklen_t len = sizeof(addr);
@@ -28,6 +31,10 @@ Connection::Connection(int fd, Logger* logger) {
         m_info.local_addr = inet_ntoa(addr.sin_addr);
         m_info.local_port = addr.sin_port;
     }
+}
+
+Connection::~Connection() {
+    pthread_mutex_destroy(&m_lock);
 }
 
 static void Time2Timeval(uint32_t ms, struct timeval* t) {
@@ -63,9 +70,14 @@ static uint64_t DiffTimeMs(struct timeval end, const struct timeval& begin) {
     return (end.tv_sec - begin.tv_sec) * 1000 + (end.tv_usec - begin.tv_usec) / 1000;
 }
 
+static void Unlock(pthread_mutex_t* lck) {
+    pthread_mutex_unlock(lck);
+}
+
 RetCode Connection::Send(const void* data, uint32_t size, uint32_t* bytes_left) {
     if (size > 0) {
-        std::unique_lock<std::mutex> __guard(m_lock);
+        pthread_mutex_lock(&m_lock);
+        unique_ptr<pthread_mutex_t, void(*)(pthread_mutex_t*)> lock_guard(&m_lock, Unlock);
 
         int nbytes = send(m_fd, data, size, 0);
         if (nbytes == -1) {
