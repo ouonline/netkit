@@ -21,7 +21,7 @@ public:
     Connection(int fd, Logger* logger);
     ~Connection();
     RetCode SetSendTimeout(uint32_t ms);
-    RetCode Send(const void* data, uint32_t  size, uint32_t* bytes_left = nullptr);
+    RetCode Send(const void* data, uint64_t size, uint64_t* bytes_left = nullptr);
     const ConnectionInfo& GetConnectionInfo() const {
         return m_info;
     }

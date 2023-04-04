@@ -13,7 +13,7 @@ namespace netkit { namespace tcp {
 
 class ProcessorTask final : public threadkit::ThreadTask {
 public:
-    ProcessorTask(const std::shared_ptr<Processor>& p, Connection* c) : m_processor(p), m_conn(c) {}
+    ProcessorTask(const std::shared_ptr<Processor>& p, Connection* c) : m_conn(c), m_processor(p) {}
     Buffer* GetBuffer() {
         return &m_buf;
     }

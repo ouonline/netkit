@@ -8,10 +8,18 @@ option(NETKIT_INSTALL "install headers and libs" ON)
 
 # ----- targets ----- #
 
-file(GLOB NETKIT_SRC ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
-add_library(netkit_static STATIC ${NETKIT_SRC})
+file(GLOB_RECURSE __NETKIT_SRC__ ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+add_library(netkit_static STATIC ${__NETKIT_SRC__})
+unset(__NETKIT_SRC__)
+
 target_include_directories(netkit_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_compile_features(netkit_static PRIVATE cxx_std_14)
+target_compile_features(netkit_static PUBLIC cxx_std_11)
+
+if(MSVC)
+    target_compile_options(netkit_static PRIVATE /W4)
+else()
+    target_compile_options(netkit_static PRIVATE -Wall -Wextra -Werror)
+endif()
 
 # ----- dependencies ----- #
 
@@ -20,7 +28,7 @@ set(FETCHCONTENT_QUIET OFF)
 set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 
 if(NOT NETKIT_DEPS_DIR)
-    get_filename_component(NETKIT_DEPS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/deps ABSOLUTE)
+    get_filename_component(NETKIT_DEPS_DIR ${CMAKE_CURRENT_BINARY_DIR} ABSOLUTE)
     message("-- `NETKIT_DEPS_DIR` is not set. set `NETKIT_DEPS_DIR` to `${NETKIT_DEPS_DIR}`.")
 endif()
 

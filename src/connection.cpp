@@ -61,20 +61,11 @@ RetCode Connection::SetSendTimeout(uint32_t ms) {
     return RC_SUCCESS;
 }
 
-static uint64_t DiffTimeMs(struct timeval end, const struct timeval& begin) {
-    if (end.tv_usec < begin.tv_usec) {
-        --end.tv_sec;
-        end.tv_usec += 1000000;
-    }
-
-    return (end.tv_sec - begin.tv_sec) * 1000 + (end.tv_usec - begin.tv_usec) / 1000;
-}
-
 static void Unlock(pthread_mutex_t* lck) {
     pthread_mutex_unlock(lck);
 }
 
-RetCode Connection::Send(const void* data, uint32_t size, uint32_t* bytes_left) {
+RetCode Connection::Send(const void* data, uint64_t size, uint64_t* bytes_left) {
     if (size > 0) {
         pthread_mutex_lock(&m_lock);
         unique_ptr<pthread_mutex_t, void(*)(pthread_mutex_t*)> lock_guard(&m_lock, Unlock);
@@ -94,7 +85,7 @@ RetCode Connection::Send(const void* data, uint32_t size, uint32_t* bytes_left) 
             return RC_INTERNAL_NET_ERR;
         }
 
-        if (nbytes < size) {
+        if ((uint64_t)nbytes < size) {
             if (bytes_left) {
                 *bytes_left = size - nbytes;
             }
