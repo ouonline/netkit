@@ -80,7 +80,7 @@ int ProcessorManager::CreateServerFd(const char* host, uint16_t port) {
     return fd;
 
 err1:
-    close(fd);
+    shutdown(fd, SHUT_RDWR);
 err:
     freeaddrinfo(info);
     return -1;
@@ -107,7 +107,7 @@ int ProcessorManager::CreateClientFd(const char* host, uint16_t port) {
     return fd;
 
 err1:
-    close(fd);
+    shutdown(fd, SHUT_RDWR);
 err:
     freeaddrinfo(info);
     return -1;
@@ -123,13 +123,13 @@ RetCode ProcessorManager::AddServer(const char* addr, uint16_t port, const share
     auto svr = new InternalServer(fd, factory, &m_event_mgr, &m_thread_pool, m_logger);
     if (!svr) {
         logger_error(m_logger, "allocate tcp server failed.");
-        close(fd);
+        shutdown(fd, SHUT_RDWR);
         return RC_NOMEM;
     }
 
     if (m_event_mgr.AddHandler(svr, EPOLLIN) != RC_SUCCESS) {
         logger_error(m_logger, "add server[%s:%u] to epoll failed: %s.", addr, port, strerror(errno));
-        close(fd);
+        shutdown(fd, SHUT_RDWR);
         delete svr;
         return RC_INTERNAL_NET_ERR;
     }
@@ -144,7 +144,7 @@ RetCode ProcessorManager::AddClient(const char* addr, uint16_t port, const share
         return RC_INTERNAL_NET_ERR;
     }
     if (SetNonBlocking(fd, m_logger) != RC_SUCCESS) {
-        close(fd);
+        shutdown(fd, SHUT_RDWR);
         return RC_INTERNAL_NET_ERR;
     }
 
@@ -161,7 +161,7 @@ RetCode ProcessorManager::AddClient(const char* addr, uint16_t port, const share
     logger_error(m_logger, "add client failed: %s.", strerror(errno));
     delete client;
 err:
-    close(fd);
+    shutdown(fd, SHUT_RDWR);
     return RC_INTERNAL_NET_ERR;
 }
 

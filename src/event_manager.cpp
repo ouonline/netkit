@@ -1,4 +1,5 @@
 #include "netkit/event_manager.h"
+#include <sys/socket.h> // shutdown()
 #include <sys/epoll.h>
 #include <unistd.h>
 #include <errno.h>
@@ -68,7 +69,7 @@ RetCode EventManager::Loop() {
                 e->ShutDown();
                 int fd = e->GetFd();
                 epoll_ctl(m_epfd, EPOLL_CTL_DEL, fd, nullptr);
-                close(fd);
+                shutdown(fd, SHUT_RDWR);
                 delete e;
             }
         }

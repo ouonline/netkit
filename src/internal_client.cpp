@@ -3,7 +3,8 @@
 #include <memory>
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <cstring> // strerror
+#include <sys/socket.h> // recv()
+#include <cstring> // strerror()
 using namespace std;
 
 namespace netkit { namespace tcp {
@@ -30,13 +31,13 @@ static RetCode ReadData(int fd, Buffer* buf, Logger* logger) {
 
     char* cursor = buf->GetData() + end_offset;
     while (nbytes > 0) {
-        int ret = read(fd, cursor, nbytes);
+        int ret = recv(fd, cursor, nbytes, 0);
         if (ret == -1) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 break;
             }
 
-            logger_error(logger, "read failed: %s", strerror(errno));
+            logger_error(logger, "recv failed: %s", strerror(errno));
             return RC_INTERNAL_NET_ERR;
         }
         if (ret == 0) {

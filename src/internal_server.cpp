@@ -14,7 +14,7 @@ RetCode InternalServer::In() {
         return RC_INTERNAL_NET_ERR;
     }
     if (SetNonBlocking(fd, m_logger) != RC_SUCCESS) {
-        close(fd);
+        shutdown(fd, SHUT_RDWR);
         return RC_INTERNAL_NET_ERR;
     }
 
@@ -35,7 +35,7 @@ RetCode InternalServer::In() {
     logger_error(m_logger, "add client failed: %s.", strerror(errno));
     delete client;
 err:
-    close(fd);
+    shutdown(fd, SHUT_RDWR);
     return RC_INTERNAL_NET_ERR;
 }
 
