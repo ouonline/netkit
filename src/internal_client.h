@@ -13,17 +13,18 @@ namespace netkit { namespace tcp {
 
 class ProcessorTask final : public threadkit::ThreadTask {
 public:
-    ProcessorTask(const std::shared_ptr<Processor>& p, Connection* c) : m_conn(c), m_processor(p) {}
+    ProcessorTask(const std::shared_ptr<Processor>& p, const std::shared_ptr<Connection>& c)
+        : m_conn(c), m_processor(p) {}
     Buffer* GetBuffer() {
         return &m_buf;
     }
     std::shared_ptr<threadkit::ThreadTask> Run() override {
-        m_processor->ProcessPacket(&m_buf, m_conn);
+        m_processor->ProcessPacket(&m_buf, m_conn.get());
         return std::shared_ptr<threadkit::ThreadTask>();
     }
 
 private:
-    Connection* m_conn;
+    std::shared_ptr<Connection> m_conn;
     std::shared_ptr<Processor> m_processor;
     Buffer m_buf;
 };
@@ -43,7 +44,7 @@ public:
 
 private:
     int m_fd;
-    Connection m_conn;
+    std::shared_ptr<Connection> m_conn;
     std::shared_ptr<ProcessorTask> m_task;
     std::shared_ptr<Processor> m_processor;
 

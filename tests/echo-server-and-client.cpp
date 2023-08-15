@@ -28,12 +28,11 @@ public:
         logger_info(m_logger, "[server] client[%s:%u] disconnected.", info.remote_addr.c_str(), info.remote_port);
     }
 
-    bool ProcessPacket(Buffer* buf, Connection* c) override {
+    void ProcessPacket(Buffer* buf, Connection* c) override {
         const ConnectionInfo& info = c->GetConnectionInfo();
         logger_info(m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
         c->Send(buf->GetData(), buf->GetSize());
-        return true;
     }
 
 private:
@@ -77,7 +76,7 @@ public:
         logger_info(m_logger, "[client] client[%s:%u] disconnected.", info.local_addr.c_str(), info.local_port);
     }
 
-    bool ProcessPacket(Buffer* buf, Connection* c) override {
+    void ProcessPacket(Buffer* buf, Connection* c) override {
         const ConnectionInfo& info = c->GetConnectionInfo();
 
         logger_info(m_logger, "[client] server[%s:%u] ==> client[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
@@ -87,7 +86,6 @@ public:
         auto num = std::stol(string(buf->GetData(), buf->GetSize()));
         const string content = std::to_string(num + 1);
         c->Send(content.data(), content.size());
-        return true;
     }
 
 private:

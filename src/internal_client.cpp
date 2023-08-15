@@ -10,9 +10,10 @@ using namespace std;
 namespace netkit { namespace tcp {
 
 InternalClient::InternalClient(int fd, const shared_ptr<Processor>& p, threadkit::ThreadPool* tp, Logger* logger)
-    : m_fd(fd), m_conn(fd, logger), m_processor(p), m_logger(logger), m_tp(tp) {
-    m_processor->OnConnected(&m_conn);
-    m_task = make_shared<ProcessorTask>(m_processor, &m_conn);
+    : m_fd(fd), m_processor(p), m_logger(logger), m_tp(tp) {
+    m_conn = make_shared<Connection>(fd, logger);
+    m_processor->OnConnected(m_conn.get());
+    m_task = make_shared<ProcessorTask>(m_processor, m_conn);
 }
 
 static RetCode ReadData(int fd, Buffer* buf, Logger* logger) {
@@ -74,7 +75,7 @@ RetCode InternalClient::In() {
         }
 
         auto last_req = m_task;
-        m_task = make_shared<ProcessorTask>(m_processor, &m_conn);
+        m_task = make_shared<ProcessorTask>(m_processor, m_conn);
 
         auto buf = last_req->GetBuffer();
         if (buf->GetSize() == packet_bytes) {
@@ -92,7 +93,7 @@ RetCode InternalClient::In() {
 }
 
 void InternalClient::ShutDown() {
-    m_processor->OnDisconnected(&m_conn);
+    m_processor->OnDisconnected(m_conn.get());
 }
 
 }} // namespace netkit::tcp

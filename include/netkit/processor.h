@@ -22,7 +22,7 @@ public:
     virtual void OnDisconnected(Connection*) = 0;
 
     virtual PacketState CheckPacket(Buffer*, uint64_t* packet_bytes) = 0;
-    virtual bool ProcessPacket(Buffer*, Connection*) = 0;
+    virtual void ProcessPacket(Buffer*, Connection*) = 0;
 };
 
 } // namespace netkit
