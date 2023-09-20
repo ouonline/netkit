@@ -1,22 +1,15 @@
 #include "netkit/connection.h"
-#include <sys/time.h>
-#include <errno.h>
-#include <string.h>
-#include <unistd.h>
-
+#include "read_write_request.h"
+#include "shutdown_request.h"
 #include <sys/socket.h>
 #include <arpa/inet.h>
-
-#include <memory>
+#include <cstring> // strerror()
 using namespace std;
 
 namespace netkit {
 
-Connection::Connection(int fd, Logger* logger) {
-    m_fd = fd;
-    m_logger = logger;
-    pthread_mutex_init(&m_lock, nullptr);
-
+Connection::Connection(int fd, struct io_uring* ring, Logger* logger)
+    : m_fd(fd), m_ring(ring), m_logger(logger) {
     struct sockaddr_in addr;
     socklen_t len = sizeof(addr);
     int ret = getpeername(fd, (struct sockaddr*)&addr, &len);
@@ -33,70 +26,91 @@ Connection::Connection(int fd, Logger* logger) {
     }
 }
 
-Connection::~Connection() {
-    pthread_mutex_destroy(&m_lock);
-}
-
-static void Time2Timeval(uint32_t ms, struct timeval* t) {
-    if (ms >= 1000) {
-        t->tv_sec = ms / 1000;
-        t->tv_usec = (ms % 1000) * 1000;
-    } else {
-        t->tv_sec = 0;
-        t->tv_usec = ms * 1000;
-    }
-}
-
-RetCode Connection::SetSendTimeout(uint32_t ms) {
-    if (ms > 0) {
-        struct timeval t;
-        Time2Timeval(ms, &t);
-
-        if (setsockopt(m_fd, SOL_SOCKET, SO_SNDTIMEO, &t, sizeof(t)) != 0) {
-            logger_error(m_logger, "set send timeout failed: %s.", strerror(errno));
+RetCode Connection::ReadAsync(void* buf, uint64_t sz, const function<void(uint64_t)>& cb) {
+    auto sqe = io_uring_get_sqe(m_ring);
+    if (!sqe) {
+        io_uring_submit(m_ring);
+        sqe = io_uring_get_sqe(m_ring);
+        if (!sqe) {
+            logger_error(m_logger, "io_uring_get_sqe failed.");
             return RC_INTERNAL_NET_ERR;
         }
     }
 
-    return RC_SUCCESS;
+    auto rd_req = new ReadWriteRequest(cb, Request::READ);
+    if (!rd_req) {
+        return RC_NOMEM;
+    }
+
+    io_uring_prep_read(sqe, m_fd, buf, sz, 0);
+    io_uring_sqe_set_data(sqe, rd_req);
+
+    int ret = io_uring_submit(m_ring);
+    if (ret <= 0) {
+        logger_error(m_logger, "io_uring_submit failed: [%s].", strerror(-ret));
+        delete rd_req;
+        return RC_INTERNAL_NET_ERR;
+    }
+
+    return RC_OK;
 }
 
-RetCode Connection::Send(const void* data, uint64_t size, uint64_t* bytes_left) {
-    if (size > 0) {
-        pthread_mutex_lock(&m_lock);
-        shared_ptr<void> __unlocker(nullptr, [this](void*) -> void {
-            pthread_mutex_unlock(&m_lock);
-        });
-
-        int nbytes = send(m_fd, data, size, 0);
-        if (nbytes == -1) {
-            if (bytes_left) {
-                *bytes_left = size;
-            }
-
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                logger_error(m_logger, "send timeout. nothing is sent.");
-                return RC_TIMEOUT;
-            }
-
-            logger_error(m_logger, "send [%u] bytes failed: %s.", size, strerror(errno));
+RetCode Connection::WriteAsync(const void* buf, uint64_t sz, const function<void(uint64_t)>& cb) {
+    auto sqe = io_uring_get_sqe(m_ring);
+    if (!sqe) {
+        io_uring_submit(m_ring);
+        sqe = io_uring_get_sqe(m_ring);
+        if (!sqe) {
+            logger_error(m_logger, "io_uring_get_sqe failed.");
             return RC_INTERNAL_NET_ERR;
         }
+    }
 
-        if ((uint64_t)nbytes < size) {
-            if (bytes_left) {
-                *bytes_left = size - nbytes;
-            }
-            logger_error(m_logger, "send timeout. [%u] of [%u] bytes are sent.", nbytes, size);
-            return RC_TIMEOUT;
+    auto wr_req = new ReadWriteRequest(cb, Request::WRITE);
+    if (!wr_req) {
+        return RC_NOMEM;
+    }
+
+    io_uring_prep_write(sqe, m_fd, buf, sz, 0);
+    io_uring_sqe_set_data(sqe, wr_req);
+
+    int ret = io_uring_submit(m_ring);
+    if (ret <= 0) {
+        logger_error(m_logger, "io_uring_submit failed: [%s].", strerror(-ret));
+        delete wr_req;
+        return RC_INTERNAL_NET_ERR;
+    }
+
+    return RC_OK;
+}
+
+RetCode Connection::ShutDownAsync(const function<void()>& cb) {
+    auto sqe = io_uring_get_sqe(m_ring);
+    if (!sqe) {
+        io_uring_submit(m_ring);
+        sqe = io_uring_get_sqe(m_ring);
+        if (!sqe) {
+            logger_error(m_logger, "io_uring_get_sqe failed.");
+            return RC_INTERNAL_NET_ERR;
         }
     }
 
-    if (bytes_left) {
-        *bytes_left = 0;
+    auto sd_req = new ShutDownRequest(cb);
+    if (!sd_req) {
+        return RC_NOMEM;
     }
 
-    return RC_SUCCESS;
+    io_uring_prep_shutdown(sqe, m_fd, SHUT_RDWR);
+    io_uring_sqe_set_data(sqe, sd_req);
+
+    int ret = io_uring_submit(m_ring);
+    if (ret <= 0) {
+        logger_error(m_logger, "io_uring_submit failed: [%s].", strerror(-ret));
+        delete sd_req;
+        return RC_INTERNAL_NET_ERR;
+    }
+
+    return RC_OK;
 }
 
-} // namespace netkit
+}

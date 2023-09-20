@@ -1,116 +1,118 @@
-#include "netkit/processor_manager.h"
+#include "netkit/connection_manager.h"
 using namespace netkit;
-using namespace netkit::tcp;
 
 #include "logger/stdio_logger.h"
 #include <unistd.h>
 using namespace std;
 
-class EchoServerProcessor final : public Processor {
-public:
-    EchoServerProcessor(Logger* logger) : m_logger(logger) {}
-    ~EchoServerProcessor() {
-        logger_info(m_logger, "[server] server processor destroyed.");
-    }
+#define ECHO_BUFFER_SIZE 1024
 
-    PacketState CheckPacket(Buffer* buf, uint64_t* size) override {
-        *size = buf->GetSize();
-        return Processor::PACKET_SUCCESS;
-    }
+static void ServerDoEcho(const shared_ptr<char>& buf, uint64_t sz, const shared_ptr<Connection>& c, Logger* logger) {
+    const Connection::Info& info = c->GetInfo();
+    logger_info(logger, "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]", info.local_addr.c_str(),
+                info.local_port, info.remote_addr.c_str(), info.remote_port, sz, buf.get());
+    c->WriteAsync(buf.get(), sz, [buf, c, logger](uint64_t) -> void {
+        c->ReadAsync(buf.get(), ECHO_BUFFER_SIZE, [buf, c, logger](uint64_t bytes_read) -> void {
+            if (bytes_read == 0) {
+                const Connection::Info& info = c->GetInfo();
+                logger_info(logger, "[server] client [%s:%u] disconnected.", info.remote_addr.c_str(), info.remote_port);
+                return;
+            }
+            ServerDoEcho(buf, bytes_read, c, logger);
+        });
+    });
+}
 
-    void OnConnected(Connection* c) override {
+static void ServerAcceptClient(const shared_ptr<Connection>& c, Logger* logger) {
+    const Connection::Info& info = c->GetInfo();
+    logger_info(logger, "[server] accepts client [%s:%u].", info.remote_addr.c_str(), info.remote_port);
+
+    shared_ptr<char> buf((char*)malloc(ECHO_BUFFER_SIZE), [](char* buf) -> void {
+        free(buf);
+    });
+    c->ReadAsync(buf.get(), ECHO_BUFFER_SIZE, [buf, c, logger](uint64_t bytes_read) -> void {
+        if (bytes_read == 0) {
+            const Connection::Info& info = c->GetInfo();
+            logger_info(logger, "[server] client [%s:%u] disconnected.", info.remote_addr.c_str(), info.remote_port);
+            return;
+        }
+        ServerDoEcho(buf, bytes_read, c, logger);
+    });
+}
+
+static void ClientGetResAndSend(const shared_ptr<char>& buf, const shared_ptr<Connection>& c, Logger* logger) {
+    c->ReadAsync(buf.get(), ECHO_BUFFER_SIZE, [buf, c, logger](uint64_t bytes_read) -> void {
         const Connection::Info& info = c->GetInfo();
-        logger_info(m_logger, "[server] accepts client[%s:%u].", info.remote_addr.c_str(), info.remote_port);
-    }
-
-    void OnDisconnected(Connection* c) override {
-        const Connection::Info& info = c->GetInfo();
-        logger_info(m_logger, "[server] client[%s:%u] disconnected.", info.remote_addr.c_str(), info.remote_port);
-    }
-
-    void ProcessPacket(Buffer* buf, Connection* c) override {
-        const Connection::Info& info = c->GetInfo();
-        logger_info(m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
-                    info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
-        c->Send(buf->GetData(), buf->GetSize());
-    }
-
-private:
-    Logger* m_logger;
-};
-
-class EchoServerFactory final : public ProcessorFactory {
-public:
-    EchoServerFactory(Logger* logger) : m_logger(logger) {}
-    Processor* CreateProcessor() override {
-        return new EchoServerProcessor(m_logger);
-    }
-    void DestroyProcessor(Processor* p) override {
-        delete p;
-    }
-
-private:
-    Logger* m_logger;
-};
-
-class EchoClientProcessor final : public Processor {
-public:
-    EchoClientProcessor(Logger* logger) : m_logger(logger) {}
-    ~EchoClientProcessor() {
-        logger_info(m_logger, "[client] client instance destroyed.");
-    }
-
-    PacketState CheckPacket(Buffer* buf, uint64_t* size) override {
-        *size = buf->GetSize();
-        return Processor::PACKET_SUCCESS;
-    }
-
-    void OnConnected(Connection* c) override {
-        const Connection::Info& info = c->GetInfo();
-        logger_info(m_logger, "[client] client[%s:%u] connected.", info.local_addr.c_str(), info.local_port);
-        c->Send("0", 1);
-    }
-
-    void OnDisconnected(Connection* c) override {
-        const Connection::Info& info = c->GetInfo();
-        logger_info(m_logger, "[client] client[%s:%u] disconnected.", info.local_addr.c_str(), info.local_port);
-    }
-
-    void ProcessPacket(Buffer* buf, Connection* c) override {
-        const Connection::Info& info = c->GetInfo();
-
-        logger_info(m_logger, "[client] server[%s:%u] ==> client[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
-                    info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
+        logger_info(logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]", info.local_addr.c_str(),
+                    info.local_port, info.remote_addr.c_str(), info.remote_port, bytes_read, buf.get());
         sleep(1);
 
-        auto num = std::stol(string(buf->GetData(), buf->GetSize()));
-        const string content = std::to_string(num + 1);
-        c->Send(content.data(), content.size());
-    }
+        if (bytes_read < ECHO_BUFFER_SIZE) {
+            buf.get()[bytes_read] = '\0';
+        } else {
+            buf.get()[bytes_read - 1] = '\0';
+        }
 
-private:
-    Logger* m_logger;
-};
+        auto num = atol(buf.get());
+        if (num == 5) {
+            c->ShutDownAsync([c, logger]() -> void {
+                logger_info(logger, "[client] shutdown.");
+            });
+            return;
+        }
+
+        auto len = sprintf(buf.get(), "%lu", num + 1);
+
+        c->WriteAsync(buf.get(), len, [buf, c, logger](uint64_t bytes_written) -> void {
+            if (bytes_written == 0) {
+                const Connection::Info& info = c->GetInfo();
+                logger_info(logger, "[client] server [%s:%u] down.", info.remote_addr.c_str(), info.remote_port);
+                return;
+            }
+            ClientGetResAndSend(buf, c, logger);
+        });
+    });
+}
+
+static void ClientSendMessage(const shared_ptr<Connection>& c, Logger* logger) {
+    const Connection::Info& info = c->GetInfo();
+    logger_info(logger, "[client] client [%s:%u] connected.", info.local_addr.c_str(), info.local_port);
+
+    shared_ptr<char> buf((char*)malloc(ECHO_BUFFER_SIZE), [](char* buf) -> void {
+        free(buf);
+    });
+    c->WriteAsync("0", 1, [buf, c, logger](uint64_t) -> void {
+        ClientGetResAndSend(buf, c, logger);
+    });
+}
 
 int main(void) {
+    const char* host = "127.0.0.1";
+    const uint16_t port = 54321;
+
     StdioLogger logger;
     stdio_logger_init(&logger);
 
-    ProcessorManager mgr(&logger.l);
-    if (mgr.Init() != RC_SUCCESS) {
+    ConnectionManager mgr(&logger.l);
+    if (mgr.Init() != RC_OK) {
         logger_error(&logger.l, "init manager failed.");
         return -1;
     }
 
-    if (mgr.AddServer("127.0.0.1", 54321, make_shared<EchoServerFactory>(&logger.l)) != RC_SUCCESS) {
+    auto rc = mgr.CreateTcpServer(host, port, [&logger](const shared_ptr<Connection>& c) -> void {
+        ServerAcceptClient(c, &logger.l);
+    });
+    if (rc != RC_OK) {
         logger_error(&logger.l, "add server failed.");
         return -1;
     }
 
-    if (mgr.AddClient("127.0.0.1", 54321, make_shared<EchoClientProcessor>(&logger.l)) != RC_SUCCESS) {
+    auto client = mgr.CreateTcpClient(host, port);
+    if (!client) {
         logger_error(&logger.l, "add client failed.");
         return -1;
     }
+    ClientSendMessage(client, &logger.l);
 
     mgr.Run();
 

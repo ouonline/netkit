@@ -3,9 +3,10 @@
 
 #include "retcode.h"
 #include "logger/logger.h"
-#include <string>
-#include <pthread.h>
+#include "liburing.h"
 #include <stdint.h>
+#include <string>
+#include <functional>
 
 namespace netkit {
 
@@ -19,25 +20,30 @@ public:
     };
 
 public:
-    Connection(int fd, Logger* logger);
-    ~Connection();
-    RetCode SetSendTimeout(uint32_t ms);
-    RetCode Send(const void* data, uint64_t size, uint64_t* bytes_left = nullptr);
+    Connection(int fd, struct io_uring* ring, Logger* logger);
+
     const Info& GetInfo() const {
         return m_info;
     }
 
+    RetCode ReadAsync(void*, uint64_t, const std::function<void(uint64_t bytes_read)>& cb = {});
+    RetCode WriteAsync(const void*, uint64_t, const std::function<void(uint64_t bytes_written)>& cb = {});
+
+    RetCode ShutDownAsync(const std::function<void()>& cb = {});
+
 private:
     int m_fd;
-    Info m_info;
-    pthread_mutex_t m_lock;
+    struct io_uring* m_ring;
     Logger* m_logger;
+    Info m_info;
 
 private:
     Connection(const Connection&) = delete;
-    Connection& operator=(const Connection&) = delete;
+    Connection(Connection&&) = delete;
+    void operator=(const Connection&) = delete;
+    void operator=(Connection&&) = delete;
 };
 
-} // namespace netkit
+}
 
 #endif
