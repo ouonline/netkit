@@ -12,7 +12,7 @@ namespace netkit { namespace tcp {
 #include <netdb.h>
 
 RetCode ProcessorManager::Init() {
-    m_thread_pool.AddThread(5);
+    m_thread_pool.Init(5);
     return m_event_mgr.Init();
 }
 

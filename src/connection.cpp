@@ -61,14 +61,12 @@ RetCode Connection::SetSendTimeout(uint32_t ms) {
     return RC_SUCCESS;
 }
 
-static void Unlock(pthread_mutex_t* lck) {
-    pthread_mutex_unlock(lck);
-}
-
 RetCode Connection::Send(const void* data, uint64_t size, uint64_t* bytes_left) {
     if (size > 0) {
         pthread_mutex_lock(&m_lock);
-        unique_ptr<pthread_mutex_t, void(*)(pthread_mutex_t*)> lock_guard(&m_lock, Unlock);
+        shared_ptr<void> __unlocker(nullptr, [this](void*) -> void {
+            pthread_mutex_unlock(&m_lock);
+        });
 
         int nbytes = send(m_fd, data, size, 0);
         if (nbytes == -1) {

@@ -19,17 +19,17 @@ public:
     }
 
     void OnConnected(Connection* c) override {
-        const ConnectionInfo& info = c->GetConnectionInfo();
+        const Connection::Info& info = c->GetInfo();
         logger_info(m_logger, "[server] accepts client[%s:%u].", info.remote_addr.c_str(), info.remote_port);
     }
 
     void OnDisconnected(Connection* c) override {
-        const ConnectionInfo& info = c->GetConnectionInfo();
+        const Connection::Info& info = c->GetInfo();
         logger_info(m_logger, "[server] client[%s:%u] disconnected.", info.remote_addr.c_str(), info.remote_port);
     }
 
     void ProcessPacket(Buffer* buf, Connection* c) override {
-        const ConnectionInfo& info = c->GetConnectionInfo();
+        const Connection::Info& info = c->GetInfo();
         logger_info(m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
         c->Send(buf->GetData(), buf->GetSize());
@@ -66,18 +66,18 @@ public:
     }
 
     void OnConnected(Connection* c) override {
-        const ConnectionInfo& info = c->GetConnectionInfo();
+        const Connection::Info& info = c->GetInfo();
         logger_info(m_logger, "[client] client[%s:%u] connected.", info.local_addr.c_str(), info.local_port);
         c->Send("0", 1);
     }
 
     void OnDisconnected(Connection* c) override {
-        const ConnectionInfo& info = c->GetConnectionInfo();
+        const Connection::Info& info = c->GetInfo();
         logger_info(m_logger, "[client] client[%s:%u] disconnected.", info.local_addr.c_str(), info.local_port);
     }
 
     void ProcessPacket(Buffer* buf, Connection* c) override {
-        const ConnectionInfo& info = c->GetConnectionInfo();
+        const Connection::Info& info = c->GetInfo();
 
         logger_info(m_logger, "[client] server[%s:%u] ==> client[%s:%u] data[%s]", info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port, string(buf->GetData(), buf->GetSize()).c_str());
