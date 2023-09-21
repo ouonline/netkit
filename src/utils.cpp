@@ -1,12 +1,12 @@
 #include "netkit/retcode.h"
 #include "utils.h"
 #include <cstring> // memset()
-#include <cstdio> // sprintf()
+#include <cstdio> // snprintf()
+#include <netdb.h>
 #include <errno.h>
+using namespace std;
 
 namespace netkit { namespace utils {
-
-#include <netdb.h>
 
 static RetCode GetHostInfo(const char* host, uint16_t port, struct addrinfo** info, Logger* logger) {
     char buf[8];

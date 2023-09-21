@@ -75,6 +75,8 @@ target_link_libraries(netkit_static PUBLIC logger_static ${LIBURING_LIBS})
 if(NETKIT_INSTALL)
     install(DIRECTORY include DESTINATION .)
     install(TARGETS netkit_static DESTINATION lib)
+    install(DIRECTORY ${LIBURING_INCS} DESTINATION .)
+    install(FILES ${LIBURING_LIBS} DESTINATION lib)
 endif()
 
 # ----- tests ----- #

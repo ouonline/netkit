@@ -2,11 +2,10 @@
 #define __NETKIT_CONNECTION_H__
 
 #include "retcode.h"
-#include "logger/logger.h"
 #include "liburing.h"
+#include "logger/logger.h"
 #include <stdint.h>
 #include <string>
-#include <functional>
 
 namespace netkit {
 
@@ -20,16 +19,21 @@ public:
     };
 
 public:
-    Connection(int fd, struct io_uring* ring, Logger* logger);
+    Connection() : m_fd(-1), m_ring(nullptr), m_logger(nullptr) {}
+    Connection(Connection&&) = default;
+    Connection& operator=(Connection&&) = default;
 
     const Info& GetInfo() const {
         return m_info;
     }
 
-    RetCode ReadAsync(void*, uint64_t, const std::function<void(uint64_t bytes_read)>& cb = {});
-    RetCode WriteAsync(const void*, uint64_t, const std::function<void(uint64_t bytes_written)>& cb = {});
+    RetCode RecvAsync(void* buf, uint64_t sz, void* tag);
+    RetCode SendAsync(const void* buf, uint64_t sz, void* tag);
+    RetCode ShutDownAsync(void* tag);
 
-    RetCode ShutDownAsync(const std::function<void()>& cb = {});
+private:
+    friend class ConnectionManager;
+    void Init(int fd, struct io_uring* ring, Logger* logger);
 
 private:
     int m_fd;
@@ -39,9 +43,7 @@ private:
 
 private:
     Connection(const Connection&) = delete;
-    Connection(Connection&&) = delete;
     void operator=(const Connection&) = delete;
-    void operator=(Connection&&) = delete;
 };
 
 }

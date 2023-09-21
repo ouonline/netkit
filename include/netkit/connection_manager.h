@@ -2,11 +2,11 @@
 #define __NETKIT_CONNECTION_MANAGER_H__
 
 #include "retcode.h"
-#include "liburing.h"
 #include "connection.h"
+#include "liburing.h"
 #include "logger/logger.h"
 #include <stdint.h>
-#include <memory>
+#include <functional>
 
 namespace netkit {
 
@@ -17,11 +17,22 @@ public:
 
     RetCode Init();
 
-    RetCode CreateTcpServer(const char* addr, uint16_t port,
-                            const std::function<void(const std::shared_ptr<Connection>&)>& cb);
-    std::shared_ptr<Connection> CreateTcpClient(const char* addr, uint16_t port);
+    RetCode CreateTcpServer(const char* addr, uint16_t port, void* tag);
+    RetCode CreateTcpClient(const char* addr, uint16_t port, Connection*);
 
-    RetCode Run();
+    /** @brief usually called in the server side after new clients are accepted. */
+    void InitializeConnection(int client_fd, Connection*);
+
+    /**
+       @param func used to handle events:
+         - CONNECTED: `res` is the client fd, `tag` is the value passed to `CreateTcpServer()`
+         - SEND: `res` is the number of bytes sent, `tag` is the value passed to `Connection::SendAsync()`.
+         - RECV: `res` is the number of bytes received, `tag` is the value passed to `Connection::RecvAsync()`.
+         - SHUTDOWN: `res` is unused, `tag` is the value passed to `Connection::ShutDownAsync()`.
+
+       @note also note that callers should handle client disconnection when `res` is 0 in SEND or RECV.
+    */
+    RetCode Loop(const std::function<void(uint64_t res, void* tag)>& func);
 
 private:
     Logger* m_logger;
