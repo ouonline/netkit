@@ -1,14 +1,13 @@
-#ifndef __NETKIT_CONNECTION_MANAGER_H__
-#define __NETKIT_CONNECTION_MANAGER_H__
+#ifndef __NETKIT_IOURING_CONNECTION_MANAGER_H__
+#define __NETKIT_IOURING_CONNECTION_MANAGER_H__
 
-#include "retcode.h"
 #include "connection.h"
+#include "netkit/retcode.h"
+#include "netkit/tcp_server.h"
 #include "liburing.h"
 #include "logger/logger.h"
-#include <stdint.h>
-#include <functional>
 
-namespace netkit {
+namespace netkit { namespace iouring {
 
 class ConnectionManager final {
 public:
@@ -17,22 +16,22 @@ public:
 
     RetCode Init();
 
-    RetCode CreateTcpServer(const char* addr, uint16_t port, void* tag);
+    TcpServer CreateTcpServer(const char* addr, uint16_t port, void* tag);
     RetCode CreateTcpClient(const char* addr, uint16_t port, Connection*);
 
     /** @brief usually called in the server side after new clients are accepted. */
-    void InitializeConnection(int client_fd, Connection*);
+    RetCode InitializeConnection(int client_fd, Connection*);
 
     /**
-       @param func used to handle events:
+       @param `res` has different meanings according to events:
          - CONNECTED: `res` is the client fd, `tag` is the value passed to `CreateTcpServer()`
-         - SEND: `res` is the number of bytes sent, `tag` is the value passed to `Connection::SendAsync()`.
-         - RECV: `res` is the number of bytes received, `tag` is the value passed to `Connection::RecvAsync()`.
+         - SEND: `res` is the number of bytes sent, `tag` is the value passed to `Connection::WriteAsync()`.
+         - RECV: `res` is the number of bytes received, `tag` is the value passed to `Connection::ReadAsync()`.
          - SHUTDOWN: `res` is unused, `tag` is the value passed to `Connection::ShutDownAsync()`.
 
-       @note also note that callers should handle client disconnection when `res` is 0 in SEND or RECV.
+       @note also note that callers should handle client states when `res` is non-positive.
     */
-    RetCode Loop(const std::function<void(uint64_t res, void* tag)>& func);
+    RetCode Wait(int64_t* res, void** tag);
 
 private:
     Logger* m_logger;
@@ -45,6 +44,6 @@ private:
     void operator=(ConnectionManager&&) = delete;
 };
 
-}
+}}
 
 #endif

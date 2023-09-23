@@ -2,7 +2,7 @@
 #include <cstring> // strerror()
 using namespace std;
 
-namespace netkit { namespace utils {
+namespace netkit { namespace iouring {
 
 RetCode GenericAsync(struct io_uring* ring, Logger* logger, const function<void(struct io_uring_sqe*)>& func) {
     auto sqe = io_uring_get_sqe(ring);

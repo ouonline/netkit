@@ -1,10 +1,16 @@
-#include "netkit/connection.h"
+#include "netkit/iouring/connection.h"
 #include "iouring_utils.h"
 #include <arpa/inet.h>
 
-namespace netkit {
+namespace netkit { namespace iouring {
 
-void Connection::Init(int fd, struct io_uring* ring, Logger* logger) {
+Connection::~Connection() {
+    if (m_fd > 0) {
+        close(m_fd);
+    }
+}
+
+RetCode Connection::Init(int fd, struct io_uring* ring, Logger* logger) {
     m_fd = fd;
     m_ring = ring;
     m_logger = logger;
@@ -23,27 +29,29 @@ void Connection::Init(int fd, struct io_uring* ring, Logger* logger) {
         m_info.local_addr = inet_ntoa(addr.sin_addr);
         m_info.local_port = addr.sin_port;
     }
+
+    return RC_OK;
 }
 
-RetCode Connection::RecvAsync(void* buf, uint64_t sz, void* tag) {
-    return utils::GenericAsync(m_ring, m_logger, [buf, sz, tag, fd = m_fd](struct io_uring_sqe* sqe) -> void {
+RetCode Connection::ReadAsync(void* buf, uint64_t sz, void* tag) {
+    return GenericAsync(m_ring, m_logger, [buf, sz, tag, fd = m_fd](struct io_uring_sqe* sqe) -> void {
         io_uring_prep_read(sqe, fd, buf, sz, 0);
         io_uring_sqe_set_data(sqe, tag);
     });
 }
 
-RetCode Connection::SendAsync(const void* buf, uint64_t sz, void* tag) {
-    return utils::GenericAsync(m_ring, m_logger, [buf, sz, tag, fd = m_fd](struct io_uring_sqe* sqe) -> void {
+RetCode Connection::WriteAsync(const void* buf, uint64_t sz, void* tag) {
+    return GenericAsync(m_ring, m_logger, [buf, sz, tag, fd = m_fd](struct io_uring_sqe* sqe) -> void {
         io_uring_prep_write(sqe, fd, buf, sz, 0);
         io_uring_sqe_set_data(sqe, tag);
     });
 }
 
 RetCode Connection::ShutDownAsync(void* tag) {
-    return utils::GenericAsync(m_ring, m_logger, [tag, fd = m_fd](struct io_uring_sqe* sqe) -> void {
+    return GenericAsync(m_ring, m_logger, [tag, fd = m_fd](struct io_uring_sqe* sqe) -> void {
         io_uring_prep_shutdown(sqe, fd, SHUT_RDWR);
         io_uring_sqe_set_data(sqe, tag);
     });
 }
 
-}
+}}

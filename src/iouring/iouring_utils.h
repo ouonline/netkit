@@ -6,7 +6,7 @@
 #include "logger/logger.h"
 #include <functional>
 
-namespace netkit { namespace utils {
+namespace netkit { namespace iouring {
 
 RetCode GenericAsync(struct io_uring*, Logger*, const std::function<void(struct io_uring_sqe*)>&);
 
