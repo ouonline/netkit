@@ -24,10 +24,10 @@ public:
 
     /**
        @param `res` has different meanings according to events:
-         - CONNECTED: `res` is the client fd, `tag` is the value passed to `CreateTcpServer()`
-         - SEND: `res` is the number of bytes sent, `tag` is the value passed to `Connection::WriteAsync()`.
-         - RECV: `res` is the number of bytes received, `tag` is the value passed to `Connection::ReadAsync()`.
-         - SHUTDOWN: `res` is unused, `tag` is the value passed to `Connection::ShutDownAsync()`.
+         - CONNECTED: `res` is the client fd or -errno, `tag` is the value passed to `CreateTcpServer()`
+         - SEND: `res` is the number of bytes sent or -errno, `tag` is the value passed to `Connection::WriteAsync()`.
+         - RECV: `res` is the number of bytes received or -errno, `tag` is the value passed to `Connection::ReadAsync()`.
+         - SHUTDOWN: `res` is the return value of `shutdown()`, `tag` is the value passed to `Connection::ShutDownAsync()`.
 
        @note also note that callers should handle client states when `res` is non-positive.
     */
