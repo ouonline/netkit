@@ -83,8 +83,8 @@ RetCode ConnectionManager::CreateTcpClient(const char* addr, uint16_t port, Conn
 }
 
 RetCode ConnectionManager::Wait(int64_t* res, void** tag) {
-again:
     if (m_event_idx >= m_nr_valid_event) {
+again:
         m_nr_valid_event = epoll_wait(m_epfd, m_event_list, MAX_EVENTS, -1);
         if (m_nr_valid_event < 0) {
             if (errno == EINTR) {

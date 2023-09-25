@@ -31,7 +31,7 @@ RetCode Connection::Init(int fd, int epfd, Logger* logger) {
 
     auto rc = utils::SetNonBlocking(fd, logger);
     if (rc != RC_OK) {
-        logger_error(logger, "SetNonBlocking failed.");
+        logger_error(logger, "SetNonBlocking of client fd failed.");
         return rc;
     }
 
@@ -40,11 +40,21 @@ RetCode Connection::Init(int fd, int epfd, Logger* logger) {
         logger_error(logger, "create write event fd failed: [%s].", strerror(errno));
         return RC_INTERNAL_NET_ERR;
     }
+    rc = utils::SetNonBlocking(m_written_fd, logger);
+    if (rc != RC_OK) {
+        logger_error(logger, "SetNonBlocking of write event fd failed.");
+        return rc;
+    }
 
     m_shutdown_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
     if (m_shutdown_fd < 0) {
         logger_error(logger, "create shutdown event fd failed: [%s].", strerror(errno));
         return RC_INTERNAL_NET_ERR;
+    }
+    rc = utils::SetNonBlocking(m_shutdown_fd, logger);
+    if (rc != RC_OK) {
+        logger_error(logger, "SetNonBlocking of shutdown event fd failed.");
+        return rc;
     }
 
     m_read_handler.Init(m_fd);
@@ -74,7 +84,7 @@ RetCode Connection::ReadAsync(void* buf, uint64_t sz, void* tag) {
 
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
-    ev.data.ptr = &m_read_handler;
+    ev.data.ptr = static_cast<EventHandler*>(&m_read_handler);
 
     uint32_t op = m_fd_added ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
     int err = epoll_ctl(m_epfd, op, m_fd, &ev);
@@ -88,11 +98,9 @@ RetCode Connection::ReadAsync(void* buf, uint64_t sz, void* tag) {
 }
 
 RetCode Connection::WriteAsync(const void* buf, uint64_t sz, void* tag) {
-    m_written_handler.SetParameters(tag);
-
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
-    ev.data.ptr = &m_written_handler;
+    ev.data.ptr = static_cast<EventHandler*>(&m_written_handler);
 
     uint32_t op = m_written_fd_added ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
     int err = epoll_ctl(m_epfd, op, m_written_fd, &ev);
@@ -102,13 +110,16 @@ RetCode Connection::WriteAsync(const void* buf, uint64_t sz, void* tag) {
     }
     m_written_fd_added = true;
 
-    int64_t nbytes = write(m_fd, buf, sz);
-    if (nbytes < 0) {
-        nbytes = -errno;
+    int64_t wr_res = write(m_fd, buf, sz);
+    if (wr_res < 0) {
+        wr_res = -errno;
     }
 
-    auto ret = write(m_written_fd, &nbytes, sizeof(nbytes));
-    if (ret != sizeof(nbytes)) {
+    m_written_handler.SetParameters(tag, wr_res);
+
+    const uint64_t value = 1;
+    auto ret = write(m_written_fd, &value, sizeof(value));
+    if (ret != sizeof(value)) {
         logger_error(m_logger, "register written event failed: [%s].", strerror(errno));
         return RC_INTERNAL_NET_ERR;
     }
@@ -117,11 +128,9 @@ RetCode Connection::WriteAsync(const void* buf, uint64_t sz, void* tag) {
 }
 
 RetCode Connection::ShutDownAsync(void* tag) {
-    m_shutdown_handler.SetParameters(tag);
-
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
-    ev.data.ptr = &m_shutdown_handler;
+    ev.data.ptr = static_cast<EventHandler*>(&m_shutdown_handler);
 
     uint32_t op = m_shutdown_fd_added ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
     int err = epoll_ctl(m_epfd, op, m_shutdown_fd, &ev);
@@ -131,10 +140,16 @@ RetCode Connection::ShutDownAsync(void* tag) {
     }
     m_shutdown_fd_added = true;
 
-    shutdown(m_fd, SHUT_RDWR);
-    m_fd = -1;
+    epoll_ctl(m_epfd, EPOLL_CTL_DEL, m_fd, nullptr);
+    int res = shutdown(m_fd, SHUT_RDWR);
+    if (res != 0) {
+        res = -errno;
+    }
 
-    const int64_t value = -errno;
+    m_fd = -1;
+    m_shutdown_handler.SetParameters(tag, res);
+
+    const uint64_t value = 1;
     auto ret = write(m_shutdown_fd, &value, sizeof(value));
     if (ret != sizeof(value)) {
         logger_error(m_logger, "register shutdown event failed: [%s].", strerror(errno));
