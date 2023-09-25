@@ -1,32 +1,37 @@
-#include "netkit/epoll/read_handler.h"
-#include "netkit/epoll/eventfd_handler.h"
+#include "netkit/epoll/tcp_client_impl.h"
+#include "netkit/epoll/notification_queue_impl.h"
 #include "../utils.h"
-#include "netkit/epoll/connection.h"
-#include <arpa/inet.h>
 #include <sys/eventfd.h>
-#include <sys/epoll.h>
 #include <unistd.h> // close()
 #include <cstring> // strerror()
+#include <sys/socket.h> // shutdown()
 using namespace std;
 
 namespace netkit { namespace epoll {
 
-Connection::~Connection() {
-    if (m_fd > 0) {
-        shutdown(m_fd, SHUT_RDWR);
-        close(m_fd);
-    }
-    if (m_written_fd > 0) {
-        close(m_written_fd);
-    }
-    if (m_shutdown_fd > 0) {
-        close(m_shutdown_fd);
-    }
+TcpClientImpl::TcpClientImpl(TcpClientImpl&& c) {
+    m_fd = c.m_fd;
+    m_written_fd = c.m_written_fd;
+    m_shutdown_fd = c.m_shutdown_fd;
+    m_read_handler = std::move(c.m_read_handler);
+    m_written_handler = std::move(c.m_written_handler);
+    m_shutdown_handler = std::move(c.m_shutdown_handler);
+    m_fd_added = c.m_fd_added;
+    m_written_fd_added = c.m_written_fd_added;
+    m_shutdown_fd_added = c.m_shutdown_fd_added;
+    m_logger = c.m_logger;
+
+    m_fd = -1;
+    m_written_fd = -1;
+    m_shutdown_fd = -1;
+    m_fd_added = false;
+    m_written_fd_added = false;
+    m_shutdown_fd_added = false;
+    m_logger = nullptr;
 }
 
-RetCode Connection::Init(int fd, int epfd, Logger* logger) {
+RetCode TcpClientImpl::Init(int fd, Logger* logger) {
     m_fd = fd;
-    m_epfd = epfd;
     m_logger = logger;
 
     auto rc = utils::SetNonBlocking(fd, logger);
@@ -61,33 +66,47 @@ RetCode Connection::Init(int fd, int epfd, Logger* logger) {
     m_written_handler.Init(m_written_fd);
     m_shutdown_handler.Init(m_shutdown_fd);
 
-    struct sockaddr_in addr;
-    socklen_t len = sizeof(addr);
-    int ret = getpeername(fd, (struct sockaddr*)&addr, &len);
-    if (ret == 0) {
-        m_info.remote_addr = inet_ntoa(addr.sin_addr);
-        m_info.remote_port = addr.sin_port;
-    }
-
-    len = sizeof(addr);
-    ret = getsockname(fd, (struct sockaddr*)&addr, &len);
-    if (ret == 0) {
-        m_info.local_addr = inet_ntoa(addr.sin_addr);
-        m_info.local_port = addr.sin_port;
-    }
+    utils::GenConnectionInfo(m_fd, &m_info);
 
     return RC_OK;
 }
 
-RetCode Connection::ReadAsync(void* buf, uint64_t sz, void* tag) {
+RetCode TcpClientImpl::Init(const char* addr, uint16_t port, Logger* l) {
+    int fd = utils::CreateTcpClientFd(addr, port, l);
+    if (fd < 0) {
+        logger_error(l, "create client failed.");
+        return RC_INTERNAL_NET_ERR;
+    }
+
+    return Init(fd, l);
+}
+
+void TcpClientImpl::Destroy() {
+    if (m_fd > 0) {
+        shutdown(m_fd, SHUT_RDWR);
+        close(m_fd);
+        m_fd = -1;
+    }
+    if (m_written_fd > 0) {
+        close(m_written_fd);
+        m_written_fd = -1;
+    }
+    if (m_shutdown_fd > 0) {
+        close(m_shutdown_fd);
+        m_shutdown_fd = -1;
+    }
+}
+
+RetCode TcpClientImpl::ReadAsync(void* buf, uint64_t sz, void* tag, NotificationQueue* nq) {
     m_read_handler.SetParameters(buf, sz, tag);
 
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
     ev.data.ptr = static_cast<EventHandler*>(&m_read_handler);
 
+    auto q = (NotificationQueueImpl*)nq;
     uint32_t op = m_fd_added ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
-    int err = epoll_ctl(m_epfd, op, m_fd, &ev);
+    int err = epoll_ctl(q->m_epfd, op, m_fd, &ev);
     if (err) {
         logger_error(m_logger, "add read event fd [%d] failed: [%s].", m_fd, strerror(errno));
         return RC_INTERNAL_NET_ERR;
@@ -97,13 +116,14 @@ RetCode Connection::ReadAsync(void* buf, uint64_t sz, void* tag) {
     return RC_OK;
 }
 
-RetCode Connection::WriteAsync(const void* buf, uint64_t sz, void* tag) {
+RetCode TcpClientImpl::WriteAsync(const void* buf, uint64_t sz, void* tag, NotificationQueue* nq) {
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
     ev.data.ptr = static_cast<EventHandler*>(&m_written_handler);
 
+    auto q = (NotificationQueueImpl*)nq;
     uint32_t op = m_written_fd_added ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
-    int err = epoll_ctl(m_epfd, op, m_written_fd, &ev);
+    int err = epoll_ctl(q->m_epfd, op, m_written_fd, &ev);
     if (err) {
         logger_error(m_logger, "add write event failed: [%s].", strerror(errno));
         return RC_INTERNAL_NET_ERR;
@@ -127,26 +147,28 @@ RetCode Connection::WriteAsync(const void* buf, uint64_t sz, void* tag) {
     return RC_OK;
 }
 
-RetCode Connection::ShutDownAsync(void* tag) {
+RetCode TcpClientImpl::ShutDownAsync(void* tag, NotificationQueue* nq) {
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
     ev.data.ptr = static_cast<EventHandler*>(&m_shutdown_handler);
 
+    auto q = (NotificationQueueImpl*)nq;
     uint32_t op = m_shutdown_fd_added ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
-    int err = epoll_ctl(m_epfd, op, m_shutdown_fd, &ev);
+    int err = epoll_ctl(q->m_epfd, op, m_shutdown_fd, &ev);
     if (err) {
         logger_error(m_logger, "add shutdown event failed: [%s].", strerror(errno));
         return RC_INTERNAL_NET_ERR;
     }
     m_shutdown_fd_added = true;
 
-    epoll_ctl(m_epfd, EPOLL_CTL_DEL, m_fd, nullptr);
     int res = shutdown(m_fd, SHUT_RDWR);
     if (res != 0) {
         res = -errno;
     }
 
+    close(m_fd);
     m_fd = -1;
+
     m_shutdown_handler.SetParameters(tag, res);
 
     const uint64_t value = 1;

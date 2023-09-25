@@ -1,4 +1,3 @@
-#include "netkit/retcode.h"
 #include "utils.h"
 #include <cstring> // memset()
 #include <cstdio> // snprintf()
@@ -6,6 +5,7 @@
 #include <netdb.h>
 #include <errno.h>
 #include <unistd.h> // close()
+#include <arpa/inet.h>
 using namespace std;
 
 namespace netkit { namespace utils {
@@ -23,6 +23,23 @@ static RetCode GetHostInfo(const char* host, uint16_t port, struct addrinfo** in
     int err = getaddrinfo(host, buf, &hints, info);
     if (err) {
         logger_error(logger, "getaddrinfo() failed: %s.", gai_strerror(err));
+        return RC_INTERNAL_NET_ERR;
+    }
+
+    return RC_OK;
+}
+
+static RetCode SetCloseOnExec(int fd, Logger* logger) {
+    int flags = fcntl(fd, F_GETFD);
+    if (flags == -1) {
+        logger_error(logger, "fcntl(F_GETFD) failed: [%s].", strerror(errno));
+        return RC_INTERNAL_NET_ERR;
+    }
+
+    flags |= FD_CLOEXEC;
+    int ret = fcntl(fd, F_SETFD);
+    if (ret == -1) {
+        logger_error(logger, "fcntl(F_SETFD) failed: [%s].", strerror(errno));
         return RC_INTERNAL_NET_ERR;
     }
 
@@ -56,6 +73,9 @@ int CreateTcpServerFd(const char* host, uint16_t port, Logger* logger) {
     }
 
     if (SetReuseAddr(fd, logger) != RC_OK) {
+        goto err1;
+    }
+    if (SetCloseOnExec(fd, logger) != RC_OK) {
         goto err1;
     }
 
@@ -97,6 +117,10 @@ int CreateTcpClientFd(const char* host, uint16_t port, Logger* logger) {
         goto err1;
     }
 
+    if (SetCloseOnExec(fd, logger) != RC_OK) {
+        goto err1;
+    }
+
     freeaddrinfo(info);
     return fd;
 
@@ -124,6 +148,23 @@ RetCode SetNonBlocking(int fd, Logger* logger) {
     }
 
     return RC_OK;
+}
+
+void GenConnectionInfo(int fd, ConnectionInfo* info) {
+    struct sockaddr_in addr;
+    socklen_t len = sizeof(addr);
+    int ret = getpeername(fd, (struct sockaddr*)&addr, &len);
+    if (ret == 0) {
+        info->remote_addr = inet_ntoa(addr.sin_addr);
+        info->remote_port = addr.sin_port;
+    }
+
+    len = sizeof(addr);
+    ret = getsockname(fd, (struct sockaddr*)&addr, &len);
+    if (ret == 0) {
+        info->local_addr = inet_ntoa(addr.sin_addr);
+        info->local_port = addr.sin_port;
+    }
 }
 
 }}

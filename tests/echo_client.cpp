@@ -1,8 +1,10 @@
 #ifdef NETKIT_ENABLE_IOURING
-#include "netkit/iouring/connection_manager.h"
+#include "netkit/iouring/tcp_client_impl.h"
+#include "netkit/iouring/notification_queue_impl.h"
 using namespace netkit::iouring;
 #elif defined NETKIT_ENABLE_EPOLL
-#include "netkit/epoll/connection_manager.h"
+#include "netkit/epoll/tcp_client_impl.h"
+#include "netkit/epoll/notification_queue_impl.h"
 using namespace netkit::epoll;
 #endif
 using namespace netkit;
@@ -25,15 +27,15 @@ struct State {
 };
 
 struct EchoClient final : public State {
-    Connection conn;
+    TcpClientImpl conn;
     char buf[ECHO_BUFFER_SIZE];
 };
 
-static void Process(int64_t res, EchoClient* client, ConnectionManager* mgr, Logger* logger) {
+static void Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, Logger* logger) {
     switch (client->value) {
         case State::CLIENT_SEND_REQ: {
             client->value = State::CLIENT_GET_RES;
-            client->conn.ReadAsync(client->buf, ECHO_BUFFER_SIZE, client);
+            client->conn.ReadAsync(client->buf, ECHO_BUFFER_SIZE, client, nq);
             break;
         }
         case State::CLIENT_GET_RES: {
@@ -56,13 +58,13 @@ static void Process(int64_t res, EchoClient* client, ConnectionManager* mgr, Log
             auto num = atol(client->buf);
             if (num == 5) {
                 client->value = State::CLIENT_SHUTDOWN;
-                client->conn.ShutDownAsync(client);
+                client->conn.ShutDownAsync(client, nq);
                 break;
             }
 
             auto len = sprintf(client->buf, "%lu", num + 1);
             client->value = State::CLIENT_SEND_REQ;
-            client->conn.WriteAsync(client->buf, len, client);
+            client->conn.WriteAsync(client->buf, len, client, nq);
             break;
         }
         case State::CLIENT_SHUTDOWN: {
@@ -89,16 +91,17 @@ int main(int argc, char* argv[]) {
     StdioLogger logger;
     stdio_logger_init(&logger);
 
-    ConnectionManager mgr(&logger.l);
-    if (mgr.Init() != RC_OK) {
-        logger_error(&logger.l, "init manager failed.");
+    NotificationQueueImpl nq;
+    auto rc = nq.Init(&logger.l);
+    if (rc != RC_OK) {
+        logger_error(&logger.l, "init notification queue failed.");
         return -1;
     }
 
     EchoClient client;
-    auto rc = mgr.CreateTcpClient(host, port, &client.conn);
+    rc = client.conn.Init(host, port, &logger.l);
     if (rc != RC_OK) {
-        logger_error(&logger.l, "CreateTcpClient failed.");
+        logger_error(&logger.l, "init client connection failed.");
         return -1;
     }
 
@@ -107,20 +110,20 @@ int main(int argc, char* argv[]) {
                 info.local_port, info.remote_addr.c_str(), info.remote_port);
 
     client.value = State::CLIENT_SEND_REQ;
-    client.conn.WriteAsync("0", 1, &client);
+    client.conn.WriteAsync("0", 1, &client, &nq);
 
     while (true) {
         int64_t res = 0;
         void* tag = nullptr;
 
-        rc = mgr.Wait(&res, &tag);
+        rc = nq.Wait(&res, &tag);
         if (rc != RC_OK) {
             logger_error(&logger.l, "get event failed.");
             break;
         }
 
         auto client = static_cast<EchoClient*>(static_cast<State*>(tag));
-        Process(res, client, &mgr, &logger.l);
+        Process(res, client, &nq, &logger.l);
     }
 
     stdio_logger_destroy(&logger);
