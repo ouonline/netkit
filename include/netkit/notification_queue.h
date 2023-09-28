@@ -10,12 +10,17 @@ class NotificationQueue {
 public:
     virtual ~NotificationQueue() {}
 
+    virtual RetCode MultiAcceptAsync(int64_t fd, void* tag) = 0;
+
+    virtual RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) = 0;
+
+    virtual RetCode WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) = 0;
+
     /**
        @param `res` has different meanings according to events:
-       - CONNECTED: `res` is the client fd or -errno, `tag` is the value passed to `TcpServer::MultiAcceptAsync()`
-       - WRITE: `res` is the number of bytes sent or -errno, `tag` is the value passed to `TcpClient::WriteAsync()`.
-       - READ: `res` is the number of bytes received or -errno, `tag` is the value passed to `TcpClient::ReadAsync()`.
-       - SHUTDOWN: `res` is the return value of `shutdown()`, `tag` is the value passed to `TcpClient::ShutDownAsync()`.
+       - CONNECTED: `res` is the client fd or -errno, `tag` is the value passed to `MultiAcceptAsync()`
+       - WRITE: `res` is the number of bytes sent or -errno, `tag` is the value passed to `WriteAsync()`.
+       - READ: `res` is the number of bytes received or -errno, `tag` is the value passed to `ReadAsync()`.
 
        @note note that callers should handle failures when `res` is negative.
     */

@@ -18,11 +18,13 @@ public:
 
     RetCode Init(Logger* l);
     void Destroy();
+
+    RetCode MultiAcceptAsync(int64_t fd, void* tag) override;
+    RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
+    RetCode WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
     RetCode Wait(int64_t* res, void** tag) override;
 
 private:
-    friend class TcpServerImpl;
-    friend class TcpClientImpl;
     RetCode GenericAsync(const std::function<void(struct io_uring_sqe*)>&);
 
 private:

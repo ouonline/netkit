@@ -1,16 +1,16 @@
 #ifdef NETKIT_ENABLE_IOURING
-#include "netkit/iouring/tcp_client_impl.h"
 #include "netkit/iouring/notification_queue_impl.h"
 using namespace netkit::iouring;
 #elif defined NETKIT_ENABLE_EPOLL
-#include "netkit/epoll/tcp_client_impl.h"
 #include "netkit/epoll/notification_queue_impl.h"
 using namespace netkit::epoll;
 #endif
+#include "netkit/utils.h"
+#include "netkit/connection_info.h"
 using namespace netkit;
 
 #include "logger/stdio_logger.h"
-#include <unistd.h> // sleep()
+#include <unistd.h> // sleep()/close()
 using namespace std;
 
 #define ECHO_BUFFER_SIZE 1024
@@ -20,14 +20,20 @@ struct State {
         UNKNOWN,
         CLIENT_SEND_REQ,
         CLIENT_GET_RES,
-        CLIENT_SHUTDOWN,
     } value;
     State(Value v = UNKNOWN) : value(v) {}
     virtual ~State() {}
 };
 
 struct EchoClient final : public State {
-    TcpClientImpl conn;
+    EchoClient() : fd(-1) {}
+    ~EchoClient() {
+        if (fd > 0) {
+            close(fd);
+        }
+    }
+    int fd;
+    ConnectionInfo info;
     char buf[ECHO_BUFFER_SIZE];
 };
 
@@ -35,11 +41,11 @@ static void Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, 
     switch (client->value) {
         case State::CLIENT_SEND_REQ: {
             client->value = State::CLIENT_GET_RES;
-            client->conn.ReadAsync(client->buf, ECHO_BUFFER_SIZE, client, nq);
+            nq->ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
             break;
         }
         case State::CLIENT_GET_RES: {
-            const ConnectionInfo& info = client->conn.GetInfo();
+            const ConnectionInfo& info = client->info;
             if (res == 0) {
                 logger_info(logger, "[client] server [%s:%u] down.", info.remote_addr.c_str(), info.remote_port);
                 break;
@@ -57,19 +63,16 @@ static void Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, 
 
             auto num = atol(client->buf);
             if (num == 5) {
-                client->value = State::CLIENT_SHUTDOWN;
-                client->conn.ShutDownAsync(client, nq);
+                logger_info(logger, "[client] client [%s:%u] shutdown.", client->info.local_addr.c_str(),
+                            client->info.local_port);
+                close(client->fd);
+                client->fd = -1;
                 break;
             }
 
             auto len = sprintf(client->buf, "%lu", num + 1);
             client->value = State::CLIENT_SEND_REQ;
-            client->conn.WriteAsync(client->buf, len, client, nq);
-            break;
-        }
-        case State::CLIENT_SHUTDOWN: {
-            const ConnectionInfo& info = client->conn.GetInfo();
-            logger_info(logger, "[client] client [%s:%u] shutdown.", info.local_addr.c_str(), info.local_port);
+            nq->WriteAsync(client->fd, client->buf, len, client);
             break;
         }
         default:
@@ -99,18 +102,19 @@ int main(int argc, char* argv[]) {
     }
 
     EchoClient client;
-    rc = client.conn.Init(host, port, &logger.l);
-    if (rc != RC_OK) {
+    client.fd = utils::CreateTcpClientFd(host, port, &logger.l);
+    if (client.fd < 0) {
         logger_error(&logger.l, "init client connection failed.");
         return -1;
     }
 
-    const ConnectionInfo& info = client.conn.GetInfo();
+    utils::GenConnectionInfo(client.fd, &client.info);
+    const ConnectionInfo& info = client.info;
     logger_info(&logger.l, "[client] client [%s:%u] connect to server [%s:%u].", info.local_addr.c_str(),
                 info.local_port, info.remote_addr.c_str(), info.remote_port);
 
     client.value = State::CLIENT_SEND_REQ;
-    client.conn.WriteAsync("0", 1, &client, &nq);
+    nq.WriteAsync(client.fd, "0", 1, &client);
 
     while (true) {
         int64_t res = 0;

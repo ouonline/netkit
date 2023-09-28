@@ -16,15 +16,16 @@ public:
 
     RetCode Init(Logger* l);
     void Destroy();
+
+    RetCode MultiAcceptAsync(int64_t fd, void* tag) override;
+    RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
+    RetCode WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
     RetCode Wait(int64_t* res, void** tag) override;
 
 private:
     static constexpr uint32_t MAX_EVENTS = 64;
 
 private:
-    friend class TcpServerImpl;
-    friend class TcpClientImpl;
-
     int m_epfd;
     int m_event_idx;
     int m_nr_valid_event;

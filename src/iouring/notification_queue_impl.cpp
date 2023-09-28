@@ -5,7 +5,7 @@ using namespace std;
 namespace netkit { namespace iouring {
 
 RetCode NotificationQueueImpl::Init(Logger* l) {
-    int err = io_uring_queue_init(32, &m_ring, 0);
+    int err = io_uring_queue_init(256, &m_ring, 0);
     if (err) {
         logger_error(l, "io_uring_queue_init failed: [%s].", strerror(err));
         return RC_INTERNAL_NET_ERR;
@@ -21,6 +21,27 @@ void NotificationQueueImpl::Destroy() {
         io_uring_queue_exit(&m_ring);
         m_logger = nullptr;
     }
+}
+
+RetCode NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
+    return GenericAsync([fd, tag](struct io_uring_sqe* sqe) -> void {
+        io_uring_prep_multishot_accept(sqe, fd, nullptr, nullptr, 0);
+        io_uring_sqe_set_data(sqe, tag);
+    });
+}
+
+RetCode NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
+    return GenericAsync([fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
+        io_uring_prep_read(sqe, fd, buf, sz, 0);
+        io_uring_sqe_set_data(sqe, tag);
+    });
+}
+
+RetCode NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
+    return GenericAsync([fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
+        io_uring_prep_write(sqe, fd, buf, sz, 0);
+        io_uring_sqe_set_data(sqe, tag);
+    });
 }
 
 RetCode NotificationQueueImpl::Wait(int64_t* res, void** tag) {

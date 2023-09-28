@@ -1,9 +1,9 @@
-#include "utils.h"
+#include "netkit/retcode.h"
+#include "netkit/utils.h"
 #include <cstring> // memset()
 #include <cstdio> // snprintf()
 #include <fcntl.h>
 #include <netdb.h>
-#include <errno.h>
 #include <unistd.h> // close()
 #include <arpa/inet.h>
 using namespace std;
@@ -130,24 +130,6 @@ err1:
 err:
     freeaddrinfo(info);
     return -1;
-}
-
-RetCode SetNonBlocking(int fd, Logger* logger) {
-    int opt;
-
-    opt = fcntl(fd, F_GETFL);
-    if (opt < 0) {
-        logger_error(logger, "fcntl failed: %s.", strerror(errno));
-        return RC_INTERNAL_NET_ERR;
-    }
-
-    opt |= O_NONBLOCK;
-    if (fcntl(fd, F_SETFL, opt) == -1) {
-        logger_error(logger, "fcntl failed: %s.", strerror(errno));
-        return RC_INTERNAL_NET_ERR;
-    }
-
-    return RC_OK;
 }
 
 void GenConnectionInfo(int fd, ConnectionInfo* info) {
