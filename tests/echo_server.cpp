@@ -10,6 +10,7 @@ using namespace netkit::epoll;
 using namespace netkit;
 
 #include "logger/stdio_logger.h"
+#include <sys/eventfd.h>
 #include <unistd.h> // close()
 #include <cstring> // strerror()
 using namespace std;
@@ -22,6 +23,7 @@ struct State {
         SERVER_CLIENT_CONNECTED,
         SERVER_GET_REQ,
         SERVER_SEND_RES,
+        SERVER_SHUTDOWN,
     } value;
     State(Value v = UNKNOWN) : value(v) {}
     virtual ~State() {}
@@ -40,7 +42,8 @@ struct EchoClient final : public State {
     char buf[ECHO_BUFFER_SIZE];
 };
 
-static void Process(int64_t res, void* tag, NotificationQueueImpl* nq, Logger* logger) {
+static void Process(int64_t res, void* tag, NotificationQueueImpl* nq, int destroy_event_fd,
+                    Logger* logger) {
     auto state = static_cast<State*>(tag);
     switch (state->value) {
         case State::SERVER_CLIENT_CONNECTED: {
@@ -64,6 +67,9 @@ static void Process(int64_t res, void* tag, NotificationQueueImpl* nq, Logger* l
                 logger_info(logger, "[server] client [%s:%u] disconnected.", info.remote_addr.c_str(),
                             info.remote_port);
                 delete client;
+
+                const uint64_t v = 1;
+                write(destroy_event_fd, &v, sizeof(v));
             } else {
                 logger_info(logger, "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]", info.remote_addr.c_str(),
                             info.remote_port, info.local_addr.c_str(), info.local_port, res, client->buf);
@@ -94,7 +100,10 @@ static void Process(int64_t res, void* tag, NotificationQueueImpl* nq, Logger* l
     }
 }
 
+/* ------------------------------------------------------------------------- */
+
 #include <iostream>
+#include <memory>
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -114,11 +123,27 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
+    uint64_t res_of_event_fd;
+    int destroy_event_fd = eventfd(0, EFD_CLOEXEC);
+    if (destroy_event_fd < 0) {
+        logger_error(&logger.l, "create destroy event fd for notification queue failed.");
+        return -1;
+    }
+    shared_ptr<void> __destroy_event_fd_destructor(nullptr, [destroy_event_fd](void*) -> void {
+        close(destroy_event_fd);
+    });
+
+    State destroy_state(State::SERVER_SHUTDOWN);
+    nq.ReadAsync(destroy_event_fd, &res_of_event_fd, sizeof(res_of_event_fd), &destroy_state);
+
     int svr_fd = utils::CreateTcpServerFd(host, port, &logger.l);
     if (svr_fd < 0) {
         logger_error(&logger.l, "init tcp server failed.");
         return -1;
     }
+    shared_ptr<void> __svr_fd_destructor(nullptr, [svr_fd](void*) -> void {
+        close(svr_fd);
+    });
 
     State connected_state(State::SERVER_CLIENT_CONNECTED);
     rc = nq.MultiAcceptAsync(svr_fd, &connected_state);
@@ -137,9 +162,15 @@ int main(int argc, char* argv[]) {
             break;
         }
 
-        Process(res, tag, &nq, &logger.l);
+        auto state = static_cast<State*>(tag);
+        if (state->value == State::SERVER_SHUTDOWN) {
+            break;
+        }
+
+        Process(res, tag, &nq, destroy_event_fd, &logger.l);
     }
 
+    logger_info(&logger.l, "server shutdown.");
     stdio_logger_destroy(&logger);
 
     return 0;

@@ -16,6 +16,7 @@ public:
     ~NotificationQueueImpl();
 
     RetCode Init(Logger* l);
+    /** @brief `Destroy()` will be called in destructor. it is save to call `Destroy()` repeatly. */
     void Destroy();
 
     RetCode MultiAcceptAsync(int64_t fd, void* tag) override;

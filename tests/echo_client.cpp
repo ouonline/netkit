@@ -10,6 +10,7 @@ using namespace netkit::epoll;
 using namespace netkit;
 
 #include "logger/stdio_logger.h"
+#include <sys/eventfd.h>
 #include <unistd.h> // sleep()/close()
 using namespace std;
 
@@ -20,6 +21,7 @@ struct State {
         UNKNOWN,
         CLIENT_SEND_REQ,
         CLIENT_GET_RES,
+        CLIENT_SHUTDOWN,
     } value;
     State(Value v = UNKNOWN) : value(v) {}
     virtual ~State() {}
@@ -37,7 +39,8 @@ struct EchoClient final : public State {
     char buf[ECHO_BUFFER_SIZE];
 };
 
-static void Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, Logger* logger) {
+static void Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, int destroy_event_fd,
+                    Logger* logger) {
     switch (client->value) {
         case State::CLIENT_SEND_REQ: {
             client->value = State::CLIENT_GET_RES;
@@ -67,6 +70,8 @@ static void Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, 
                             client->info.local_port);
                 close(client->fd);
                 client->fd = -1;
+                const uint64_t v = 1;
+                write(destroy_event_fd, &v, sizeof(v));
                 break;
             }
 
@@ -81,7 +86,10 @@ static void Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, 
     }
 }
 
+/* ------------------------------------------------------------------------- */
+
 #include <iostream>
+#include <memory>
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -101,12 +109,25 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
+    uint64_t res_of_event_fd;
+    int destroy_event_fd = eventfd(0, EFD_CLOEXEC);
+    if (destroy_event_fd < 0) {
+        logger_error(&logger.l, "create destroy event fd for notification queue failed.");
+        return -1;
+    }
+    shared_ptr<void> __destroy_event_fd_destructor(nullptr, [destroy_event_fd](void*) -> void {
+        close(destroy_event_fd);
+    });
+
     EchoClient client;
     client.fd = utils::CreateTcpClientFd(host, port, &logger.l);
     if (client.fd < 0) {
         logger_error(&logger.l, "init client connection failed.");
         return -1;
     }
+
+    State destroy_state(State::CLIENT_SHUTDOWN);
+    nq.ReadAsync(destroy_event_fd, &res_of_event_fd, sizeof(res_of_event_fd), &destroy_state);
 
     utils::GenConnectionInfo(client.fd, &client.info);
     const ConnectionInfo& info = client.info;
@@ -126,8 +147,13 @@ int main(int argc, char* argv[]) {
             break;
         }
 
-        auto client = static_cast<EchoClient*>(static_cast<State*>(tag));
-        Process(res, client, &nq, &logger.l);
+        auto state = static_cast<State*>(tag);
+        if (state->value == State::CLIENT_SHUTDOWN) {
+            break;
+        }
+
+        auto client = static_cast<EchoClient*>(state);
+        Process(res, client, &nq, destroy_event_fd, &logger.l);
     }
 
     stdio_logger_destroy(&logger);

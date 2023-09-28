@@ -6,6 +6,31 @@
 
 namespace netkit { namespace epoll {
 
+RetCode NotificationQueueImpl::Init(Logger* l) {
+    if (m_logger) {
+        return RC_OK;
+    }
+
+    m_epfd = epoll_create(MAX_EVENTS);
+    if (m_epfd < 0) {
+        logger_error(l, "create epoll failed: %s.", strerror(errno));
+        return RC_INTERNAL_NET_ERR;
+    }
+
+    m_logger = l;
+
+    return RC_OK;
+}
+
+void NotificationQueueImpl::Destroy() {
+    if (m_epfd > 0) {
+        close(m_epfd);
+        m_epfd = -1;
+        m_event_idx = 0;
+        m_nr_valid_event = 0;
+    }
+}
+
 struct EventHandler {
     EventHandler(int f, void* t) : fd(f), tag(t) {}
     virtual ~EventHandler() {}
@@ -19,18 +44,6 @@ struct EventHandler {
     int fd;
     void* tag;
 };
-
-RetCode NotificationQueueImpl::Init(Logger* l) {
-    m_epfd = epoll_create(MAX_EVENTS);
-    if (m_epfd < 0) {
-        logger_error(l, "create epoll failed: %s.", strerror(errno));
-        return RC_INTERNAL_NET_ERR;
-    }
-
-    m_logger = l;
-
-    return RC_OK;
-}
 
 struct AcceptHandler final : public EventHandler {
 public:
@@ -113,15 +126,6 @@ RetCode NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t 
     }
 
     return RC_OK;
-}
-
-void NotificationQueueImpl::Destroy() {
-    if (m_epfd > 0) {
-        close(m_epfd);
-        m_epfd = -1;
-        m_event_idx = 0;
-        m_nr_valid_event = 0;
-    }
 }
 
 RetCode NotificationQueueImpl::Wait(int64_t* res, void** tag) {

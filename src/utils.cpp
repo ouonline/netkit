@@ -93,7 +93,6 @@ int CreateTcpServerFd(const char* host, uint16_t port, Logger* logger) {
     return fd;
 
 err1:
-    shutdown(fd, SHUT_RDWR);
     close(fd);
 err:
     freeaddrinfo(info);
@@ -125,7 +124,6 @@ int CreateTcpClientFd(const char* host, uint16_t port, Logger* logger) {
     return fd;
 
 err1:
-    shutdown(fd, SHUT_RDWR);
     close(fd);
 err:
     freeaddrinfo(info);

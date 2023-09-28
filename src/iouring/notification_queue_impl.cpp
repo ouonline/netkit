@@ -14,6 +14,10 @@ NotificationQueueImpl::~NotificationQueueImpl() {
 }
 
 RetCode NotificationQueueImpl::Init(Logger* l) {
+    if (m_logger) {
+        return RC_OK;
+    }
+
     int err = io_uring_queue_init(256, &m_ring, 0);
     if (err) {
         logger_error(l, "io_uring_queue_init failed: [%s].", strerror(err));
