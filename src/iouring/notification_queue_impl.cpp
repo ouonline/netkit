@@ -1,19 +1,30 @@
 #include "netkit/iouring/notification_queue_impl.h"
+#include <pthread.h>
 #include <cstring> // strerror()
+#include <functional>
 using namespace std;
 
 namespace netkit { namespace iouring {
 
-NotificationQueueImpl::NotificationQueueImpl() : m_logger(nullptr) {
-    pthread_mutex_init(&m_producer_lock, nullptr);
-}
+class Locker final {
+public:
+    Locker() {
+        pthread_mutex_init(&m_mutex, nullptr);
+    }
+    ~Locker() {
+        pthread_mutex_destroy(&m_mutex);
+    }
+    void Lock() {
+        pthread_mutex_lock(&m_mutex);
+    }
+    void Unlock() {
+        pthread_mutex_unlock(&m_mutex);
+    }
+private:
+    pthread_mutex_t m_mutex;
+};
 
-NotificationQueueImpl::~NotificationQueueImpl() {
-    Destroy();
-    pthread_mutex_destroy(&m_producer_lock);
-}
-
-RetCode NotificationQueueImpl::Init(Logger* l) {
+RetCode NotificationQueueImpl::Init(bool read_write_thread_safe, Logger* l) {
     if (m_logger) {
         return RC_OK;
     }
@@ -24,6 +35,10 @@ RetCode NotificationQueueImpl::Init(Logger* l) {
         return RC_INTERNAL_NET_ERR;
     }
 
+    if (read_write_thread_safe) {
+        m_locker = new Locker();
+    }
+
     m_logger = l;
 
     return RC_OK;
@@ -32,29 +47,9 @@ RetCode NotificationQueueImpl::Init(Logger* l) {
 void NotificationQueueImpl::Destroy() {
     if (m_logger) {
         io_uring_queue_exit(&m_ring);
+        delete m_locker;
         m_logger = nullptr;
     }
-}
-
-RetCode NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
-    return GenericAsync([fd, tag](struct io_uring_sqe* sqe) -> void {
-        io_uring_prep_multishot_accept(sqe, fd, nullptr, nullptr, 0);
-        io_uring_sqe_set_data(sqe, tag);
-    });
-}
-
-RetCode NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
-    return GenericAsync([fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
-        io_uring_prep_read(sqe, fd, buf, sz, 0);
-        io_uring_sqe_set_data(sqe, tag);
-    });
-}
-
-RetCode NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
-    return GenericAsync([fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
-        io_uring_prep_write(sqe, fd, buf, sz, 0);
-        io_uring_sqe_set_data(sqe, tag);
-    });
 }
 
 RetCode NotificationQueueImpl::Wait(int64_t* res, void** tag) {
@@ -74,34 +69,63 @@ RetCode NotificationQueueImpl::Wait(int64_t* res, void** tag) {
     return RC_OK;
 }
 
-RetCode NotificationQueueImpl::GenericAsync(const function<void(struct io_uring_sqe*)>& func) {
+static RetCode GenericAsync(struct io_uring* ring, Locker* locker, Logger* logger,
+                            const function<void(struct io_uring_sqe*)>& func) {
     int ret;
-    pthread_mutex_lock(&m_producer_lock);
 
-    auto sqe = io_uring_get_sqe(&m_ring);
+    if (locker) {
+        locker->Lock();
+    }
+
+    auto sqe = io_uring_get_sqe(ring);
     if (!sqe) {
-        io_uring_submit(&m_ring);
-        sqe = io_uring_get_sqe(&m_ring);
+        io_uring_submit(ring);
+        sqe = io_uring_get_sqe(ring);
         if (!sqe) {
-            logger_error(m_logger, "io_uring_get_sqe failed.");
+            logger_error(logger, "io_uring_get_sqe failed.");
             goto err;
         }
     }
 
     func(sqe);
 
-    ret = io_uring_submit(&m_ring);
+    ret = io_uring_submit(ring);
     if (ret <= 0) {
-        logger_error(m_logger, "io_uring_submit failed: [%s].", strerror(-ret));
+        logger_error(logger, "io_uring_submit failed: [%s].", strerror(-ret));
         goto err;
     }
 
-    pthread_mutex_unlock(&m_producer_lock);
+    if (locker) {
+        locker->Unlock();
+    }
     return RC_OK;
 
 err:
-    pthread_mutex_unlock(&m_producer_lock);
+    if (locker) {
+        locker->Unlock();
+    }
     return RC_INTERNAL_NET_ERR;
+}
+
+RetCode NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
+    return GenericAsync(&m_ring, m_locker, m_logger, [fd, tag](struct io_uring_sqe* sqe) -> void {
+        io_uring_prep_multishot_accept(sqe, fd, nullptr, nullptr, 0);
+        io_uring_sqe_set_data(sqe, tag);
+    });
+}
+
+RetCode NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
+    return GenericAsync(&m_ring, m_locker, m_logger, [fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
+        io_uring_prep_read(sqe, fd, buf, sz, 0);
+        io_uring_sqe_set_data(sqe, tag);
+    });
+}
+
+RetCode NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
+    return GenericAsync(&m_ring, m_locker, m_logger, [fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
+        io_uring_prep_write(sqe, fd, buf, sz, 0);
+        io_uring_sqe_set_data(sqe, tag);
+    });
 }
 
 }}

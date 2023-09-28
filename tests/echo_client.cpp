@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
     stdio_logger_init(&logger);
 
     NotificationQueueImpl nq;
-    auto rc = nq.Init(&logger.l);
+    auto rc = nq.Init(false, &logger.l);
     if (rc != RC_OK) {
         logger_error(&logger.l, "init notification queue failed.");
         return -1;

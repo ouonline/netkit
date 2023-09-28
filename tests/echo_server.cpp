@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
     stdio_logger_init(&logger);
 
     NotificationQueueImpl nq;
-    auto rc = nq.Init(&logger.l);
+    auto rc = nq.Init(false, &logger.l);
     if (rc != RC_OK) {
         logger_error(&logger.l, "init notification queue failed.");
         return -1;
@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
         Process(res, tag, &nq, destroy_event_fd, &logger.l);
     }
 
-    logger_info(&logger.l, "server shutdown.");
+    logger_info(&logger.l, "[server] server shutdown.");
     stdio_logger_destroy(&logger);
 
     return 0;
