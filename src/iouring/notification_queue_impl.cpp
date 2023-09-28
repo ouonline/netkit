@@ -4,6 +4,15 @@ using namespace std;
 
 namespace netkit { namespace iouring {
 
+NotificationQueueImpl::NotificationQueueImpl() : m_logger(nullptr) {
+    pthread_mutex_init(&m_producer_lock, nullptr);
+}
+
+NotificationQueueImpl::~NotificationQueueImpl() {
+    Destroy();
+    pthread_mutex_destroy(&m_producer_lock);
+}
+
 RetCode NotificationQueueImpl::Init(Logger* l) {
     int err = io_uring_queue_init(256, &m_ring, 0);
     if (err) {
@@ -62,25 +71,33 @@ RetCode NotificationQueueImpl::Wait(int64_t* res, void** tag) {
 }
 
 RetCode NotificationQueueImpl::GenericAsync(const function<void(struct io_uring_sqe*)>& func) {
+    int ret;
+    pthread_mutex_lock(&m_producer_lock);
+
     auto sqe = io_uring_get_sqe(&m_ring);
     if (!sqe) {
         io_uring_submit(&m_ring);
         sqe = io_uring_get_sqe(&m_ring);
         if (!sqe) {
             logger_error(m_logger, "io_uring_get_sqe failed.");
-            return RC_INTERNAL_NET_ERR;
+            goto err;
         }
     }
 
     func(sqe);
 
-    int ret = io_uring_submit(&m_ring);
+    ret = io_uring_submit(&m_ring);
     if (ret <= 0) {
         logger_error(m_logger, "io_uring_submit failed: [%s].", strerror(-ret));
-        return RC_INTERNAL_NET_ERR;
+        goto err;
     }
 
+    pthread_mutex_unlock(&m_producer_lock);
     return RC_OK;
+
+err:
+    pthread_mutex_unlock(&m_producer_lock);
+    return RC_INTERNAL_NET_ERR;
 }
 
 }}

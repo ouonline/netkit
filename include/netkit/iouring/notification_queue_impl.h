@@ -5,16 +5,15 @@
 #include "netkit/retcode.h"
 #include "logger/logger.h"
 #include "liburing.h"
+#include <pthread.h>
 #include <functional>
 
 namespace netkit { namespace iouring {
 
 class NotificationQueueImpl final : public NotificationQueue {
 public:
-    NotificationQueueImpl() : m_logger(nullptr) {}
-    ~NotificationQueueImpl() {
-        Destroy();
-    }
+    NotificationQueueImpl();
+    ~NotificationQueueImpl();
 
     RetCode Init(Logger* l);
     void Destroy();
@@ -29,6 +28,7 @@ private:
 
 private:
     struct io_uring m_ring;
+    pthread_mutex_t m_producer_lock;
     Logger* m_logger;
 
 private:

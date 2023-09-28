@@ -10,10 +10,13 @@ class NotificationQueue {
 public:
     virtual ~NotificationQueue() {}
 
+    /** @brief thread-safe */
     virtual RetCode MultiAcceptAsync(int64_t fd, void* tag) = 0;
 
+    /** @brief thread-safe */
     virtual RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) = 0;
 
+    /** @brief thread-safe */
     virtual RetCode WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) = 0;
 
     /**
@@ -22,7 +25,9 @@ public:
        - WRITE: `res` is the number of bytes sent or -errno, `tag` is the value passed to `WriteAsync()`.
        - READ: `res` is the number of bytes received or -errno, `tag` is the value passed to `ReadAsync()`.
 
-       @note note that callers should handle failures when `res` is negative.
+       @note
+       - `Wait()` is NOT thread-safe.
+       - callers should handle failures when `res` is negative.
     */
     virtual RetCode Wait(int64_t* res, void** tag) = 0;
 };
