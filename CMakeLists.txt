@@ -8,7 +8,7 @@ option(NETKIT_INSTALL "install headers and libs" ON)
 option(NETKIT_HOLD_DEPS "do not update existing deps" OFF)
 
 option(NETKIT_ENABLE_EPOLL "enable epoll support" OFF)
-option(NETKIT_ENABLE_IOURING "enable iouring support. kernel >= 5.19 required." OFF)
+option(NETKIT_ENABLE_IOURING "enable iouring support. kernel version >= 5.19 required." OFF)
 
 if(NOT CMAKE_CXX_STANDARD)
     set(CMAKE_CXX_STANDARD 14)
@@ -16,6 +16,23 @@ endif()
 
 if(NOT NETKIT_ENABLE_EPOLL AND NOT NETKIT_ENABLE_IOURING)
     message(FATAL_ERROR "Neither `NETKIT_ENABLE_IOURING` nor `NETKIT_ENABLE_EPOLL` is enabled.")
+endif()
+
+# ----- requirement ----- #
+
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "only Linux is supported currently.")
+endif()
+
+if(NETKIT_ENABLE_IOURING)
+    execute_process(COMMAND uname -r OUTPUT_VARIABLE __UNAME_RESULT__ OUTPUT_STRIP_TRAILING_WHITESPACE)
+    message(-- " Kernel version: " ${__UNAME_RESULT__})
+    string(REGEX MATCH "[0-9]+.[0-9]+" LINUX_KERNEL_VERSION ${__UNAME_RESULT__})
+    unset(__UNAME_RESULT__)
+
+    if(LINUX_KERNEL_VERSION VERSION_LESS 5.19)
+        message(FATAL_ERROR "kernel version >= 5.19 is required for io_uring.")
+    endif()
 endif()
 
 # ----- targets ----- #
