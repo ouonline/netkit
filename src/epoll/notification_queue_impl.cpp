@@ -32,7 +32,7 @@ void NotificationQueueImpl::Destroy() {
 }
 
 struct EventHandler {
-    EventHandler(int f, void* t) : fd(f), tag(t) {}
+    EventHandler(int f, void* t, bool is_svr) : fd(f), tag(t), is_server(is_svr) {}
     virtual ~EventHandler() {}
     virtual int64_t In() {
         return -1;
@@ -43,14 +43,15 @@ struct EventHandler {
 
     int fd;
     void* tag;
+    bool is_server;
 };
 
 struct AcceptHandler final : public EventHandler {
 public:
-    AcceptHandler(int svr_fd, void* t) : EventHandler(svr_fd, t) {}
+    AcceptHandler(int svr_fd, void* t) : EventHandler(svr_fd, t, true) {}
     int64_t In() override {
         int cfd = accept(fd, nullptr, nullptr);
-        if (cfd < 0) {
+        if (cfd <= 0) {
             return -errno;
         }
         return cfd;
@@ -70,7 +71,7 @@ RetCode NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
 
 struct ReadHandler final : public EventHandler {
 public:
-    ReadHandler(int cfd, void* buf, uint64_t sz, void* t) : EventHandler(cfd, t), m_buf(buf), m_sz(sz) {}
+    ReadHandler(int cfd, void* buf, uint64_t sz, void* t) : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
     int64_t In() override {
         auto nbytes = read(fd, m_buf, m_sz);
         if (nbytes == -1) {
@@ -100,7 +101,7 @@ RetCode NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, voi
 
 struct WriteHandler final : public EventHandler {
 public:
-    WriteHandler(int cfd, const void* buf, uint64_t sz, void* t) : EventHandler(cfd, t), m_buf(buf), m_sz(sz) {}
+    WriteHandler(int cfd, const void* buf, uint64_t sz, void* t) : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
     int64_t Out() override {
         auto nbytes = write(fd, m_buf, m_sz);
         if (nbytes == -1) {
@@ -147,18 +148,28 @@ RetCode NotificationQueueImpl::Wait(int64_t* res, void** tag) {
     auto handler = static_cast<EventHandler*>(m_event_list[m_event_idx].data.ptr);
     ++m_event_idx;
 
+    if (!handler->is_server) {
+        epoll_ctl(m_epfd, EPOLL_CTL_DEL, handler->fd, nullptr);
+    }
+
     *tag = handler->tag;
 
     if ((events & EPOLLHUP) || (events & EPOLLRDHUP) || (events & EPOLLERR)) {
         *res = 0;
+        if (handler->is_server) {
+            epoll_ctl(m_epfd, EPOLL_CTL_DEL, handler->fd, nullptr);
+        }
+        delete handler;
     } else if (events & EPOLLIN) {
         *res = handler->In();
+        if (!handler->is_server) {
+            delete handler;
+        }
     } else if (events & EPOLLOUT) {
         *res = handler->Out();
+        delete handler;
     }
 
-    epoll_ctl(m_epfd, EPOLL_CTL_DEL, handler->fd, nullptr);
-    delete handler;
 
     return RC_OK;
 }

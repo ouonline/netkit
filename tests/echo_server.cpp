@@ -1,18 +1,31 @@
+#include "netkit/utils.h"
+using namespace netkit;
+
 #ifdef NETKIT_ENABLE_IOURING
+
 #include "netkit/iouring/notification_queue_impl.h"
 using namespace netkit::iouring;
+
+static RetCode DoInitNq(NotificationQueueImpl* nq, bool read_write_thread_safe, Logger* l) {
+    return nq->Init(read_write_thread_safe, l);
+}
+
 #elif defined NETKIT_ENABLE_EPOLL
+
 #include "netkit/epoll/notification_queue_impl.h"
 using namespace netkit::epoll;
+
+static RetCode DoInitNq(NotificationQueueImpl* nq, bool, Logger* l) {
+    return nq->Init(l);
+}
+
 #endif
-#include "netkit/utils.h"
-#include "netkit/connection_info.h"
-using namespace netkit;
 
 #include "logger/stdio_logger.h"
 #include <sys/eventfd.h>
 #include <unistd.h> // close()
 #include <cstring> // strerror()
+#include <sys/socket.h> // shutdown()
 using namespace std;
 
 #define ECHO_BUFFER_SIZE 1024
@@ -42,11 +55,18 @@ struct EchoClient final : public State {
     char buf[ECHO_BUFFER_SIZE];
 };
 
-static void Process(int64_t res, void* tag, NotificationQueueImpl* nq, int destroy_event_fd,
+static void Process(int svr_fd, int64_t res, void* tag, NotificationQueueImpl* nq, int destroy_event_fd,
                     Logger* logger) {
     auto state = static_cast<State*>(tag);
     switch (state->value) {
         case State::SERVER_CLIENT_CONNECTED: {
+            if (res <= 0) {
+                logger_info(logger, "[server] server shutdown.");
+                const uint64_t v = 1;
+                write(destroy_event_fd, &v, sizeof(v));
+                break;
+            }
+
             auto client = new EchoClient();
             client->fd = res;
             utils::GenConnectionInfo(res, &client->info);
@@ -66,10 +86,8 @@ static void Process(int64_t res, void* tag, NotificationQueueImpl* nq, int destr
             } else if (res == 0) {
                 logger_info(logger, "[server] client [%s:%u] disconnected.", info.remote_addr.c_str(),
                             info.remote_port);
+                shutdown(svr_fd, SHUT_RDWR);
                 delete client;
-
-                const uint64_t v = 1;
-                write(destroy_event_fd, &v, sizeof(v));
             } else {
                 logger_info(logger, "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]", info.remote_addr.c_str(),
                             info.remote_port, info.local_addr.c_str(), info.local_port, res, client->buf);
@@ -117,7 +135,7 @@ int main(int argc, char* argv[]) {
     stdio_logger_init(&logger);
 
     NotificationQueueImpl nq;
-    auto rc = nq.Init(false, &logger.l);
+    auto rc = DoInitNq(&nq, false, &logger.l);
     if (rc != RC_OK) {
         logger_error(&logger.l, "init notification queue failed.");
         return -1;
@@ -167,10 +185,9 @@ int main(int argc, char* argv[]) {
             break;
         }
 
-        Process(res, tag, &nq, destroy_event_fd, &logger.l);
+        Process(svr_fd, res, tag, &nq, destroy_event_fd, &logger.l);
     }
 
-    logger_info(&logger.l, "[server] server shutdown.");
     stdio_logger_destroy(&logger);
 
     return 0;

@@ -1,13 +1,25 @@
+#include "netkit/utils.h"
+using namespace netkit;
+
 #ifdef NETKIT_ENABLE_IOURING
+
 #include "netkit/iouring/notification_queue_impl.h"
 using namespace netkit::iouring;
+
+static RetCode DoInitNq(NotificationQueueImpl* nq, bool read_write_thread_safe, Logger* l) {
+    return nq->Init(read_write_thread_safe, l);
+}
+
 #elif defined NETKIT_ENABLE_EPOLL
+
 #include "netkit/epoll/notification_queue_impl.h"
 using namespace netkit::epoll;
+
+static RetCode DoInitNq(NotificationQueueImpl* nq, bool, Logger* l) {
+    return nq->Init(l);
+}
+
 #endif
-#include "netkit/utils.h"
-#include "netkit/connection_info.h"
-using namespace netkit;
 
 #include "logger/stdio_logger.h"
 #include <sys/eventfd.h>
@@ -103,7 +115,7 @@ int main(int argc, char* argv[]) {
     stdio_logger_init(&logger);
 
     NotificationQueueImpl nq;
-    auto rc = nq.Init(false, &logger.l);
+    auto rc = DoInitNq(&nq, false, &logger.l);
     if (rc != RC_OK) {
         logger_error(&logger.l, "init notification queue failed.");
         return -1;

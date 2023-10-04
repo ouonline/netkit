@@ -10,13 +10,13 @@ class NotificationQueue {
 public:
     virtual ~NotificationQueue() {}
 
-    /** @brief thread-safe */
-    virtual RetCode MultiAcceptAsync(int64_t fd, void* tag) = 0;
+    /** @brief `shutdown()` should be called before closing `svr_fd`. thread-safe. */
+    virtual RetCode MultiAcceptAsync(int64_t svr_fd, void* tag) = 0;
 
-    /** @brief thread-safe */
+    /** @brief thread-safe. */
     virtual RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) = 0;
 
-    /** @brief thread-safe */
+    /** @brief thread-safe. */
     virtual RetCode WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) = 0;
 
     /**
