@@ -9,6 +9,11 @@ namespace netkit { namespace iouring {
 
 struct Locker;
 
+struct NotificationQueueOptions final {
+    /** @brief whether *Async() functions are thread-safe */
+    bool thread_safe_async = false;
+};
+
 class NotificationQueueImpl final : public NotificationQueue {
 public:
     NotificationQueueImpl() : m_locker(nullptr), m_logger(nullptr) {}
@@ -16,8 +21,7 @@ public:
         Destroy();
     }
 
-    /** @param read_write_thread_safe indicates whether `ReadAsync()` and `WriteAsync()` are thread-safe */
-    RetCode Init(bool read_write_thread_safe, Logger* l);
+    RetCode Init(const NotificationQueueOptions&, Logger* l);
 
     /** @brief it is save to call `Destroy()` repeatly. */
     void Destroy();
@@ -26,6 +30,8 @@ public:
     RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
     RetCode WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
     RetCode CloseAsync(int64_t fd, void* tag) override;
+
+    /** @brief NOT thread-safe. */
     RetCode Wait(int64_t* res, void** tag) override;
 
 private:

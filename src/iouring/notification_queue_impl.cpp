@@ -25,7 +25,7 @@ private:
     pthread_mutex_t m_mutex;
 };
 
-RetCode NotificationQueueImpl::Init(bool read_write_thread_safe, Logger* l) {
+RetCode NotificationQueueImpl::Init(const NotificationQueueOptions& options, Logger* l) {
     if (m_logger) {
         return RC_OK;
     }
@@ -36,7 +36,7 @@ RetCode NotificationQueueImpl::Init(bool read_write_thread_safe, Logger* l) {
         return RC_INTERNAL_NET_ERR;
     }
 
-    if (read_write_thread_safe) {
+    if (options.thread_safe_async) {
         m_locker = new Locker();
     }
 

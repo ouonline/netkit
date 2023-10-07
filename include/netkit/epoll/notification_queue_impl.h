@@ -18,10 +18,19 @@ public:
     /** @brief `Destroy()` will be called in destructor. it is save to call `Destroy()` repeatly. */
     void Destroy();
 
+    /** @brief thread-safe. */
     RetCode MultiAcceptAsync(int64_t, void*) override;
+
+    /** @brief thread-safe. */
     RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
+
+    /** @brief thread-safe. */
     RetCode WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
+
+    /** @brief thread-safe. */
     RetCode CloseAsync(int64_t fd, void* tag) override;
+
+    /** @brief NOT thread-safe. */
     RetCode Wait(int64_t* res, void** tag) override;
 
 private:

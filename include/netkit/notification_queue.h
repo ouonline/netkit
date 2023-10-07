@@ -10,16 +10,16 @@ class NotificationQueue {
 public:
     virtual ~NotificationQueue() {}
 
-    /** @brief use `CloseAsync()` to close `svr_fd`. thread-safe. */
+    /** @brief use `CloseAsync()` to close `svr_fd`. */
     virtual RetCode MultiAcceptAsync(int64_t svr_fd, void* tag) = 0;
 
-    /** @brief thread-safe. */
+    /** @brief reads at most `sz` bytes into `buf` from `fd`. */
     virtual RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) = 0;
 
-    /** @brief thread-safe. */
+    /** @brief writes at most `sz` bytes from `buf` to `fd`. */
     virtual RetCode WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) = 0;
 
-    /** @brief thread-safe. */
+    /** @brief closes `fd`. */
     virtual RetCode CloseAsync(int64_t fd, void* tag) = 0;
 
     /**
@@ -29,9 +29,7 @@ public:
        - WRITTEN: `res` is the number of bytes written or -errno, `tag` is the value passed to `WriteAsync()`.
        - CLOSED: `res` is the return value of `close()` or -errno, `tag` is the value passed to `CloseAsync()`.
 
-       @note
-       - `Wait()` is NOT thread-safe.
-       - callers should handle failures according to `res`.
+       @note callers should handle failures according to `res`.
     */
     virtual RetCode Wait(int64_t* res, void** tag) = 0;
 };
