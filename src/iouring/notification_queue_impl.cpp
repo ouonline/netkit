@@ -20,6 +20,7 @@ public:
     void Unlock() {
         pthread_mutex_unlock(&m_mutex);
     }
+
 private:
     pthread_mutex_t m_mutex;
 };
@@ -79,12 +80,8 @@ static RetCode GenericAsync(struct io_uring* ring, Locker* locker, Logger* logge
 
     auto sqe = io_uring_get_sqe(ring);
     if (!sqe) {
-        io_uring_submit(ring);
-        sqe = io_uring_get_sqe(ring);
-        if (!sqe) {
-            logger_error(logger, "io_uring_get_sqe failed.");
-            goto err;
-        }
+        logger_error(logger, "io_uring_get_sqe failed.");
+        goto err;
     }
 
     func(sqe);
@@ -124,6 +121,13 @@ RetCode NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, voi
 RetCode NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
     return GenericAsync(&m_ring, m_locker, m_logger, [fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
         io_uring_prep_write(sqe, fd, buf, sz, 0);
+        io_uring_sqe_set_data(sqe, tag);
+    });
+}
+
+RetCode NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
+    return GenericAsync(&m_ring, m_locker, m_logger, [fd, tag](struct io_uring_sqe* sqe) -> void {
+        io_uring_prep_close(sqe, fd);
         io_uring_sqe_set_data(sqe, tag);
     });
 }

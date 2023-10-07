@@ -2,6 +2,7 @@
 #include <sys/socket.h> // accept()
 #include <unistd.h> // close()
 #include <cstring> // strerror()
+#include <sys/eventfd.h>
 #include <errno.h>
 
 namespace netkit { namespace epoll {
@@ -11,7 +12,7 @@ RetCode NotificationQueueImpl::Init(Logger* l) {
         return RC_OK;
     }
 
-    m_epfd = epoll_create(MAX_EVENTS);
+    m_epfd = epoll_create1(EPOLL_CLOEXEC);
     if (m_epfd < 0) {
         logger_error(l, "create epoll failed: %s.", strerror(errno));
         return RC_INTERNAL_NET_ERR;
@@ -32,7 +33,7 @@ void NotificationQueueImpl::Destroy() {
 }
 
 struct EventHandler {
-    EventHandler(int f, void* t, bool is_svr) : fd(f), tag(t), is_server(is_svr) {}
+    EventHandler(int f, void* t, bool ka) : fd(f), tag(t), keep_alive(ka) {}
     virtual ~EventHandler() {}
     virtual int64_t In() {
         return -1;
@@ -43,7 +44,7 @@ struct EventHandler {
 
     int fd;
     void* tag;
-    bool is_server;
+    bool keep_alive;
 };
 
 struct AcceptHandler final : public EventHandler {
@@ -129,6 +130,46 @@ RetCode NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t 
     return RC_OK;
 }
 
+struct EventfdHandler final : public EventHandler {
+public:
+    EventfdHandler(int fd, void* t) : EventHandler(fd, t, false) {}
+    ~EventfdHandler() {
+        close(fd);
+    }
+    int64_t In() override {
+        return res;
+    }
+
+    int64_t res;
+};
+
+RetCode NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
+    int efd = eventfd(0, EFD_CLOEXEC);
+    if (efd < 0) {
+        logger_error(m_logger, "create eventfd failed: [%s].", strerror(errno));
+        return RC_INTERNAL_NET_ERR;
+    }
+
+    auto handler = new EventfdHandler(efd, tag);
+
+    struct epoll_event ev;
+    ev.events = EPOLLIN | EPOLLONESHOT;
+    ev.data.ptr = static_cast<EventHandler*>(handler);
+
+    int err = epoll_ctl(m_epfd, EPOLL_CTL_ADD, efd, &ev);
+    if (err) {
+        logger_error(m_logger, "add write event of fd [%ld] failed: [%s].", efd, strerror(errno));
+        delete handler;
+        return RC_INTERNAL_NET_ERR;
+    }
+
+    handler->res = close(fd);
+    const uint64_t v = 1;
+    write(efd, &v, sizeof(v));
+
+    return RC_OK;
+}
+
 RetCode NotificationQueueImpl::Wait(int64_t* res, void** tag) {
     if (m_event_idx >= m_nr_valid_event) {
     again:
@@ -148,7 +189,7 @@ RetCode NotificationQueueImpl::Wait(int64_t* res, void** tag) {
     auto handler = static_cast<EventHandler*>(m_event_list[m_event_idx].data.ptr);
     ++m_event_idx;
 
-    if (!handler->is_server) {
+    if (!handler->keep_alive) {
         epoll_ctl(m_epfd, EPOLL_CTL_DEL, handler->fd, nullptr);
     }
 
@@ -156,20 +197,19 @@ RetCode NotificationQueueImpl::Wait(int64_t* res, void** tag) {
 
     if ((events & EPOLLHUP) || (events & EPOLLRDHUP) || (events & EPOLLERR)) {
         *res = 0;
-        if (handler->is_server) {
+        if (handler->keep_alive) {
             epoll_ctl(m_epfd, EPOLL_CTL_DEL, handler->fd, nullptr);
         }
         delete handler;
     } else if (events & EPOLLIN) {
         *res = handler->In();
-        if (!handler->is_server) {
+        if (!handler->keep_alive) {
             delete handler;
         }
     } else if (events & EPOLLOUT) {
         *res = handler->Out();
         delete handler;
     }
-
 
     return RC_OK;
 }

@@ -7,8 +7,6 @@ namespace netkit {
 
 enum {
     RC_OK = 0,
-    RC_NOMEM,
-    RC_NOT_IMPLEMENTED,
     RC_INTERNAL_NET_ERR,
 };
 

@@ -22,40 +22,38 @@ static RetCode DoInitNq(NotificationQueueImpl* nq, bool, Logger* l) {
 #endif
 
 #include "logger/stdio_logger.h"
-#include <sys/eventfd.h>
 #include <unistd.h> // sleep()/close()
 using namespace std;
 
 #define ECHO_BUFFER_SIZE 1024
 
-struct State {
-    enum Value {
-        UNKNOWN,
-        CLIENT_SEND_REQ,
-        CLIENT_GET_RES,
-        CLIENT_SHUTDOWN,
-    } value;
-    State(Value v = UNKNOWN) : value(v) {}
-    virtual ~State() {}
+enum State {
+    UNKNOWN,
+    CLIENT_SEND_REQ,
+    CLIENT_GET_RES,
+    CLIENT_CLOSED,
+    CLIENT_END_LOOP,
 };
 
-struct EchoClient final : public State {
-    EchoClient() : fd(-1) {}
-    ~EchoClient() {
-        if (fd > 0) {
-            close(fd);
-        }
-    }
+struct EchoClient final {
     int fd;
+    State state;
     ConnectionInfo info;
     char buf[ECHO_BUFFER_SIZE];
 };
 
-static void Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, int destroy_event_fd,
-                    Logger* logger) {
-    switch (client->value) {
+static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, Logger* logger) {
+    switch (client->state) {
         case State::CLIENT_SEND_REQ: {
-            client->value = State::CLIENT_GET_RES;
+            if (res == 0) {
+                const ConnectionInfo& info = client->info;
+                logger_info(logger, "[client] server [%s:%u] down.", info.remote_addr.c_str(), info.remote_port);
+                client->state = State::CLIENT_CLOSED;
+                nq->CloseAsync(client->fd, client);
+                break;
+            }
+
+            client->state = State::CLIENT_GET_RES;
             nq->ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
             break;
         }
@@ -63,6 +61,8 @@ static void Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, 
             const ConnectionInfo& info = client->info;
             if (res == 0) {
                 logger_info(logger, "[client] server [%s:%u] down.", info.remote_addr.c_str(), info.remote_port);
+                client->state = State::CLIENT_CLOSED;
+                nq->CloseAsync(client->fd, client);
                 break;
             }
 
@@ -78,30 +78,33 @@ static void Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, 
 
             auto num = atol(client->buf);
             if (num == 5) {
-                logger_info(logger, "[client] client [%s:%u] shutdown.", client->info.local_addr.c_str(),
-                            client->info.local_port);
-                close(client->fd);
-                client->fd = -1;
-                const uint64_t v = 1;
-                write(destroy_event_fd, &v, sizeof(v));
+                client->state = State::CLIENT_CLOSED;
+                nq->CloseAsync(client->fd, client);
                 break;
             }
 
             auto len = sprintf(client->buf, "%lu", num + 1);
-            client->value = State::CLIENT_SEND_REQ;
+            client->state = State::CLIENT_SEND_REQ;
             nq->WriteAsync(client->fd, client->buf, len, client);
             break;
         }
+        case State::CLIENT_CLOSED: {
+            logger_info(logger, "[client] client [%s:%u] shutdown.", client->info.local_addr.c_str(),
+                        client->info.local_port);
+            client->state = State::CLIENT_END_LOOP;
+            break;
+        }
         default:
-            logger_error(logger, "unknown state [%u].", client->value);
+            logger_error(logger, "unknown state [%u].", client->state);
             break;
     }
+
+    return client->state;
 }
 
 /* ------------------------------------------------------------------------- */
 
 #include <iostream>
-#include <memory>
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -121,16 +124,6 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    uint64_t res_of_event_fd;
-    int destroy_event_fd = eventfd(0, EFD_CLOEXEC);
-    if (destroy_event_fd < 0) {
-        logger_error(&logger.l, "create destroy event fd for notification queue failed.");
-        return -1;
-    }
-    shared_ptr<void> __destroy_event_fd_destructor(nullptr, [destroy_event_fd](void*) -> void {
-        close(destroy_event_fd);
-    });
-
     EchoClient client;
     client.fd = utils::CreateTcpClientFd(host, port, &logger.l);
     if (client.fd < 0) {
@@ -138,15 +131,12 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    State destroy_state(State::CLIENT_SHUTDOWN);
-    nq.ReadAsync(destroy_event_fd, &res_of_event_fd, sizeof(res_of_event_fd), &destroy_state);
-
     utils::GenConnectionInfo(client.fd, &client.info);
     const ConnectionInfo& info = client.info;
     logger_info(&logger.l, "[client] client [%s:%u] connect to server [%s:%u].", info.local_addr.c_str(),
                 info.local_port, info.remote_addr.c_str(), info.remote_port);
 
-    client.value = State::CLIENT_SEND_REQ;
+    client.state = State::CLIENT_SEND_REQ;
     nq.WriteAsync(client.fd, "0", 1, &client);
 
     while (true) {
@@ -159,13 +149,11 @@ int main(int argc, char* argv[]) {
             break;
         }
 
-        auto state = static_cast<State*>(tag);
-        if (state->value == State::CLIENT_SHUTDOWN) {
+        auto client = static_cast<EchoClient*>(tag);
+        auto st = Process(res, client, &nq, &logger.l);
+        if (st == State::CLIENT_END_LOOP) {
             break;
         }
-
-        auto client = static_cast<EchoClient*>(state);
-        Process(res, client, &nq, destroy_event_fd, &logger.l);
     }
 
     stdio_logger_destroy(&logger);
