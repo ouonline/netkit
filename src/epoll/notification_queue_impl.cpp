@@ -47,6 +47,28 @@ struct EventHandler {
     bool keep_alive;
 };
 
+static RetCode DoEpollUpdate(int epfd, uint32_t flags, EventHandler* handler, int fd, Logger* logger) {
+    struct epoll_event ev;
+    ev.events = flags;
+    ev.data.ptr = handler;
+
+    auto ret = epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);
+    if (ret != 0) {
+        if (errno == EEXIST) {
+            ret = epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev);
+            if (ret != 0) {
+                logger_error(logger, "epoll mod server fd [%d] failed: [%s].", fd, strerror(errno));
+                return RC_INTERNAL_NET_ERR;
+            }
+        } else {
+            logger_error(logger, "epoll add server fd [%d] failed: [%s].", fd, strerror(errno));
+            return RC_INTERNAL_NET_ERR;
+        }
+    }
+
+    return RC_OK;
+}
+
 struct AcceptHandler final : public EventHandler {
 public:
     AcceptHandler(int svr_fd, void* t) : EventHandler(svr_fd, t, true) {}
@@ -60,14 +82,13 @@ public:
 };
 
 RetCode NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
-    struct epoll_event ev;
-    ev.events = EPOLLIN;
-    ev.data.ptr = static_cast<EventHandler*>(new AcceptHandler(fd, tag));
-    if (epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev) != 0) {
-        logger_error(m_logger, "epoll add server fd failed: [%s].", strerror(errno));
-        return RC_INTERNAL_NET_ERR;
+    auto handler = new AcceptHandler(fd, tag);
+    auto ret = DoEpollUpdate(m_epfd, EPOLLIN, handler, fd, m_logger);
+    if (ret != RC_OK) {
+        logger_error(m_logger, "DoEpollUpdate in MultiAcceptAsync() failed.");
+        delete handler;
     }
-    return RC_OK;
+    return ret;
 }
 
 struct ReadHandler final : public EventHandler {
@@ -87,17 +108,13 @@ private:
 };
 
 RetCode NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
-    struct epoll_event ev;
-    ev.events = EPOLLIN | EPOLLONESHOT;
-    ev.data.ptr = static_cast<EventHandler*>(new ReadHandler(fd, buf, sz, tag));
-
-    int err = epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev);
-    if (err) {
-        logger_error(m_logger, "add read event of fd [%ld] failed: [%s].", fd, strerror(errno));
-        return RC_INTERNAL_NET_ERR;
+    auto handler = new ReadHandler(fd, buf, sz, tag);
+    auto ret = DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
+    if (ret != RC_OK) {
+        logger_error(m_logger, "DoEpollUpdate in ReadAsync() failed.");
+        delete handler;
     }
-
-    return RC_OK;
+    return ret;
 }
 
 struct WriteHandler final : public EventHandler {
@@ -117,17 +134,13 @@ private:
 };
 
 RetCode NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
-    struct epoll_event ev;
-    ev.events = EPOLLOUT | EPOLLONESHOT;
-    ev.data.ptr = static_cast<EventHandler*>(new WriteHandler(fd, buf, sz, tag));
-
-    int err = epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev);
-    if (err) {
-        logger_error(m_logger, "add write event of fd [%ld] failed: [%s].", fd, strerror(errno));
-        return RC_INTERNAL_NET_ERR;
+    auto handler = new WriteHandler(fd, buf, sz, tag);
+    auto ret = DoEpollUpdate(m_epfd, EPOLLOUT | EPOLLONESHOT, handler, fd, m_logger);
+    if (ret != RC_OK) {
+        logger_error(m_logger, "DoEpollUpdate in WriteAsync() failed.");
+        delete handler;
     }
-
-    return RC_OK;
+    return ret;
 }
 
 struct EventfdHandler final : public EventHandler {
@@ -151,16 +164,11 @@ RetCode NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
     }
 
     auto handler = new EventfdHandler(efd, tag);
-
-    struct epoll_event ev;
-    ev.events = EPOLLIN | EPOLLONESHOT;
-    ev.data.ptr = static_cast<EventHandler*>(handler);
-
-    int err = epoll_ctl(m_epfd, EPOLL_CTL_ADD, efd, &ev);
-    if (err) {
-        logger_error(m_logger, "add write event of fd [%ld] failed: [%s].", efd, strerror(errno));
+    auto ret = DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, efd, m_logger);
+    if (ret != RC_OK) {
+        logger_error(m_logger, "DoEpollUpdate in CloseAsync() failed.");
         delete handler;
-        return RC_INTERNAL_NET_ERR;
+        return ret;
     }
 
     handler->res = close(fd);
@@ -189,17 +197,11 @@ RetCode NotificationQueueImpl::Wait(int64_t* res, void** tag) {
     auto handler = static_cast<EventHandler*>(m_event_list[m_event_idx].data.ptr);
     ++m_event_idx;
 
-    if (!handler->keep_alive) {
-        epoll_ctl(m_epfd, EPOLL_CTL_DEL, handler->fd, nullptr);
-    }
-
     *tag = handler->tag;
 
     if ((events & EPOLLHUP) || (events & EPOLLRDHUP) || (events & EPOLLERR)) {
         *res = 0;
-        if (handler->keep_alive) {
-            epoll_ctl(m_epfd, EPOLL_CTL_DEL, handler->fd, nullptr);
-        }
+        epoll_ctl(m_epfd, EPOLL_CTL_DEL, handler->fd, nullptr);
         delete handler;
     } else if (events & EPOLLIN) {
         *res = handler->In();

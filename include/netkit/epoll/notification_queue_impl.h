@@ -15,7 +15,8 @@ public:
     }
 
     RetCode Init(Logger* l);
-    /** @brief `Destroy()` will be called in destructor. it is save to call `Destroy()` repeatly. */
+
+    /** @brief it is save to call `Destroy()` repeatly. */
     void Destroy();
 
     /** @brief thread-safe. */
