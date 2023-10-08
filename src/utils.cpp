@@ -1,4 +1,3 @@
-#include "netkit/retcode.h"
 #include "netkit/utils.h"
 #include <cstring> // memset()
 #include <cstdio> // snprintf()
@@ -10,7 +9,7 @@ using namespace std;
 
 namespace netkit { namespace utils {
 
-static RetCode GetHostInfo(const char* host, uint16_t port, struct addrinfo** info, Logger* logger) {
+static int GetHostInfo(const char* host, uint16_t port, struct addrinfo** info, Logger* logger) {
     char buf[8];
     struct addrinfo hints;
 
@@ -23,47 +22,47 @@ static RetCode GetHostInfo(const char* host, uint16_t port, struct addrinfo** in
     int err = getaddrinfo(host, buf, &hints, info);
     if (err) {
         logger_error(logger, "getaddrinfo() failed: %s.", gai_strerror(err));
-        return RC_INTERNAL_NET_ERR;
+        return -err;
     }
 
-    return RC_OK;
+    return 0;
 }
 
-static RetCode SetCloseOnExec(int fd, Logger* logger) {
+static int SetCloseOnExec(int fd, Logger* logger) {
     int flags = fcntl(fd, F_GETFD);
     if (flags == -1) {
         logger_error(logger, "fcntl(F_GETFD) failed: [%s].", strerror(errno));
-        return RC_INTERNAL_NET_ERR;
+        return -errno;
     }
 
     flags |= FD_CLOEXEC;
     int ret = fcntl(fd, F_SETFD);
     if (ret == -1) {
         logger_error(logger, "fcntl(F_SETFD) failed: [%s].", strerror(errno));
-        return RC_INTERNAL_NET_ERR;
+        return -errno;
     }
 
-    return RC_OK;
+    return 0;
 }
 
-static RetCode SetReuseAddr(int fd, Logger* logger) {
+static int SetReuseAddr(int fd, Logger* logger) {
     int opt = 1;
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) != 0) {
         logger_error(logger, "setsockopt failed: %s.", strerror(errno));
-        return RC_INTERNAL_NET_ERR;
+        return -errno;
     }
 
-    return RC_OK;
+    return 0;
 }
 
 int CreateTcpServerFd(const char* host, uint16_t port, Logger* logger) {
     int fd;
-    RetCode sc = RC_INTERNAL_NET_ERR;
+    int sc = 0;
     struct addrinfo* info = nullptr;
 
     sc = GetHostInfo(host, port, &info, logger);
-    if (sc != RC_OK) {
-        return -1;
+    if (sc != 0) {
+        return sc;
     }
 
     fd = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
@@ -72,10 +71,10 @@ int CreateTcpServerFd(const char* host, uint16_t port, Logger* logger) {
         goto err;
     }
 
-    if (SetReuseAddr(fd, logger) != RC_OK) {
+    if (SetReuseAddr(fd, logger) != 0) {
         goto err1;
     }
-    if (SetCloseOnExec(fd, logger) != RC_OK) {
+    if (SetCloseOnExec(fd, logger) != 0) {
         goto err1;
     }
 
@@ -96,27 +95,31 @@ err1:
     close(fd);
 err:
     freeaddrinfo(info);
-    return -1;
+    return -errno;
 }
 
 int CreateTcpClientFd(const char* host, uint16_t port, Logger* logger) {
     struct addrinfo* info = nullptr;
-    if (GetHostInfo(host, port, &info, logger) != RC_OK) {
-        return -1;
+    auto ret = GetHostInfo(host, port, &info, logger);
+    if (ret != 0) {
+        return ret;
     }
 
     int fd = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
     if (fd == -1) {
         logger_error(logger, "socket() failed: %s", strerror(errno));
+        ret = -errno;
         goto err;
     }
 
     if (connect(fd, info->ai_addr, info->ai_addrlen) != 0) {
         logger_error(logger, "connect() failed: %s", strerror(errno));
+        ret = -errno;
         goto err1;
     }
 
-    if (SetCloseOnExec(fd, logger) != RC_OK) {
+    ret = SetCloseOnExec(fd, logger);
+    if (ret != 0) {
         goto err1;
     }
 
@@ -127,7 +130,7 @@ err1:
     close(fd);
 err:
     freeaddrinfo(info);
-    return -1;
+    return ret;
 }
 
 void GenConnectionInfo(int fd, ConnectionInfo* info) {

@@ -6,7 +6,7 @@ using namespace netkit;
 #include "netkit/iouring/notification_queue_impl.h"
 using namespace netkit::iouring;
 
-static RetCode DoInitNq(NotificationQueueImpl* nq, Logger* l) {
+static int DoInitNq(NotificationQueueImpl* nq, Logger* l) {
     return nq->Init(NotificationQueueOptions(), l);
 }
 
@@ -15,7 +15,7 @@ static RetCode DoInitNq(NotificationQueueImpl* nq, Logger* l) {
 #include "netkit/epoll/notification_queue_impl.h"
 using namespace netkit::epoll;
 
-static RetCode DoInitNq(NotificationQueueImpl* nq, Logger* l) {
+static int DoInitNq(NotificationQueueImpl* nq, Logger* l) {
     return nq->Init(l);
 }
 
@@ -119,7 +119,7 @@ int main(int argc, char* argv[]) {
 
     NotificationQueueImpl nq;
     auto rc = DoInitNq(&nq, &logger.l);
-    if (rc != RC_OK) {
+    if (rc != 0) {
         logger_error(&logger.l, "init notification queue failed.");
         return -1;
     }
@@ -144,7 +144,7 @@ int main(int argc, char* argv[]) {
         void* tag = nullptr;
 
         rc = nq.Wait(&res, &tag);
-        if (rc != RC_OK) {
+        if (rc != 0) {
             logger_error(&logger.l, "get event failed.");
             break;
         }

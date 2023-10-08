@@ -21,19 +21,19 @@ public:
         Destroy();
     }
 
-    RetCode Init(const NotificationQueueOptions&, Logger* l);
+    int Init(const NotificationQueueOptions&, Logger* l);
 
     /** @brief it is save to call `Destroy()` repeatly. */
     void Destroy();
 
-    RetCode MultiAcceptAsync(int64_t fd, void* tag) override;
-    RetCode AcceptAsync(int64_t svr_fd, void* tag) override;
-    RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
-    RetCode WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
-    RetCode CloseAsync(int64_t fd, void* tag) override;
+    int MultiAcceptAsync(int64_t fd, void* tag) override;
+    int AcceptAsync(int64_t svr_fd, void* tag) override;
+    int ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
+    int WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
+    int CloseAsync(int64_t fd, void* tag) override;
 
     /** @brief NOT thread-safe. */
-    RetCode Wait(int64_t* res, void** tag) override;
+    int Wait(int64_t* res, void** tag) override;
 
 private:
     struct io_uring m_ring;
