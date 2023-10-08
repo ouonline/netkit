@@ -43,18 +43,26 @@ struct EchoClient final {
 };
 
 static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, Logger* logger) {
+    int rc;
+
     switch (client->state) {
         case State::CLIENT_SEND_REQ: {
             if (res == 0) {
                 const ConnectionInfo& info = client->info;
                 logger_info(logger, "[client] server [%s:%u] down.", info.remote_addr.c_str(), info.remote_port);
                 client->state = State::CLIENT_CLOSED;
-                nq->CloseAsync(client->fd, client);
+                rc = nq->CloseAsync(client->fd, client);
+                if (rc != 0) {
+                    logger_error(logger, "CloseAsync() failed.");
+                }
                 break;
             }
 
             client->state = State::CLIENT_GET_RES;
-            nq->ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
+            rc = nq->ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
+            if (rc != 0) {
+                logger_error(logger, "ReadAsync() failed.");
+            }
             break;
         }
         case State::CLIENT_GET_RES: {
@@ -62,7 +70,10 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
             if (res == 0) {
                 logger_info(logger, "[client] server [%s:%u] down.", info.remote_addr.c_str(), info.remote_port);
                 client->state = State::CLIENT_CLOSED;
-                nq->CloseAsync(client->fd, client);
+                rc = nq->CloseAsync(client->fd, client);
+                if (rc != 0) {
+                    logger_error(logger, "CloseAsync() failed.");
+                }
                 break;
             }
 
@@ -79,13 +90,19 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
             auto num = atol(client->buf);
             if (num == 5) {
                 client->state = State::CLIENT_CLOSED;
-                nq->CloseAsync(client->fd, client);
+                rc = nq->CloseAsync(client->fd, client);
+                if (rc != 0) {
+                    logger_error(logger, "CloseAsync() failed.");
+                }
                 break;
             }
 
             auto len = sprintf(client->buf, "%lu", num + 1);
             client->state = State::CLIENT_SEND_REQ;
-            nq->WriteAsync(client->fd, client->buf, len, client);
+            rc = nq->WriteAsync(client->fd, client->buf, len, client);
+            if (rc != 0) {
+                logger_error(logger, "WriteAsync() failed.");
+            }
             break;
         }
         case State::CLIENT_CLOSED: {
@@ -137,7 +154,11 @@ int main(int argc, char* argv[]) {
                 info.local_port, info.remote_addr.c_str(), info.remote_port);
 
     client.state = State::CLIENT_SEND_REQ;
-    nq.WriteAsync(client.fd, "0", 1, &client);
+    rc = nq.WriteAsync(client.fd, "0", 1, &client);
+    if (rc != 0) {
+        logger_error(&logger.l, "send initial request failed.");
+        return -1;
+    }
 
     while (true) {
         int64_t res = 0;

@@ -59,6 +59,8 @@ struct EchoClient final : public State {
 };
 
 static State::Value Process(EchoServer* svr, int64_t res, void* tag, NotificationQueueImpl* nq, Logger* logger) {
+    int rc;
+
     auto state = static_cast<State*>(tag);
     auto ret_state = state->value;
     switch (ret_state) {
@@ -75,7 +77,10 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
                         client->info.remote_port);
 
             client->value = State::SERVER_CLIENT_GET_REQ;
-            nq->ReadAsync(res, client->buf, ECHO_BUFFER_SIZE, static_cast<State*>(client));
+            rc = nq->ReadAsync(res, client->buf, ECHO_BUFFER_SIZE, static_cast<State*>(client));
+            if (rc != 0) {
+                logger_error(logger, "ReadAsync() failed.");
+            }
             break;
         }
         case State::SERVER_CLIENT_GET_REQ: {
@@ -89,12 +94,18 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
                             info.remote_port);
                 delete client;
                 svr->value = State::SERVER_CLOSED;
-                nq->CloseAsync(svr->fd, static_cast<State*>(svr));
+                rc = nq->CloseAsync(svr->fd, static_cast<State*>(svr));
+                if (rc != 0) {
+                    logger_error(logger, "CloseAsync() failed.");
+                }
             } else {
                 logger_info(logger, "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]", info.remote_addr.c_str(),
                             info.remote_port, info.local_addr.c_str(), info.local_port, res, client->buf);
                 client->value = State::SERVER_CLIENT_SEND_RES;
-                nq->WriteAsync(client->fd, client->buf, res, tag);
+                rc = nq->WriteAsync(client->fd, client->buf, res, tag);
+                if (rc != 0) {
+                    logger_error(logger, "WriteAsync() failed.");
+                }
             }
             break;
         }
@@ -110,7 +121,10 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
                 delete client;
             } else {
                 client->value = State::SERVER_CLIENT_GET_REQ;
-                nq->ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, tag);
+                rc = nq->ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, tag);
+                if (rc != 0) {
+                    logger_error(logger, "ReadAsync() failed.");
+                }
             }
             break;
         }
