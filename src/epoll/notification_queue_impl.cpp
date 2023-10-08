@@ -71,7 +71,7 @@ static RetCode DoEpollUpdate(int epfd, uint32_t flags, EventHandler* handler, in
 
 struct AcceptHandler final : public EventHandler {
 public:
-    AcceptHandler(int svr_fd, void* t) : EventHandler(svr_fd, t, true) {}
+    AcceptHandler(int svr_fd, void* t, bool keep_alive) : EventHandler(svr_fd, t, keep_alive) {}
     int64_t In() override {
         int cfd = accept(fd, nullptr, nullptr);
         if (cfd <= 0) {
@@ -82,10 +82,25 @@ public:
 };
 
 RetCode NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
-    auto handler = new AcceptHandler(fd, tag);
-    auto ret = DoEpollUpdate(m_epfd, EPOLLIN, handler, fd, m_logger);
+    auto handler = new AcceptHandler(fd, tag, true);
+    struct epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.ptr = static_cast<EventHandler*>(handler);
+
+    auto ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev);
+    if (ret != 0) {
+        logger_error(m_logger, "epoll add server fd [%d] failed: [%s].", fd, strerror(errno));
+        delete handler;
+    }
+
+    return ret;
+}
+
+RetCode NotificationQueueImpl::AcceptAsync(int64_t fd, void* tag) {
+    auto handler = new AcceptHandler(fd, tag, false);
+    auto ret = DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != RC_OK) {
-        logger_error(m_logger, "DoEpollUpdate in MultiAcceptAsync() failed.");
+        logger_error(m_logger, "DoEpollUpdate in AcceptAsync() failed.");
         delete handler;
     }
     return ret;

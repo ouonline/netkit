@@ -27,6 +27,7 @@ public:
     void Destroy();
 
     RetCode MultiAcceptAsync(int64_t fd, void* tag) override;
+    RetCode AcceptAsync(int64_t svr_fd, void* tag) override;
     RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
     RetCode WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
     RetCode CloseAsync(int64_t fd, void* tag) override;

@@ -1,14 +1,39 @@
 cmake_minimum_required(VERSION 3.14)
 project(netkit)
 
+# ----- requirements ----- #
+
+if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "only Linux is supported currently.")
+endif()
+
+execute_process(COMMAND uname -r OUTPUT_VARIABLE __UNAME_RESULT__ OUTPUT_STRIP_TRAILING_WHITESPACE)
+message(-- " Kernel version: " ${__UNAME_RESULT__})
+string(REGEX MATCH "[0-9]+.[0-9]+" LINUX_KERNEL_VERSION ${__UNAME_RESULT__})
+unset(__UNAME_RESULT__)
+
+# io_uring accept support since 5.5, and multi accept support since 5.19.
+set(__IOURING_MIN_KERNEL_VERSION__ 5.5)
+
 # ----- options ----- #
 
 option(NETKIT_BUILD_TESTS "build tests" ON)
 option(NETKIT_INSTALL "install headers and libs" ON)
 option(NETKIT_HOLD_DEPS "do not update existing deps" OFF)
 
-option(NETKIT_ENABLE_EPOLL "enable epoll support" OFF)
-option(NETKIT_ENABLE_IOURING "enable iouring support. kernel version >= 5.19 required." OFF)
+if(LINUX_KERNEL_VERSION VERSION_LESS ${__IOURING_MIN_KERNEL_VERSION__})
+    set(__PREFER_EPOLL__ ON)
+    set(__PREFER_IOURING__ OFF)
+else()
+    set(__PREFER_EPOLL__ OFF)
+    set(__PREFER_IOURING__ ON)
+endif()
+
+option(NETKIT_ENABLE_EPOLL "enable epoll support" ${__PREFER_EPOLL__})
+option(NETKIT_ENABLE_IOURING "enable iouring support. kernel version >= ${__IOURING_MIN_KERNEL_VERSION__} required." ${__PREFER_IOURING__})
+
+unset(__PREFER_EPOLL__)
+unset(__PREFER_IOURING__)
 
 if(NOT CMAKE_CXX_STANDARD)
     set(CMAKE_CXX_STANDARD 14)
@@ -18,20 +43,9 @@ if(NOT NETKIT_ENABLE_EPOLL AND NOT NETKIT_ENABLE_IOURING)
     message(FATAL_ERROR "Neither `NETKIT_ENABLE_IOURING` nor `NETKIT_ENABLE_EPOLL` is enabled.")
 endif()
 
-# ----- requirement ----- #
-
-if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    message(FATAL_ERROR "only Linux is supported currently.")
-endif()
-
 if(NETKIT_ENABLE_IOURING)
-    execute_process(COMMAND uname -r OUTPUT_VARIABLE __UNAME_RESULT__ OUTPUT_STRIP_TRAILING_WHITESPACE)
-    message(-- " Kernel version: " ${__UNAME_RESULT__})
-    string(REGEX MATCH "[0-9]+.[0-9]+" LINUX_KERNEL_VERSION ${__UNAME_RESULT__})
-    unset(__UNAME_RESULT__)
-
-    if(LINUX_KERNEL_VERSION VERSION_LESS 5.19)
-        message(FATAL_ERROR "kernel version >= 5.19 is required for io_uring.")
+    if(LINUX_KERNEL_VERSION VERSION_LESS ${__IOURING_MIN_KERNEL_VERSION__})
+        message(FATAL_ERROR "kernel version >= ${__IOURING_MIN_KERNEL_VERSION__} is required for io_uring.")
     endif()
 endif()
 
@@ -106,6 +120,9 @@ if(NETKIT_ENABLE_IOURING)
     target_include_directories(netkit_static PUBLIC ${LIBURING_INCS})
     target_link_libraries(netkit_static PUBLIC ${LIBURING_LIBS})
     target_compile_definitions(netkit_static PUBLIC NETKIT_ENABLE_IOURING)
+    if(LINUX_KERNEL_VERSION VERSION_GREATER_EQUAL 5.19)
+        target_compile_definitions(netkit_static PUBLIC NETKIT_IOURING_ENABLE_MULTI_ACCEPT)
+    endif()
 endif()
 
 if(NETKIT_ENABLE_EPOLL)

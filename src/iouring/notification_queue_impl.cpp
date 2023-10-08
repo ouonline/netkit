@@ -105,8 +105,22 @@ err:
 }
 
 RetCode NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
+#ifdef NETKIT_IOURING_ENABLE_MULTI_ACCEPT
     return GenericAsync(&m_ring, m_locker, m_logger, [fd, tag](struct io_uring_sqe* sqe) -> void {
         io_uring_prep_multishot_accept(sqe, fd, nullptr, nullptr, 0);
+        io_uring_sqe_set_data(sqe, tag);
+    });
+#else
+    (void)fd;
+    (void)tag;
+    logger_error(m_logger, "multi accept is not supported.");
+    return RC_NOT_IMPLEMENTED;
+#endif
+}
+
+RetCode NotificationQueueImpl::AcceptAsync(int64_t fd, void* tag) {
+    return GenericAsync(&m_ring, m_locker, m_logger, [fd, tag](struct io_uring_sqe* sqe) -> void {
+        io_uring_prep_accept(sqe, fd, nullptr, nullptr, 0);
         io_uring_sqe_set_data(sqe, tag);
     });
 }

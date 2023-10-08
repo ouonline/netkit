@@ -13,6 +13,9 @@ public:
     /** @brief use `CloseAsync()` to close `svr_fd`. */
     virtual RetCode MultiAcceptAsync(int64_t svr_fd, void* tag) = 0;
 
+    /** @brief use `CloseAsync()` to close `svr_fd`. */
+    virtual RetCode AcceptAsync(int64_t svr_fd, void* tag) = 0;
+
     /** @brief reads at most `sz` bytes into `buf` from `fd`. */
     virtual RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) = 0;
 

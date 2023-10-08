@@ -23,6 +23,9 @@ public:
     RetCode MultiAcceptAsync(int64_t, void*) override;
 
     /** @brief thread-safe. */
+    RetCode AcceptAsync(int64_t svr_fd, void* tag) override;
+
+    /** @brief thread-safe. */
     RetCode ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
 
     /** @brief thread-safe. */

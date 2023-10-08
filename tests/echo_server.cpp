@@ -64,7 +64,7 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
     switch (ret_state) {
         case State::SERVER_CLIENT_CONNECTED: {
             if (res <= 0) {
-                logger_info(logger, "[server] server shutdown.");
+                logger_info(logger, "[server] server shutdown: [%s].", strerror(-res));
                 break;
             }
 
