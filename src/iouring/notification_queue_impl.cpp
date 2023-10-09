@@ -80,25 +80,26 @@ static int GenericAsync(struct io_uring* ring, Locker* locker, Logger* logger,
 
     auto sqe = io_uring_get_sqe(ring);
     if (!sqe) {
-        logger_error(logger, "io_uring_get_sqe failed.");
-        ret = -errno;
-        goto err;
+        ret = io_uring_submit(ring);
+        if (ret < 0) {
+            logger_error(logger, "io_uring_submit failed: [%s].", strerror(-ret));
+            goto end;
+        }
+
+        sqe = io_uring_get_sqe(ring);
     }
 
     func(sqe);
 
     ret = io_uring_submit(ring);
-    if (ret <= 0) {
+    if (ret < 0) {
         logger_error(logger, "io_uring_submit failed: [%s].", strerror(-ret));
-        goto err;
+        goto end;
     }
 
-    if (locker) {
-        locker->Unlock();
-    }
-    return 0;
+    ret = 0;
 
-err:
+end:
     if (locker) {
         locker->Unlock();
     }
