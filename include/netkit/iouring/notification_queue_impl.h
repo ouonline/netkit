@@ -12,6 +12,8 @@ struct Locker;
 struct NotificationQueueOptions final {
     /** @brief whether *Async() functions are thread-safe */
     bool thread_safe_async = false;
+    /** @brief creates a kernel thread to poll the SQ ring */
+    bool enable_kernel_polling = false;
 };
 
 class NotificationQueueImpl final : public NotificationQueue {
