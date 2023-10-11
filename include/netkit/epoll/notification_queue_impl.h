@@ -15,26 +15,14 @@ public:
     }
 
     int Init(Logger* l);
+    void Destroy(); // destroy this instance if necessary
 
-    /** @brief it is save to call `Destroy()` repeatly. */
-    void Destroy();
-
-    /** @brief thread-safe. */
     int MultiAcceptAsync(int64_t, void*) override;
-
-    /** @brief thread-safe. */
     int AcceptAsync(int64_t svr_fd, void* tag) override;
-
-    /** @brief thread-safe. */
     int ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
-
-    /** @brief thread-safe. */
     int WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
-
-    /** @brief thread-safe. */
     int CloseAsync(int64_t fd, void* tag) override;
 
-    /** @brief NOT thread-safe. */
     int Wait(int64_t* res, void** tag) override;
 
 private:
