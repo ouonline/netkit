@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
         int64_t res = 0;
         void* tag = nullptr;
 
-        auto rc = nq.Wait(&res, &tag);
+        auto rc = nq.Next(&res, &tag);
         if (rc != 0) {
             logger_error(&logger.l, "get event failed.");
             break;

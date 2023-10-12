@@ -194,11 +194,15 @@ int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
     return 0;
 }
 
-int NotificationQueueImpl::Wait(int64_t* res, void** tag) {
+int NotificationQueueImpl::Next(int64_t* res, void** tag, bool blocking) {
     if (m_event_idx >= m_nr_valid_event) {
+        int timeout = blocking ? -1 : 0;
     again:
-        m_nr_valid_event = epoll_wait(m_epfd, m_event_list, MAX_EVENTS, -1);
+        m_nr_valid_event = epoll_wait(m_epfd, m_event_list, MAX_EVENTS, timeout);
         if (m_nr_valid_event < 0) {
+            if (errno == EAGAIN) {
+                return -EAGAIN;
+            }
             if (errno == EINTR) {
                 goto again;
             }

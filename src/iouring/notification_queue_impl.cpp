@@ -33,13 +33,20 @@ void NotificationQueueImpl::Destroy() {
     }
 }
 
-int NotificationQueueImpl::Wait(int64_t* res, void** tag) {
+int NotificationQueueImpl::Next(int64_t* res, void** tag, bool blocking) {
     struct io_uring_cqe* cqe = nullptr;
 
-    int ret = io_uring_wait_cqe(&m_ring, &cqe);
-    if (ret < 0) {
-        logger_error(m_logger, "wait cqe failed: [%s].", strerror(-ret));
-        return ret;
+    if (blocking) {
+        int ret = io_uring_wait_cqe(&m_ring, &cqe);
+        if (ret < 0) {
+            logger_error(m_logger, "wait cqe failed: [%s].", strerror(-ret));
+            return ret;
+        }
+    } else {
+        int ret = io_uring_peek_cqe(&m_ring, &cqe);
+        if (ret < 0) {
+            return ret;
+        }
     }
 
     *res = cqe->res;
