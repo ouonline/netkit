@@ -25,7 +25,7 @@ public:
     virtual int CloseAsync(int64_t fd, void* tag) = 0;
 
     /**
-       @brief blocks until something happens. returns 0 or -errno.
+       @brief gets next event. returns 0 or -errno.
 
        @param `res` has different meanings according to events:
        - ACCEPTED: `res` is the client fd or -errno, `tag` is the value passed to `MultiAcceptAsync()`
@@ -33,9 +33,11 @@ public:
        - WRITTEN: `res` is the number of bytes written or -errno, `tag` is the value passed to `WriteAsync()`.
        - CLOSED: `res` is the return value of `close()` or -errno, `tag` is the value passed to `CloseAsync()`.
 
+       @param blocking block until at least one event arrives or error occurs. returns -EAGAIN if there is no events when `blocking` is false.
+
        @note callers should handle failures according to `res`.
     */
-    virtual int Wait(int64_t* res, void** tag) = 0;
+    virtual int Next(int64_t* res, void** tag, bool blocking = true) = 0;
 };
 
 }
