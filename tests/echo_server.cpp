@@ -31,11 +31,11 @@ using namespace std;
 struct State {
     enum Value {
         UNKNOWN,
-        SERVER_CLIENT_CONNECTED,
-        SERVER_CLIENT_GET_REQ,
-        SERVER_CLIENT_SEND_RES,
-        SERVER_CLOSED,
-        SERVER_END_LOOP,
+        CLIENT_CONNECTED,
+        RECV_REQ,
+        SEND_RES,
+        CLOSED,
+        END_LOOP,
     } value;
     State(Value v = UNKNOWN) : value(v) {}
     virtual ~State() {}
@@ -45,9 +45,9 @@ struct EchoServer final : public State {
     int64_t fd;
 };
 
-struct EchoClient final : public State {
-    EchoClient() : fd(-1) {}
-    ~EchoClient() {
+struct EchoSession final : public State {
+    EchoSession() : fd(-1) {}
+    ~EchoSession() {
         if (fd > 0) {
             close(fd);
         }
@@ -64,72 +64,72 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
     auto state = static_cast<State*>(tag);
     auto ret_state = state->value;
     switch (ret_state) {
-        case State::SERVER_CLIENT_CONNECTED: {
+        case State::CLIENT_CONNECTED: {
             if (res <= 0) {
                 logger_info(logger, "[server] server shutdown: [%s].", strerror(-res));
                 break;
             }
 
-            auto client = new EchoClient();
-            client->fd = res;
-            utils::GenConnectionInfo(res, &client->info);
-            logger_info(logger, "[server] accepts client [%s:%u].", client->info.remote_addr.c_str(),
-                        client->info.remote_port);
+            auto session = new EchoSession();
+            session->fd = res;
+            utils::GenConnectionInfo(res, &session->info);
+            logger_info(logger, "[server] accepts client [%s:%u].", session->info.remote_addr.c_str(),
+                        session->info.remote_port);
 
-            client->value = State::SERVER_CLIENT_GET_REQ;
-            rc = nq->ReadAsync(res, client->buf, ECHO_BUFFER_SIZE, static_cast<State*>(client));
+            session->value = State::RECV_REQ;
+            rc = nq->ReadAsync(res, session->buf, ECHO_BUFFER_SIZE, static_cast<State*>(session));
             if (rc != 0) {
                 logger_error(logger, "ReadAsync() failed.");
             }
             break;
         }
-        case State::SERVER_CLIENT_GET_REQ: {
-            auto client = static_cast<EchoClient*>(state);
-            const ConnectionInfo& info = client->info;
+        case State::RECV_REQ: {
+            auto session = static_cast<EchoSession*>(state);
+            const ConnectionInfo& info = session->info;
             if (res < 0) {
-                logger_error(logger, "read client request failed: [%s].", strerror(-res));
-                delete client;
+                logger_error(logger, "read session request failed: [%s].", strerror(-res));
+                delete session;
             } else if (res == 0) {
                 logger_info(logger, "[server] client [%s:%u] disconnected.", info.remote_addr.c_str(),
                             info.remote_port);
-                delete client;
-                svr->value = State::SERVER_CLOSED;
+                delete session;
+                svr->value = State::CLOSED;
                 rc = nq->CloseAsync(svr->fd, static_cast<State*>(svr));
                 if (rc != 0) {
                     logger_error(logger, "CloseAsync() failed.");
                 }
             } else {
                 logger_info(logger, "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]", info.remote_addr.c_str(),
-                            info.remote_port, info.local_addr.c_str(), info.local_port, res, client->buf);
-                client->value = State::SERVER_CLIENT_SEND_RES;
-                rc = nq->WriteAsync(client->fd, client->buf, res, tag);
+                            info.remote_port, info.local_addr.c_str(), info.local_port, res, session->buf);
+                session->value = State::SEND_RES;
+                rc = nq->WriteAsync(session->fd, session->buf, res, tag);
                 if (rc != 0) {
                     logger_error(logger, "WriteAsync() failed.");
                 }
             }
             break;
         }
-        case State::SERVER_CLIENT_SEND_RES: {
-            auto client = static_cast<EchoClient*>(state);
+        case State::SEND_RES: {
+            auto session = static_cast<EchoSession*>(state);
             if (res < 0) {
-                logger_error(logger, "send response to client failed: [%s].", strerror(-res));
-                delete client;
+                logger_error(logger, "send response to session failed: [%s].", strerror(-res));
+                delete session;
             } else if (res == 0) {
-                const ConnectionInfo& info = client->info;
+                const ConnectionInfo& info = session->info;
                 logger_info(logger, "[server] client [%s:%u] disconnected.", info.remote_addr.c_str(),
                             info.remote_port);
-                delete client;
+                delete session;
             } else {
-                client->value = State::SERVER_CLIENT_GET_REQ;
-                rc = nq->ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, tag);
+                session->value = State::RECV_REQ;
+                rc = nq->ReadAsync(session->fd, session->buf, ECHO_BUFFER_SIZE, tag);
                 if (rc != 0) {
                     logger_error(logger, "ReadAsync() failed.");
                 }
             }
             break;
         }
-        case State::SERVER_CLOSED: {
-            ret_state = State::SERVER_END_LOOP;
+        case State::CLOSED: {
+            ret_state = State::END_LOOP;
             logger_info(logger, "[server] server shutdown.");
             break;
         }
@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    svr.value = State::SERVER_CLIENT_CONNECTED;
+    svr.value = State::CLIENT_CONNECTED;
     rc = nq.MultiAcceptAsync(svr.fd, static_cast<State*>(&svr));
     if (rc != 0) {
         logger_error(&logger.l, "register server to notification queue failed.");
@@ -188,7 +188,7 @@ int main(int argc, char* argv[]) {
         }
 
         auto st = Process(&svr, res, tag, &nq, &logger.l);
-        if (st == State::SERVER_END_LOOP) {
+        if (st == State::END_LOOP) {
             break;
         }
     }
