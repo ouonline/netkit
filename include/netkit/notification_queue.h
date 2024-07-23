@@ -2,6 +2,7 @@
 #define __NETKIT_NOTIFICATION_QUEUE_H__
 
 #include <stdint.h>
+#include <time.h>
 
 namespace netkit {
 
@@ -33,11 +34,12 @@ public:
        - WRITTEN: `res` is the number of bytes written or -errno, `tag` is the value passed to `WriteAsync()`.
        - CLOSED: `res` is the return value of `close()` or -errno, `tag` is the value passed to `CloseAsync()`.
 
-       @param blocking block until at least one event arrives or error occurs. returns -EAGAIN if there is no events when `blocking` is false.
+       @param timtout waits until at least one event arrives, timeout reaches, or some error occurs.
+       nullptr for blocking without timeout.
 
-       @note callers should handle failures according to `res`.
+       @return -EAGAIN if there is no events, 0 for success, and -errno for other errors.
     */
-    virtual int Next(int64_t* res, void** tag, bool blocking = true) = 0;
+    virtual int Next(int64_t* res, void** tag, struct timeval* timeout) = 0;
 };
 
 }

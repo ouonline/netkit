@@ -33,18 +33,33 @@ void NotificationQueueImpl::Destroy() {
     }
 }
 
-int NotificationQueueImpl::Next(int64_t* res, void** tag, bool blocking) {
+int NotificationQueueImpl::Next(int64_t* res, void** tag, struct timeval* timeout) {
     struct io_uring_cqe* cqe = nullptr;
 
-    if (blocking) {
+    if (timeout) {
+        if (timeout->tv_sec == 0 && timeout->tv_usec == 0) {
+            int ret = io_uring_peek_cqe(&m_ring, &cqe);
+            if (ret < 0) {
+                return ret;
+            }
+        } else {
+            struct __kernel_timespec kts = {
+                .tv_sec = timeout->tv_sec,
+                .tv_nsec = timeout->tv_usec * 1000,
+            };
+            int ret = io_uring_wait_cqe_timeout(&m_ring, &cqe, &kts);
+            if (ret == -EAGAIN) {
+                return ret;
+            }
+            if (ret < 0) {
+                logger_error(m_logger, "wait cqe with timeout failed: [%s].", strerror(-ret));
+                return ret;
+            }
+        }
+    } else {
         int ret = io_uring_wait_cqe(&m_ring, &cqe);
         if (ret < 0) {
             logger_error(m_logger, "wait cqe failed: [%s].", strerror(-ret));
-            return ret;
-        }
-    } else {
-        int ret = io_uring_peek_cqe(&m_ring, &cqe);
-        if (ret < 0) {
             return ret;
         }
     }

@@ -194,19 +194,23 @@ int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
     return 0;
 }
 
-int NotificationQueueImpl::Next(int64_t* res, void** tag, bool blocking) {
+int NotificationQueueImpl::Next(int64_t* res, void** tag, struct timeval* timeout) {
     if (m_event_idx >= m_nr_valid_event) {
-        int timeout = blocking ? -1 : 0;
-    again:
-        m_nr_valid_event = epoll_wait(m_epfd, m_event_list, MAX_EVENTS, timeout);
+        int ts;
+        if (timeout) {
+            if (timeout->tv_sec == 0 && timeout->tv_usec == 0) {
+                ts = 0;
+            } else {
+                ts = timeout->tv_sec * 1000000 + timeout->tv_usec;
+            }
+        } else {
+            ts = -1; // infinitely
+        }
+        m_nr_valid_event = epoll_wait(m_epfd, m_event_list, MAX_EVENTS, ts);
         if (m_nr_valid_event < 0) {
-            if (errno == EAGAIN) {
-                return -EAGAIN;
+            if (errno != EAGAIN) {
+                logger_error(m_logger, "epoll_wait failed: %s", strerror(errno));
             }
-            if (errno == EINTR) {
-                goto again;
-            }
-            logger_error(m_logger, "epoll_wait failed: %s", strerror(errno));
             return -errno;
         }
 

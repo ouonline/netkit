@@ -164,7 +164,7 @@ int main(int argc, char* argv[]) {
         int64_t res = 0;
         void* tag = nullptr;
 
-        rc = nq.Next(&res, &tag);
+        rc = nq.Next(&res, &tag, nullptr);
         if (rc != 0) {
             logger_error(&logger.l, "get event failed.");
             break;

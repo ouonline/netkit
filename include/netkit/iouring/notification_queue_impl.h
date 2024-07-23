@@ -28,7 +28,7 @@ public:
     int WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
     int CloseAsync(int64_t fd, void* tag) override;
 
-    int Next(int64_t* res, void** tag, bool blocking = true) override;
+    int Next(int64_t* res, void** tag, struct timeval* timeout) override;
 
 private:
     struct io_uring m_ring;
