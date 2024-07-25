@@ -119,16 +119,16 @@ int NotificationQueueImpl::AcceptAsync(int64_t fd, void* tag) {
     });
 }
 
-int NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
+int NotificationQueueImpl::RecvAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
     return GenericAsync(&m_ring, m_logger, [fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
-        io_uring_prep_read(sqe, fd, buf, sz, 0);
+        io_uring_prep_recv(sqe, fd, buf, sz, 0);
         io_uring_sqe_set_data(sqe, tag);
     });
 }
 
-int NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
+int NotificationQueueImpl::SendAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
     return GenericAsync(&m_ring, m_logger, [fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
-        io_uring_prep_write(sqe, fd, buf, sz, 0);
+        io_uring_prep_send(sqe, fd, buf, sz, 0);
         io_uring_sqe_set_data(sqe, tag);
     });
 }

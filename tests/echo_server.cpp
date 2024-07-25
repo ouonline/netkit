@@ -66,7 +66,7 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
     switch (ret_state) {
         case State::CLIENT_CONNECTED: {
             if (res <= 0) {
-                logger_info(logger, "[server] server shutdown: [%s].", strerror(-res));
+                logger_info(logger, "[server] closes server: [%s].", strerror(-res));
                 break;
             }
 
@@ -77,9 +77,9 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
                         session->info.remote_port);
 
             session->value = State::RECV_REQ;
-            rc = nq->ReadAsync(res, session->buf, ECHO_BUFFER_SIZE, static_cast<State*>(session));
+            rc = nq->RecvAsync(res, session->buf, ECHO_BUFFER_SIZE, static_cast<State*>(session));
             if (rc != 0) {
-                logger_error(logger, "ReadAsync() failed.");
+                logger_error(logger, "RecvAsync() failed.");
             }
             break;
         }
@@ -87,7 +87,7 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
             auto session = static_cast<EchoSession*>(state);
             const ConnectionInfo& info = session->info;
             if (res < 0) {
-                logger_error(logger, "read session request failed: [%s].", strerror(-res));
+                logger_error(logger, "recv session request failed: [%s].", strerror(-res));
                 delete session;
             } else if (res == 0) {
                 logger_info(logger, "[server] client [%s:%u] disconnected.", info.remote_addr.c_str(),
@@ -102,9 +102,9 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
                 logger_info(logger, "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]", info.remote_addr.c_str(),
                             info.remote_port, info.local_addr.c_str(), info.local_port, res, session->buf);
                 session->value = State::SEND_RES;
-                rc = nq->WriteAsync(session->fd, session->buf, res, tag);
+                rc = nq->SendAsync(session->fd, session->buf, res, tag);
                 if (rc != 0) {
-                    logger_error(logger, "WriteAsync() failed.");
+                    logger_error(logger, "SendAsync() failed.");
                 }
             }
             break;
@@ -121,16 +121,16 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
                 delete session;
             } else {
                 session->value = State::RECV_REQ;
-                rc = nq->ReadAsync(session->fd, session->buf, ECHO_BUFFER_SIZE, tag);
+                rc = nq->RecvAsync(session->fd, session->buf, ECHO_BUFFER_SIZE, tag);
                 if (rc != 0) {
-                    logger_error(logger, "ReadAsync() failed.");
+                    logger_error(logger, "RecvAsync() failed.");
                 }
             }
             break;
         }
         case State::CLOSED: {
             ret_state = State::END_LOOP;
-            logger_info(logger, "[server] server shutdown.");
+            logger_info(logger, "[server] server closed.");
             break;
         }
         default:
