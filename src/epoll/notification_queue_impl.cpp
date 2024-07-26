@@ -240,4 +240,8 @@ int NotificationQueueImpl::Next(int64_t* res, void** tag, struct timeval* timeou
     return 0;
 }
 
+int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl*, int, void*) {
+    return -ENOSYS;
+}
+
 }}

@@ -22,6 +22,7 @@ public:
     int RecvAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
     int SendAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
     int CloseAsync(int64_t fd, void* tag) override;
+    int NotifyAsync(NotificationQueueImpl*, int res, void* tag);
 
     int Next(int64_t* res, void** tag, struct timeval* timeout) override;
 

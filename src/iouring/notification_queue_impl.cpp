@@ -107,7 +107,6 @@ int NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
 #else
     (void)fd;
     (void)tag;
-    logger_error(m_logger, "multi accept is not supported.");
     return -ENOSYS;
 #endif
 }
@@ -138,6 +137,19 @@ int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
         io_uring_prep_close(sqe, fd);
         io_uring_sqe_set_data(sqe, tag);
     });
+}
+
+int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res, void* tag) {
+#ifdef NETKIT_IOURING_ENABLE_RING_MSG
+    return GenericAsync(&m_ring, m_logger, [nq, res, tag](struct io_uring_sqe* sqe) -> void {
+        io_uring_prep_msg_ring(sqe, nq->m_ring.ring_fd, res, (uint64_t)tag, 0);
+    });
+#else
+    (void)nq;
+    (void)res;
+    (void)tag;
+    return -ENOSYS;
+#endif
 }
 
 }}

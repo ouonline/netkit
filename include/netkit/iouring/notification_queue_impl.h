@@ -22,11 +22,12 @@ public:
     int Init(const NotificationQueueOptions&, Logger* l);
     void Destroy(); // destroy this instance if necessary
 
-    int MultiAcceptAsync(int64_t fd, void* tag) override;
+    int MultiAcceptAsync(int64_t svr_fd, void* tag) override;
     int AcceptAsync(int64_t svr_fd, void* tag) override;
-    int RecvAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
-    int SendAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
+    int RecvAsync(int64_t sock_fd, void* buf, uint64_t sz, void* tag) override;
+    int SendAsync(int64_t sock_fd, const void* buf, uint64_t sz, void* tag) override;
     int CloseAsync(int64_t fd, void* tag) override;
+    int NotifyAsync(NotificationQueueImpl*, int res, void* tag);
 
     int Next(int64_t* res, void** tag, struct timeval* timeout) override;
 
