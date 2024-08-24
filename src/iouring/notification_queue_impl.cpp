@@ -15,7 +15,7 @@ int NotificationQueueImpl::Init(const NotificationQueueOptions& options, Logger*
         flags |= IORING_SETUP_SQPOLL;
     }
 
-    int err = io_uring_queue_init(256, &m_ring, flags);
+    int err = io_uring_queue_init(options.queue_size, &m_ring, flags);
     if (err) {
         logger_error(l, "io_uring_queue_init failed: [%s].", strerror(-err));
         return err;

@@ -8,6 +8,7 @@
 namespace netkit { namespace iouring {
 
 struct NotificationQueueOptions final {
+    uint32_t queue_size = 256;
     /** @brief creates a kernel thread to poll the SQ ring */
     bool enable_kernel_polling = false;
 };
