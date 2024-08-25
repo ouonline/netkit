@@ -107,11 +107,11 @@ int NotificationQueueImpl::AcceptAsync(int64_t fd, void* tag) {
     return ret;
 }
 
-struct RecvHandler final : public EventHandler {
+struct ReadHandler final : public EventHandler {
 public:
-    RecvHandler(int cfd, void* buf, uint64_t sz, void* t) : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
+    ReadHandler(int cfd, void* buf, uint64_t sz, void* t) : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
     int64_t In() override {
-        auto nbytes = recv(fd, m_buf, m_sz, 0);
+        auto nbytes = read(fd, m_buf, m_sz);
         if (nbytes == -1) {
             return -errno;
         }
@@ -123,21 +123,21 @@ private:
     uint64_t m_sz;
 };
 
-int NotificationQueueImpl::RecvAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
-    auto handler = new RecvHandler(fd, buf, sz, tag);
+int NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
+    auto handler = new ReadHandler(fd, buf, sz, tag);
     auto ret = DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
-        logger_error(m_logger, "DoEpollUpdate in RecvAsync() failed.");
+        logger_error(m_logger, "DoEpollUpdate in ReadAsync() failed.");
         delete handler;
     }
     return ret;
 }
 
-struct SendHandler final : public EventHandler {
+struct WriteHandler final : public EventHandler {
 public:
-    SendHandler(int cfd, const void* buf, uint64_t sz, void* t) : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
+    WriteHandler(int cfd, const void* buf, uint64_t sz, void* t) : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
     int64_t Out() override {
-        auto nbytes = send(fd, m_buf, m_sz, 0);
+        auto nbytes = write(fd, m_buf, m_sz);
         if (nbytes == -1) {
             return -errno;
         }
@@ -149,11 +149,11 @@ private:
     uint64_t m_sz;
 };
 
-int NotificationQueueImpl::SendAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
-    auto handler = new SendHandler(fd, buf, sz, tag);
+int NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
+    auto handler = new WriteHandler(fd, buf, sz, tag);
     auto ret = DoEpollUpdate(m_epfd, EPOLLOUT | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
-        logger_error(m_logger, "DoEpollUpdate in SendAsync() failed.");
+        logger_error(m_logger, "DoEpollUpdate in WriteAsync() failed.");
         delete handler;
     }
     return ret;

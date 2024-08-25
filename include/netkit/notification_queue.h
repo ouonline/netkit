@@ -16,11 +16,11 @@ public:
     /** @brief use `CloseAsync()` to close `svr_fd`. returns 0 or -errno. */
     virtual int AcceptAsync(int64_t svr_fd, void* tag) = 0;
 
-    /** @brief receive at most `sz` bytes into `buf` from `fd`. returns 0 or -errno. */
-    virtual int RecvAsync(int64_t sock_fd, void* buf, uint64_t sz, void* tag) = 0;
+    /** @brief read at most `sz` bytes into `buf` from `fd`. returns 0 or -errno. */
+    virtual int ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) = 0;
 
-    /** @brief send at most `sz` bytes from `buf` to `fd`. returns 0 or -errno. */
-    virtual int SendAsync(int64_t sock_fd, const void* buf, uint64_t sz, void* tag) = 0;
+    /** @brief write at most `sz` bytes from `buf` to `fd`. returns 0 or -errno. */
+    virtual int WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) = 0;
 
     /** @brief close `fd`. returns 0 or -errno. */
     virtual int CloseAsync(int64_t fd, void* tag) = 0;
@@ -30,9 +30,8 @@ public:
 
        @param `res` has different meanings according to events:
        - ACCEPT: `res` is the client fd or -errno, `tag` is the value passed to `MultiAcceptAsync()` or `AcceptAsync()`.
-       - RECV: `res` is the number of bytes read or -errno, `tag` is the value passed to `RecvAsync()`.
-       - SEND: `res` is the number of bytes written or -errno, `tag` is the value passed to `SendAsync()`.
-       - COPY: `res` is the number of bytes copied or -errno, `tag` is the value passed to `CopyAsync()`.
+       - READ: `res` is the number of bytes read or -errno, `tag` is the value passed to `ReadAsync()`.
+       - WRITE: `res` is the number of bytes written or -errno, `tag` is the value passed to `WriteAsync()`.
        - CLOSE: `res` is the return value of `close()` or -errno, `tag` is the value passed to `CloseAsync()`.
 
        @param timtout waits until at least one event arrives, timeout reaches, or some error occurs.

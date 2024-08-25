@@ -32,8 +32,8 @@ struct State {
     enum Value {
         UNKNOWN,
         CLIENT_CONNECTED,
-        RECV_REQ,
-        SEND_RES,
+        READ_REQ,
+        WRITE_RES,
         CLOSED,
         END_LOOP,
     } value;
@@ -76,18 +76,18 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
             logger_info(logger, "[server] accepts client [%s:%u].", session->info.remote_addr.c_str(),
                         session->info.remote_port);
 
-            session->value = State::RECV_REQ;
-            rc = nq->RecvAsync(res, session->buf, ECHO_BUFFER_SIZE, static_cast<State*>(session));
+            session->value = State::READ_REQ;
+            rc = nq->ReadAsync(res, session->buf, ECHO_BUFFER_SIZE, static_cast<State*>(session));
             if (rc != 0) {
-                logger_error(logger, "RecvAsync() failed.");
+                logger_error(logger, "ReadAsync() failed.");
             }
             break;
         }
-        case State::RECV_REQ: {
+        case State::READ_REQ: {
             auto session = static_cast<EchoSession*>(state);
             const ConnectionInfo& info = session->info;
             if (res < 0) {
-                logger_error(logger, "recv session request failed: [%s].", strerror(-res));
+                logger_error(logger, "read session request failed: [%s].", strerror(-res));
                 delete session;
             } else if (res == 0) {
                 logger_info(logger, "[server] client [%s:%u] disconnected.", info.remote_addr.c_str(),
@@ -101,18 +101,18 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
             } else {
                 logger_info(logger, "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]", info.remote_addr.c_str(),
                             info.remote_port, info.local_addr.c_str(), info.local_port, res, session->buf);
-                session->value = State::SEND_RES;
-                rc = nq->SendAsync(session->fd, session->buf, res, tag);
+                session->value = State::WRITE_RES;
+                rc = nq->WriteAsync(session->fd, session->buf, res, tag);
                 if (rc != 0) {
-                    logger_error(logger, "SendAsync() failed.");
+                    logger_error(logger, "WriteAsync() failed.");
                 }
             }
             break;
         }
-        case State::SEND_RES: {
+        case State::WRITE_RES: {
             auto session = static_cast<EchoSession*>(state);
             if (res < 0) {
-                logger_error(logger, "send response to session failed: [%s].", strerror(-res));
+                logger_error(logger, "write response to session failed: [%s].", strerror(-res));
                 delete session;
             } else if (res == 0) {
                 const ConnectionInfo& info = session->info;
@@ -120,10 +120,10 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
                             info.remote_port);
                 delete session;
             } else {
-                session->value = State::RECV_REQ;
-                rc = nq->RecvAsync(session->fd, session->buf, ECHO_BUFFER_SIZE, tag);
+                session->value = State::READ_REQ;
+                rc = nq->ReadAsync(session->fd, session->buf, ECHO_BUFFER_SIZE, tag);
                 if (rc != 0) {
-                    logger_error(logger, "RecvAsync() failed.");
+                    logger_error(logger, "ReadAsync() failed.");
                 }
             }
             break;
