@@ -189,7 +189,29 @@ int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
 
     handler->res = close(fd);
     const uint64_t v = 1;
-    send(efd, &v, sizeof(v), 0);
+    write(efd, &v, sizeof(v));
+
+    return 0;
+}
+
+int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res, void* tag) {
+    int efd = eventfd(0, EFD_CLOEXEC);
+    if (efd < 0) {
+        logger_error(m_logger, "create eventfd failed: [%s].", strerror(errno));
+        return -errno;
+    }
+
+    auto handler = new EventfdHandler(efd, tag);
+    auto ret = DoEpollUpdate(nq->m_epfd, EPOLLIN | EPOLLONESHOT, handler, efd, m_logger);
+    if (ret != 0) {
+        logger_error(m_logger, "DoEpollUpdate in NotifyAsync() failed.");
+        delete handler;
+        return ret;
+    }
+
+    handler->res = res;
+    const uint64_t v = 1;
+    write(efd, &v, sizeof(v));
 
     return 0;
 }
@@ -238,10 +260,6 @@ int NotificationQueueImpl::Next(int64_t* res, void** tag, struct timeval* timeou
     }
 
     return 0;
-}
-
-int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl*, int, void*) {
-    return -ENOSYS;
 }
 
 }}
