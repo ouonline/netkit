@@ -216,7 +216,7 @@ int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res, void*
     return 0;
 }
 
-int NotificationQueueImpl::Next(int64_t* res, void** tag, struct timeval* timeout) {
+int NotificationQueueImpl::Next(int64_t* res, void** tag, TimeVal* timeout) {
     if (m_event_idx >= m_nr_valid_event) {
         int ts;
         if (timeout) {

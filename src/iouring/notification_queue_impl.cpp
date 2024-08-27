@@ -33,7 +33,7 @@ void NotificationQueueImpl::Destroy() {
     }
 }
 
-int NotificationQueueImpl::Next(int64_t* res, void** tag, struct timeval* timeout) {
+int NotificationQueueImpl::Next(int64_t* res, void** tag, TimeVal* timeout) {
     struct io_uring_cqe* cqe = nullptr;
 
     if (timeout) {

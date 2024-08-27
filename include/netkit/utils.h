@@ -7,7 +7,10 @@
 
 namespace netkit { namespace utils {
 
+/** @return fd or -errno  */
 int CreateTcpServerFd(const char* host, uint16_t port, Logger*);
+
+/** @return fd or -errno  */
 int CreateTcpClientFd(const char* host, uint16_t port, Logger*);
 
 void GenConnectionInfo(int fd, ConnectionInfo*);

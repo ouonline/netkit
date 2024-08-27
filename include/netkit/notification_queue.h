@@ -6,6 +6,8 @@
 
 namespace netkit {
 
+typedef struct timeval TimeVal;
+
 class NotificationQueue {
 public:
     virtual ~NotificationQueue() {}
@@ -39,7 +41,7 @@ public:
 
        @return -EAGAIN if there is no events, 0 for success, and -errno for other errors.
     */
-    virtual int Next(int64_t* res, void** tag, struct timeval* timeout) = 0;
+    virtual int Next(int64_t* res, void** tag, TimeVal* timeout) = 0;
 };
 
 }
