@@ -21,7 +21,7 @@ static int DoInitNq(NotificationQueueImpl* nq, Logger* l) {
 
 #endif
 
-#include "logger/stdio_logger.h"
+#include "logger/stdout_logger.h"
 #include <unistd.h> // sleep()/close()
 using namespace std;
 
@@ -131,8 +131,8 @@ int main(int argc, char* argv[]) {
     const char* host = argv[1];
     const uint16_t port = atol(argv[2]);
 
-    StdioLogger logger;
-    stdio_logger_init(&logger);
+    StdoutLogger logger;
+    stdout_logger_init(&logger);
 
     NotificationQueueImpl nq;
     auto rc = DoInitNq(&nq, &logger.l);
@@ -177,7 +177,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    stdio_logger_destroy(&logger);
+    stdout_logger_destroy(&logger);
 
     return 0;
 }
