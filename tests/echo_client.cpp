@@ -1,25 +1,6 @@
 #include "netkit/utils.h"
+#include "netkit/nq_utils.h"
 using namespace netkit;
-
-#ifdef NETKIT_ENABLE_IOURING
-
-#include "netkit/iouring/notification_queue_impl.h"
-using namespace netkit::iouring;
-
-static int DoInitNq(NotificationQueueImpl* nq, Logger* l) {
-    return nq->Init(NotificationQueueOptions(), l);
-}
-
-#elif defined NETKIT_ENABLE_EPOLL
-
-#include "netkit/epoll/notification_queue_impl.h"
-using namespace netkit::epoll;
-
-static int DoInitNq(NotificationQueueImpl* nq, Logger* l) {
-    return nq->Init(l);
-}
-
-#endif
 
 #include "logger/stdout_logger.h"
 #include <unistd.h> // sleep()/close()
@@ -135,7 +116,7 @@ int main(int argc, char* argv[]) {
     stdout_logger_init(&logger);
 
     NotificationQueueImpl nq;
-    auto rc = DoInitNq(&nq, &logger.l);
+    auto rc = InitNq(&nq, &logger.l);
     if (rc != 0) {
         logger_error(&logger.l, "init notification queue failed.");
         return -1;

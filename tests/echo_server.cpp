@@ -173,7 +173,8 @@ int main(int argc, char* argv[]) {
     svr.value = State::CLIENT_CONNECTED;
     rc = nq.MultiAcceptAsync(svr.fd, static_cast<State*>(&svr));
     if (rc != 0) {
-        logger_error(&logger.l, "register server to notification queue failed.");
+        logger_error(&logger.l, "register server to notification queue failed: [%s].",
+                     strerror(-rc));
         return -1;
     }
 

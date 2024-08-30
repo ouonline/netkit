@@ -104,7 +104,15 @@ if(NOT TARGET logger_static)
     netkit_import_git_dep(logger "https://github.com/ouonline/logger.git" master)
 endif()
 
-target_link_libraries(netkit_static PUBLIC logger_static)
+if(NOT TARGET threadkit_static)
+    set(THREADKIT_DEPS_DIR ${NETKIT_DEPS_DIR})
+    set(THREADKIT_BUILD_TESTS OFF)
+    set(THREADKIT_INSTALL ${NETKIT_INSTALL})
+    set(THREADKIT_HOLD_DEPS ${NETKIT_HOLD_DEPS})
+    netkit_import_git_dep(threadkit "https://github.com/ouonline/threadkit.git" master)
+endif()
+
+target_link_libraries(netkit_static PUBLIC threadkit_static logger_static)
 
 if(NETKIT_ENABLE_IOURING)
     if(NOT LIBURING_LIBS)
