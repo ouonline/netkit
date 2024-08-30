@@ -22,6 +22,7 @@ int NotificationQueueImpl::Init(const NotificationQueueOptions& options, Logger*
     }
 
     m_logger = l;
+    signal(SIGPIPE, SIG_IGN);
 
     return 0;
 }

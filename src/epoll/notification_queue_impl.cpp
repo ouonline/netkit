@@ -4,6 +4,7 @@
 #include <cstring> // strerror()
 #include <sys/eventfd.h>
 #include <errno.h>
+#include <signal.h>
 
 namespace netkit { namespace epoll {
 
@@ -19,6 +20,7 @@ int NotificationQueueImpl::Init(Logger* l) {
     }
 
     m_logger = l;
+    signal(SIGPIPE, SIG_IGN);
 
     return 0;
 }
