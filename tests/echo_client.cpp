@@ -10,7 +10,7 @@ using namespace std;
 
 enum State {
     UNKNOWN,
-    CLIENT_WRITE_REQ,
+    CLIENT_SEND_REQ,
     CLIENT_GET_RES,
     CLIENT_DISCONNECTED,
     CLIENT_END_LOOP,
@@ -28,7 +28,7 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
     int rc;
 
     switch (client->state) {
-        case State::CLIENT_WRITE_REQ: {
+        case State::CLIENT_SEND_REQ: {
             if (res == 0) {
                 const ConnectionInfo& info = client->info;
                 logger_info(logger, "[client] server [%s:%u] down.",
@@ -42,9 +42,9 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
             }
 
             client->state = State::CLIENT_GET_RES;
-            rc = nq->ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
+            rc = nq->RecvAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
             if (rc != 0) {
-                logger_error(logger, "ReadAsync() failed.");
+                logger_error(logger, "RecvAsync() failed.");
             }
             break;
         }
@@ -84,10 +84,10 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
             }
 
             auto len = sprintf(client->buf, "%lu", num + 1);
-            client->state = State::CLIENT_WRITE_REQ;
-            rc = nq->WriteAsync(client->fd, client->buf, len, client);
+            client->state = State::CLIENT_SEND_REQ;
+            rc = nq->SendAsync(client->fd, client->buf, len, client);
             if (rc != 0) {
-                logger_error(logger, "WriteAsync() failed.");
+                logger_error(logger, "SendAsync() failed.");
             }
             break;
         }
@@ -140,10 +140,10 @@ int main(int argc, char* argv[]) {
                 info.local_addr.c_str(), info.local_port,
                 info.remote_addr.c_str(), info.remote_port);
 
-    client.state = State::CLIENT_WRITE_REQ;
-    rc = nq.WriteAsync(client.fd, "0", 1, &client);
+    client.state = State::CLIENT_SEND_REQ;
+    rc = nq.SendAsync(client.fd, "0", 1, &client);
     if (rc != 0) {
-        logger_error(&logger.l, "write initial request failed.");
+        logger_error(&logger.l, "send initial request failed.");
         return -1;
     }
 

@@ -28,15 +28,15 @@ public:
         return ReqStat::VALID;
     }
 
-    void Process(Buffer&& req, Writer* writer) override {
-        const ConnectionInfo& info = writer->GetConnectionInfo();
+    void Process(Buffer&& req, Sender* sender) override {
+        const ConnectionInfo& info = sender->GetConnectionInfo();
         logger_info(m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
                     info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port,
                     req.GetSize(), req.GetData());
-        auto err = writer->WriteAsync(std::move(req));
+        auto err = sender->SendAsync(std::move(req));
         if (err) {
-            logger_error(m_logger, "write data failed: [%s].", strerror(-err));
+            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
         }
     }
 

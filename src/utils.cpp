@@ -29,23 +29,6 @@ static int GetHostInfo(const char* host, uint16_t port, struct addrinfo** info,
     return 0;
 }
 
-static int SetCloseOnExec(int fd, Logger* logger) {
-    int flags = fcntl(fd, F_GETFD);
-    if (flags == -1) {
-        logger_error(logger, "fcntl(F_GETFD) failed: [%s].", strerror(errno));
-        return -errno;
-    }
-
-    flags |= FD_CLOEXEC;
-    int ret = fcntl(fd, F_SETFD);
-    if (ret == -1) {
-        logger_error(logger, "fcntl(F_SETFD) failed: [%s].", strerror(errno));
-        return -errno;
-    }
-
-    return 0;
-}
-
 static int SetReuseAddr(int fd, Logger* logger) {
     int opt = 1;
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) != 0) {
@@ -66,16 +49,14 @@ int CreateTcpServerFd(const char* host, uint16_t port, Logger* logger) {
         return sc;
     }
 
-    fd = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
+    fd = socket(info->ai_family, info->ai_socktype | SOCK_CLOEXEC,
+                info->ai_protocol);
     if (fd < 0) {
         logger_error(logger, "socket() failed: %s.", strerror(errno));
         goto err;
     }
 
     if (SetReuseAddr(fd, logger) != 0) {
-        goto err1;
-    }
-    if (SetCloseOnExec(fd, logger) != 0) {
         goto err1;
     }
 
@@ -106,7 +87,8 @@ int CreateTcpClientFd(const char* host, uint16_t port, Logger* logger) {
         return ret;
     }
 
-    int fd = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
+    int fd = socket(info->ai_family, info->ai_socktype | SOCK_CLOEXEC,
+                    info->ai_protocol);
     if (fd == -1) {
         logger_error(logger, "socket() failed: %s", strerror(errno));
         ret = -errno;
@@ -116,11 +98,6 @@ int CreateTcpClientFd(const char* host, uint16_t port, Logger* logger) {
     if (connect(fd, info->ai_addr, info->ai_addrlen) != 0) {
         logger_error(logger, "connect() failed: %s", strerror(errno));
         ret = -errno;
-        goto err1;
-    }
-
-    ret = SetCloseOnExec(fd, logger);
-    if (ret != 0) {
         goto err1;
     }
 

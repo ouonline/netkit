@@ -13,8 +13,8 @@ struct State {
     enum Value {
         UNKNOWN,
         CLIENT_CONNECTED,
-        READ_REQ,
-        WRITE_RES,
+        RECV_REQ,
+        SEND_RES,
         CLOSED,
         END_LOOP,
     } value;
@@ -60,19 +60,19 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
                         session->info.remote_addr.c_str(),
                         session->info.remote_port);
 
-            session->value = State::READ_REQ;
-            rc = nq->ReadAsync(res, session->buf, ECHO_BUFFER_SIZE,
+            session->value = State::RECV_REQ;
+            rc = nq->RecvAsync(res, session->buf, ECHO_BUFFER_SIZE,
                                static_cast<State*>(session));
             if (rc != 0) {
-                logger_error(logger, "ReadAsync() failed.");
+                logger_error(logger, "RecvAsync() failed.");
             }
             break;
         }
-        case State::READ_REQ: {
+        case State::RECV_REQ: {
             auto session = static_cast<EchoSession*>(state);
             const ConnectionInfo& info = session->info;
             if (res < 0) {
-                logger_error(logger, "read session request failed: [%s].",
+                logger_error(logger, "recv session request failed: [%s].",
                              strerror(-res));
                 delete session;
             } else if (res == 0) {
@@ -90,18 +90,18 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
                     info.remote_addr.c_str(), info.remote_port,
                     info.local_addr.c_str(), info.local_port,
                     res, session->buf);
-                session->value = State::WRITE_RES;
-                rc = nq->WriteAsync(session->fd, session->buf, res, tag);
+                session->value = State::SEND_RES;
+                rc = nq->SendAsync(session->fd, session->buf, res, tag);
                 if (rc != 0) {
-                    logger_error(logger, "WriteAsync() failed.");
+                    logger_error(logger, "SendAsync() failed.");
                 }
             }
             break;
         }
-        case State::WRITE_RES: {
+        case State::SEND_RES: {
             auto session = static_cast<EchoSession*>(state);
             if (res < 0) {
-                logger_error(logger, "write response to session failed: [%s].",
+                logger_error(logger, "send response to session failed: [%s].",
                              strerror(-res));
                 delete session;
             } else if (res == 0) {
@@ -110,10 +110,10 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
                             info.remote_addr.c_str(), info.remote_port);
                 delete session;
             } else {
-                session->value = State::READ_REQ;
-                rc = nq->ReadAsync(session->fd, session->buf, ECHO_BUFFER_SIZE, tag);
+                session->value = State::RECV_REQ;
+                rc = nq->RecvAsync(session->fd, session->buf, ECHO_BUFFER_SIZE, tag);
                 if (rc != 0) {
-                    logger_error(logger, "ReadAsync() failed.");
+                    logger_error(logger, "RecvAsync() failed.");
                 }
             }
             break;

@@ -2,7 +2,7 @@
 #define __NETKIT_REQUEST_HANDLER_H__
 
 #include "buffer.h"
-#include "writer.h"
+#include "sender.h"
 
 namespace netkit {
 
@@ -27,7 +27,7 @@ public:
     virtual void OnConnected(const ConnectionInfo&) = 0;
     virtual void OnDisconnected(const ConnectionInfo&) = 0;
     virtual ReqStat Check(const Buffer&, uint64_t* req_bytes) = 0;
-    virtual void Process(Buffer&&, Writer*) = 0;
+    virtual void Process(Buffer&&, Sender*) = 0;
 };
 
 }

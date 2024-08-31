@@ -22,8 +22,8 @@ void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
 
     if (!client->current_sending_res) {
         client->current_sending_res = response;
-        err = m_wr_nq.WriteAsync(client->fd, qbuf_data(&response->data),
-                                 qbuf_size(&response->data), tag);
+        err = m_wr_nq.SendAsync(client->fd, qbuf_data(&response->data),
+                                qbuf_size(&response->data), tag);
         if (err) {
             logger_error(m_logger, "send data failed: [%s].", strerror(-err));
             goto out;
@@ -39,7 +39,7 @@ void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
     }
 
     if (res < 0) {
-        logger_error(m_logger, "write data to client [%s:%u] failed: [%s].",
+        logger_error(m_logger, "send data to client [%s:%u] failed: [%s].",
                      client->info.remote_addr.c_str(),
                      client->info.remote_port, strerror(-res));
         err = res;
@@ -53,7 +53,7 @@ void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
 
     client->bytes_sent += res;
     if (client->bytes_sent < qbuf_size(&response->data)) {
-        err = m_wr_nq.WriteAsync(
+        err = m_wr_nq.SendAsync(
             client->fd,
             (const char*)qbuf_data(&response->data) + client->bytes_sent,
             qbuf_size(&response->data) - client->bytes_sent, tag);
@@ -79,13 +79,13 @@ void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
         return;
     }
 
-    err = m_wr_nq.WriteAsync(client->fd, qbuf_data(&response->data),
-                             qbuf_size(&response->data), response);
+    err = m_wr_nq.SendAsync(client->fd, qbuf_data(&response->data),
+                            qbuf_size(&response->data), response);
     if (!err) {
         return;
     }
 
-    logger_error(m_logger, "write data failed: [%s].", strerror(-err));
+    logger_error(m_logger, "send data failed: [%s].", strerror(-err));
 
 out:
     if (response->callback) {
@@ -134,7 +134,7 @@ int ConnectionManager::Init() {
 
     err = InitNq(&m_new_rd_nq, m_logger);
     if (err) {
-        logger_error(m_logger, "init new and reading notification queue failed: [%s].",
+        logger_error(m_logger, "init new and recving notification queue failed: [%s].",
                      strerror(-err));
         return err;
     }
@@ -162,10 +162,10 @@ int ConnectionManager::DoAddClient(int64_t new_fd,
 
     client->value = State::CLIENT_READ_REQ;
     GetClient(client);
-    err = m_new_rd_nq.ReadAsync(client->fd, client->req.GetData(),
+    err = m_new_rd_nq.RecvAsync(client->fd, client->req.GetData(),
                                 REQ_BUF_EXPAND_SIZE, static_cast<State*>(client));
     if (err) {
-        logger_error(m_logger, "about to read data failed: [%s].", strerror(-err));
+        logger_error(m_logger, "about to recv data failed: [%s].", strerror(-err));
         PutClient(client);
     }
     return err;
@@ -213,8 +213,8 @@ public:
     }
 
     ThreadTask* Run(uint32_t idx) override {
-        Writer writer(m_client, m_wr_nq, &m_signal_nq_list[idx]);
-        m_client->handler->Process(std::move(m_req), &writer);
+        Sender sender(m_client, m_wr_nq, &m_signal_nq_list[idx]);
+        m_client->handler->Process(std::move(m_req), &sender);
         return nullptr;
     }
 
@@ -266,10 +266,10 @@ void ConnectionManager::HandleMoreDataRequest(void* client_ptr, uint64_t expand_
         goto errout;
     }
 
-    err = m_new_rd_nq.ReadAsync(client->fd, (char*)req->GetData() + req->GetSize(),
+    err = m_new_rd_nq.RecvAsync(client->fd, (char*)req->GetData() + req->GetSize(),
                                 expand_size, static_cast<State*>(client));
     if (err) {
-        logger_error(m_logger, "about to read data failed: [%s].", strerror(-err));
+        logger_error(m_logger, "about to recv data failed: [%s].", strerror(-err));
         goto errout;
     }
 
@@ -346,7 +346,7 @@ void ConnectionManager::HandleClientReading(int64_t res, void* client_ptr) {
     auto client = static_cast<InternalClient*>(client_ptr);
 
     if (res < 0) {
-        logger_error(m_logger, "read data from client [%s:%u] failed: [%s].",
+        logger_error(m_logger, "recv data from client [%s:%u] failed: [%s].",
                      client->info.remote_addr.c_str(),
                      client->info.remote_port, strerror(-res));
         PutClient(client);
@@ -358,19 +358,19 @@ void ConnectionManager::HandleClientReading(int64_t res, void* client_ptr) {
         return;
     }
 
-    // resize req to the real size after reading.
-    // the real size is less than we reserved before reading.
+    // resize req to the real size after recving.
+    // the real size is less than we reserved before recving.
     client->req.Resize(client->req.GetSize() + res);
 
     // we already have a HandleClientRequest() before
     if (client->bytes_needed > 0) {
         client->bytes_needed -= res;
         if (client->bytes_needed > 0) {
-            auto err = m_new_rd_nq.ReadAsync(
+            auto err = m_new_rd_nq.RecvAsync(
                 client->fd, client->req.GetData() + client->req.GetSize(),
                 client->bytes_needed, static_cast<State*>(client));
             if (err) {
-                logger_error(m_logger, "about to read req failed: [%s].",
+                logger_error(m_logger, "about to recv req failed: [%s].",
                              strerror(-err));
                 PutClient(client);
             }

@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
     std::thread recv_thread([l = &logger.l, &client_list, &recv_nq]() -> void {
         for (auto it = client_list.begin(); it != client_list.end(); ++it) {
             auto client = &(*it);
-            recv_nq.ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
+            recv_nq.RecvAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
         }
 
         while (true) {
@@ -88,16 +88,16 @@ int main(int argc, char* argv[]) {
             }
 
             auto client = static_cast<EchoClient*>(tag);
-            recv_nq.ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
+            recv_nq.RecvAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
         }
     });
 
     // initial sending
     for (uint32_t i = 0; i < nr_client; ++i) {
         auto client = &client_list[i];
-        rc = send_nq.WriteAsync(client->fd, test_data_buf, lens[0], client);
+        rc = send_nq.SendAsync(client->fd, test_data_buf, lens[0], client);
         if (rc != 0) {
-            logger_error(&logger.l, "write initial request failed.");
+            logger_error(&logger.l, "send initial request failed.");
             return -1;
         }
     }
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
         auto client = static_cast<EchoClient*>(tag);
         auto len = lens[client->test_data_idx];
         client->test_data_idx = (client->test_data_idx + 1) % lens.size();
-        send_nq.WriteAsync(client->fd, test_data_buf, len, client);
+        send_nq.SendAsync(client->fd, test_data_buf, len, client);
     }
 
     stdout_logger_destroy(&logger);
