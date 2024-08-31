@@ -36,7 +36,9 @@ unset(__PREFER_EPOLL__)
 unset(__PREFER_IOURING__)
 
 if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 14)
+    set(CMAKE_CXX_STANDARD 17)
+elseif(CMAKE_CXX_STANDARD LESS 17)
+    message(FATAL_ERROR "the `new` operator for `alignas` requires C++17 at least.")
 endif()
 
 if(NOT NETKIT_ENABLE_EPOLL AND NOT NETKIT_ENABLE_IOURING)

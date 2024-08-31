@@ -22,7 +22,7 @@ void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
 
     if (!client->current_sending_res) {
         client->current_sending_res = response;
-        err = m_wr_nq.SendAsync(client->fd, qbuf_data(&response->data),
+        err = m_wr_nq.SendAsync(client->fd_for_writing, qbuf_data(&response->data),
                                 qbuf_size(&response->data), tag);
         if (err) {
             logger_error(m_logger, "send data failed: [%s].", strerror(-err));
@@ -54,7 +54,7 @@ void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
     client->bytes_sent += res;
     if (client->bytes_sent < qbuf_size(&response->data)) {
         err = m_wr_nq.SendAsync(
-            client->fd,
+            client->fd_for_writing,
             (const char*)qbuf_data(&response->data) + client->bytes_sent,
             qbuf_size(&response->data) - client->bytes_sent, tag);
         if (!err) {
@@ -79,7 +79,7 @@ void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
         return;
     }
 
-    err = m_wr_nq.SendAsync(client->fd, qbuf_data(&response->data),
+    err = m_wr_nq.SendAsync(client->fd_for_writing, qbuf_data(&response->data),
                             qbuf_size(&response->data), response);
     if (!err) {
         return;
@@ -162,7 +162,7 @@ int ConnectionManager::DoAddClient(int64_t new_fd,
 
     client->value = State::CLIENT_READ_REQ;
     GetClient(client);
-    err = m_new_rd_nq.RecvAsync(client->fd, client->req.GetData(),
+    err = m_new_rd_nq.RecvAsync(client->fd_for_reading, client->req.GetData(),
                                 REQ_BUF_EXPAND_SIZE, static_cast<State*>(client));
     if (err) {
         logger_error(m_logger, "about to recv data failed: [%s].", strerror(-err));
@@ -266,7 +266,8 @@ void ConnectionManager::HandleMoreDataRequest(void* client_ptr, uint64_t expand_
         goto errout;
     }
 
-    err = m_new_rd_nq.RecvAsync(client->fd, (char*)req->GetData() + req->GetSize(),
+    err = m_new_rd_nq.RecvAsync(client->fd_for_reading,
+                                (char*)req->GetData() + req->GetSize(),
                                 expand_size, static_cast<State*>(client));
     if (err) {
         logger_error(m_logger, "about to recv data failed: [%s].", strerror(-err));
@@ -367,7 +368,8 @@ void ConnectionManager::HandleClientReading(int64_t res, void* client_ptr) {
         client->bytes_needed -= res;
         if (client->bytes_needed > 0) {
             auto err = m_new_rd_nq.RecvAsync(
-                client->fd, client->req.GetData() + client->req.GetSize(),
+                client->fd_for_reading,
+                client->req.GetData() + client->req.GetSize(),
                 client->bytes_needed, static_cast<State*>(client));
             if (err) {
                 logger_error(m_logger, "about to recv req failed: [%s].",

@@ -2,6 +2,7 @@
 #define __NETKIT_IOURING_NOTIFICATION_QUEUE_IMPL_H__
 
 #include "netkit/notification_queue.h"
+#include "threadkit/common.h"
 #include "logger/logger.h"
 #include "liburing.h"
 
@@ -13,7 +14,8 @@ struct NotificationQueueOptions final {
     bool enable_kernel_polling = false;
 };
 
-class NotificationQueueImpl final : public NotificationQueue {
+class alignas(threadkit::CACHELINE_SIZE) NotificationQueueImpl final
+    : public NotificationQueue {
 public:
     NotificationQueueImpl() : m_logger(nullptr) {}
     ~NotificationQueueImpl() {

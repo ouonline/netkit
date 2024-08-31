@@ -11,8 +11,7 @@ namespace netkit {
 
 class ConnectionManager final {
 public:
-    ConnectionManager(Logger* logger)
-        : m_signal_nq_list(nullptr), m_logger(logger) {}
+    ConnectionManager(Logger* logger) : m_logger(logger) {}
 
     int Init();
     int StartServer(const char* addr, uint16_t port,
@@ -30,8 +29,12 @@ private:
     void ProcessWriting(int64_t, void* tag);
 
 private:
-    // workers
+    alignas(threadkit::CACHELINE_SIZE)
+
     threadkit::ThreadPool m_thread_pool;
+    Logger* m_logger;
+
+    alignas(threadkit::CACHELINE_SIZE)
 
     // for writing events
     NotificationQueueImpl m_wr_nq;
@@ -41,10 +44,10 @@ private:
     // for sending events to writing thread. one nq per thread.
     std::unique_ptr<NotificationQueueImpl[]> m_signal_nq_list;
 
+    alignas(threadkit::CACHELINE_SIZE)
+
     // for new connection and reading events
     NotificationQueueImpl m_new_rd_nq;
-
-    Logger* m_logger;
 
 private:
     ConnectionManager(ConnectionManager&&) = delete;
