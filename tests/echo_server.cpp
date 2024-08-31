@@ -1,25 +1,6 @@
 #include "netkit/utils.h"
+#include "netkit/nq_utils.h"
 using namespace netkit;
-
-#ifdef NETKIT_ENABLE_IOURING
-
-#include "netkit/iouring/notification_queue_impl.h"
-using namespace netkit::iouring;
-
-static int DoInitNq(NotificationQueueImpl* nq, Logger* l) {
-    return nq->Init(NotificationQueueOptions(), l);
-}
-
-#elif defined NETKIT_ENABLE_EPOLL
-
-#include "netkit/epoll/notification_queue_impl.h"
-using namespace netkit::epoll;
-
-static int DoInitNq(NotificationQueueImpl* nq, Logger* l) {
-    return nq->Init(l);
-}
-
-#endif
 
 #include "logger/stdout_logger.h"
 #include <unistd.h> // close()
@@ -58,7 +39,8 @@ struct EchoSession final : public State {
     char buf[ECHO_BUFFER_SIZE];
 };
 
-static State::Value Process(EchoServer* svr, int64_t res, void* tag, NotificationQueueImpl* nq, Logger* logger) {
+static State::Value Process(EchoServer* svr, int64_t res, void* tag,
+                            NotificationQueueImpl* nq, Logger* logger) {
     int rc;
 
     auto state = static_cast<State*>(tag);
@@ -66,18 +48,21 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
     switch (ret_state) {
         case State::CLIENT_CONNECTED: {
             if (res <= 0) {
-                logger_info(logger, "[server] closes server: [%s].", strerror(-res));
+                logger_info(logger, "[server] closes server: [%s].",
+                            strerror(-res));
                 break;
             }
 
             auto session = new EchoSession();
             session->fd = res;
             utils::GenConnectionInfo(res, &session->info);
-            logger_info(logger, "[server] accepts client [%s:%u].", session->info.remote_addr.c_str(),
+            logger_info(logger, "[server] accepts client [%s:%u].",
+                        session->info.remote_addr.c_str(),
                         session->info.remote_port);
 
             session->value = State::READ_REQ;
-            rc = nq->ReadAsync(res, session->buf, ECHO_BUFFER_SIZE, static_cast<State*>(session));
+            rc = nq->ReadAsync(res, session->buf, ECHO_BUFFER_SIZE,
+                               static_cast<State*>(session));
             if (rc != 0) {
                 logger_error(logger, "ReadAsync() failed.");
             }
@@ -87,11 +72,12 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
             auto session = static_cast<EchoSession*>(state);
             const ConnectionInfo& info = session->info;
             if (res < 0) {
-                logger_error(logger, "read session request failed: [%s].", strerror(-res));
+                logger_error(logger, "read session request failed: [%s].",
+                             strerror(-res));
                 delete session;
             } else if (res == 0) {
-                logger_info(logger, "[server] client [%s:%u] disconnected.", info.remote_addr.c_str(),
-                            info.remote_port);
+                logger_info(logger, "[server] client [%s:%u] disconnected.",
+                            info.remote_addr.c_str(), info.remote_port);
                 delete session;
                 svr->value = State::CLOSED;
                 rc = nq->CloseAsync(svr->fd, static_cast<State*>(svr));
@@ -99,8 +85,11 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
                     logger_error(logger, "CloseAsync() failed.");
                 }
             } else {
-                logger_info(logger, "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]", info.remote_addr.c_str(),
-                            info.remote_port, info.local_addr.c_str(), info.local_port, res, session->buf);
+                logger_info(
+                    logger, "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]",
+                    info.remote_addr.c_str(), info.remote_port,
+                    info.local_addr.c_str(), info.local_port,
+                    res, session->buf);
                 session->value = State::WRITE_RES;
                 rc = nq->WriteAsync(session->fd, session->buf, res, tag);
                 if (rc != 0) {
@@ -112,12 +101,13 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag, Notificatio
         case State::WRITE_RES: {
             auto session = static_cast<EchoSession*>(state);
             if (res < 0) {
-                logger_error(logger, "write response to session failed: [%s].", strerror(-res));
+                logger_error(logger, "write response to session failed: [%s].",
+                             strerror(-res));
                 delete session;
             } else if (res == 0) {
                 const ConnectionInfo& info = session->info;
-                logger_info(logger, "[server] client [%s:%u] disconnected.", info.remote_addr.c_str(),
-                            info.remote_port);
+                logger_info(logger, "[server] client [%s:%u] disconnected.",
+                            info.remote_addr.c_str(), info.remote_port);
                 delete session;
             } else {
                 session->value = State::READ_REQ;
@@ -157,7 +147,7 @@ int main(int argc, char* argv[]) {
     stdout_logger_init(&logger);
 
     NotificationQueueImpl nq;
-    auto rc = DoInitNq(&nq, &logger.l);
+    auto rc = InitNq(&nq, &logger.l);
     if (rc != 0) {
         logger_error(&logger.l, "init notification queue failed.");
         return -1;
@@ -173,7 +163,8 @@ int main(int argc, char* argv[]) {
     svr.value = State::CLIENT_CONNECTED;
     rc = nq.MultiAcceptAsync(svr.fd, static_cast<State*>(&svr));
     if (rc != 0) {
-        logger_error(&logger.l, "register server to notification queue failed: [%s].",
+        logger_error(&logger.l,
+                     "register server to notification queue failed: [%s].",
                      strerror(-rc));
         return -1;
     }

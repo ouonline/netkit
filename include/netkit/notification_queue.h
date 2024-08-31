@@ -12,36 +12,40 @@ class NotificationQueue {
 public:
     virtual ~NotificationQueue() {}
 
-    /** @brief use `CloseAsync()` to close `svr_fd`. returns 0 or -errno. */
+    /** @brief accepts multiple connections. returns 0 or -errno. */
     virtual int MultiAcceptAsync(int64_t svr_fd, void* tag) = 0;
 
-    /** @brief use `CloseAsync()` to close `svr_fd`. returns 0 or -errno. */
+    /** @brief accepts one connection. returns 0 or -errno. */
     virtual int AcceptAsync(int64_t svr_fd, void* tag) = 0;
 
-    /** @brief read at most `sz` bytes into `buf` from `fd`. returns 0 or -errno. */
+    /** @brief reads at most `sz` bytes into `buf` from `fd`. returns 0 or -errno. */
     virtual int ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) = 0;
 
-    /** @brief write at most `sz` bytes from `buf` to `fd`. returns 0 or -errno. */
+    /** @brief writes at most `sz` bytes from `buf` to `fd`. returns 0 or -errno. */
     virtual int WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) = 0;
 
-    /** @brief close `fd`. returns 0 or -errno. */
+    /** @brief closes `fd`. returns 0 or -errno. */
     virtual int CloseAsync(int64_t fd, void* tag) = 0;
 
     /**
        @brief gets next event. returns 0 or -errno.
 
        @param `res` has different meanings according to events:
-       - ACCEPT: `res` is the client fd or -errno, `tag` is the value passed to `MultiAcceptAsync()` or `AcceptAsync()`.
-       - READ: `res` is the number of bytes read or -errno, `tag` is the value passed to `ReadAsync()`.
-       - WRITE: `res` is the number of bytes written or -errno, `tag` is the value passed to `WriteAsync()`.
-       - CLOSE: `res` is the return value of `close()` or -errno, `tag` is the value passed to `CloseAsync()`.
+       - ACCEPT: `res` is the client fd or -errno, `tag` is the value passed to
+                 `MultiAcceptAsync()` or `AcceptAsync()`.
+       - READ: `res` is the number of bytes read or -errno, `tag` is the value
+               passed to `ReadAsync()`.
+       - WRITE: `res` is the number of bytes written or -errno, `tag` is the value
+                passed to `WriteAsync()`.
+       - CLOSE: `res` is the return value of `close()` or -errno, `tag` is the value
+                passed to `CloseAsync()`.
 
-       @param timtout waits until at least one event arrives, timeout reaches, or some error occurs.
-       nullptr for blocking without timeout.
+       @param `timtout` waits until at least one event arrives, timeout reaches, or
+       some error occurs. `nullptr` for blocking without timeout.
 
        @return -EAGAIN if there is no events, 0 for success, and -errno for other errors.
     */
-    virtual int Next(int64_t* res, void** tag, TimeVal* timeout) = 0;
+    virtual int Next(int64_t* res, void** tag, const TimeVal* timeout) = 0;
 };
 
 }

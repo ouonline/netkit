@@ -11,7 +11,8 @@ namespace netkit {
 
 class ConnectionManager final {
 public:
-    ConnectionManager(Logger* logger) : m_signal_nq_list(nullptr), m_logger(logger) {}
+    ConnectionManager(Logger* logger)
+        : m_signal_nq_list(nullptr), m_logger(logger) {}
 
     int Init();
     int StartServer(const char* addr, uint16_t port,

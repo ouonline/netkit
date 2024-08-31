@@ -64,7 +64,8 @@ int main(int argc, char* argv[]) {
     for (uint32_t i = 0; i < nr_client; ++i) {
         int ret = utils::CreateTcpClientFd(host, port, &logger.l);
         if (ret < 0) {
-            logger_error(&logger.l, "init client connection failed: [%s].", strerror(-ret));
+            logger_error(&logger.l, "init client connection failed: [%s].",
+                         strerror(-ret));
             return -1;
         }
         client_list[i].fd = ret;

@@ -23,14 +23,16 @@ struct EchoClient final {
     char buf[ECHO_BUFFER_SIZE];
 };
 
-static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq, Logger* logger) {
+static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
+                     Logger* logger) {
     int rc;
 
     switch (client->state) {
         case State::CLIENT_WRITE_REQ: {
             if (res == 0) {
                 const ConnectionInfo& info = client->info;
-                logger_info(logger, "[client] server [%s:%u] down.", info.remote_addr.c_str(), info.remote_port);
+                logger_info(logger, "[client] server [%s:%u] down.",
+                            info.remote_addr.c_str(), info.remote_port);
                 client->state = State::CLIENT_DISCONNECTED;
                 rc = nq->CloseAsync(client->fd, client);
                 if (rc != 0) {
@@ -49,7 +51,8 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
         case State::CLIENT_GET_RES: {
             const ConnectionInfo& info = client->info;
             if (res == 0) {
-                logger_info(logger, "[client] server [%s:%u] down.", info.remote_addr.c_str(), info.remote_port);
+                logger_info(logger, "[client] server [%s:%u] down.",
+                            info.remote_addr.c_str(), info.remote_port);
                 client->state = State::CLIENT_DISCONNECTED;
                 rc = nq->CloseAsync(client->fd, client);
                 if (rc != 0) {
@@ -58,8 +61,10 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
                 break;
             }
 
-            logger_info(logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]", info.remote_addr.c_str(),
-                        info.remote_port, info.local_addr.c_str(), info.local_port, res, client->buf);
+            logger_info(logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
+                        info.remote_addr.c_str(), info.remote_port,
+                        info.local_addr.c_str(), info.local_port,
+                        res, client->buf);
             sleep(1);
 
             if (res < ECHO_BUFFER_SIZE) {
@@ -87,8 +92,8 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
             break;
         }
         case State::CLIENT_DISCONNECTED: {
-            logger_info(logger, "[client] client [%s:%u] closed.", client->info.local_addr.c_str(),
-                        client->info.local_port);
+            logger_info(logger, "[client] client [%s:%u] closed.",
+                        client->info.local_addr.c_str(), client->info.local_port);
             client->state = State::CLIENT_END_LOOP;
             break;
         }
@@ -131,8 +136,9 @@ int main(int argc, char* argv[]) {
 
     utils::GenConnectionInfo(client.fd, &client.info);
     const ConnectionInfo& info = client.info;
-    logger_info(&logger.l, "[client] client [%s:%u] connect to server [%s:%u].", info.local_addr.c_str(),
-                info.local_port, info.remote_addr.c_str(), info.remote_port);
+    logger_info(&logger.l, "[client] client [%s:%u] connect to server [%s:%u].",
+                info.local_addr.c_str(), info.local_port,
+                info.remote_addr.c_str(), info.remote_port);
 
     client.state = State::CLIENT_WRITE_REQ;
     rc = nq.WriteAsync(client.fd, "0", 1, &client);

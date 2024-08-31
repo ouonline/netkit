@@ -12,7 +12,8 @@ class InternalClient;
 
 class Writer final {
 public:
-    Writer(InternalClient* c, NotificationQueueImpl* wr_nq, NotificationQueueImpl* signal_nq)
+    Writer(InternalClient* c, NotificationQueueImpl* wr_nq,
+           NotificationQueueImpl* signal_nq)
         : m_client(c), m_wr_nq(wr_nq), m_signal_nq(signal_nq) {}
 
     const ConnectionInfo& GetConnectionInfo() const;

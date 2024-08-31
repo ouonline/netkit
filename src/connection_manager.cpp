@@ -53,14 +53,16 @@ void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
 
     client->bytes_sent += res;
     if (client->bytes_sent < qbuf_size(&response->data)) {
-        err = m_wr_nq.WriteAsync(client->fd,
-                                 (const char*)qbuf_data(&response->data) + client->bytes_sent,
-                                 qbuf_size(&response->data) - client->bytes_sent, tag);
+        err = m_wr_nq.WriteAsync(
+            client->fd,
+            (const char*)qbuf_data(&response->data) + client->bytes_sent,
+            qbuf_size(&response->data) - client->bytes_sent, tag);
         if (!err) {
             return;
         }
 
-        logger_error(m_logger, "about to send data failed: [%s].", strerror(-err));
+        logger_error(m_logger, "about to send data failed: [%s].",
+                     strerror(-err));
         goto out;
     }
 
@@ -140,7 +142,8 @@ int ConnectionManager::Init() {
     return 0;
 }
 
-int ConnectionManager::DoAddClient(int64_t new_fd, const shared_ptr<RequestHandler>& handler) {
+int ConnectionManager::DoAddClient(int64_t new_fd,
+                                   const shared_ptr<RequestHandler>& handler) {
     auto client = new InternalClient(new_fd, handler);
     if (!client) {
         logger_error(m_logger, "create InternalClient failed: [%s].",
@@ -157,10 +160,10 @@ int ConnectionManager::DoAddClient(int64_t new_fd, const shared_ptr<RequestHandl
         return err;
     }
 
-    client->value = State::READ_REQ;
+    client->value = State::CLIENT_READ_REQ;
     GetClient(client);
-    err = m_new_rd_nq.ReadAsync(client->fd, client->req.GetData(), REQ_BUF_EXPAND_SIZE,
-                                static_cast<State*>(client));
+    err = m_new_rd_nq.ReadAsync(client->fd, client->req.GetData(),
+                                REQ_BUF_EXPAND_SIZE, static_cast<State*>(client));
     if (err) {
         logger_error(m_logger, "about to read data failed: [%s].", strerror(-err));
         PutClient(client);
@@ -185,7 +188,7 @@ int ConnectionManager::StartServer(const char* addr, uint16_t port,
         return -ENOMEM;
     }
 
-    svr->value = State::ACCEPT;
+    svr->value = State::SERVER_ACCEPT;
     auto err = m_new_rd_nq.MultiAcceptAsync(fd, static_cast<State*>(svr));
     if (err != 0) {
         logger_error(m_logger, "add server to notification queue failed: [%s].",
@@ -258,7 +261,8 @@ void ConnectionManager::HandleMoreDataRequest(void* client_ptr, uint64_t expand_
     auto req = &client->req;
     auto err = req->Reserve(req->GetSize() + expand_size);
     if (err) {
-        logger_error(m_logger, "allocate buffer for request failed: [%s].", strerror(-err));
+        logger_error(m_logger, "allocate buffer for request failed: [%s].",
+                     strerror(-err));
         goto errout;
     }
 
@@ -315,10 +319,11 @@ again:
     }
     std::swap(req_to_be_processed, client->req);
 
-    auto task = new ProcessReqTask(std::move(req_to_be_processed), client, &m_wr_nq,
-                                   m_signal_nq_list.get());
+    auto task = new ProcessReqTask(std::move(req_to_be_processed), client,
+                                   &m_wr_nq, m_signal_nq_list.get());
     if (!task) {
-        logger_error(m_logger, "create ProcessReqTask failed: [%s].", strerror(ENOMEM));
+        logger_error(m_logger, "create ProcessReqTask failed: [%s].",
+                     strerror(ENOMEM));
         goto errout;
     }
 
@@ -353,17 +358,20 @@ void ConnectionManager::HandleClientReading(int64_t res, void* client_ptr) {
         return;
     }
 
-    // resize req to the real size after reading. the real size is less than we reserved before reading.
+    // resize req to the real size after reading.
+    // the real size is less than we reserved before reading.
     client->req.Resize(client->req.GetSize() + res);
 
     // we already have a HandleClientRequest() before
     if (client->bytes_needed > 0) {
         client->bytes_needed -= res;
         if (client->bytes_needed > 0) {
-            auto err = m_new_rd_nq.ReadAsync(client->fd, client->req.GetData() + client->req.GetSize(),
-                                             client->bytes_needed, static_cast<State*>(client));
+            auto err = m_new_rd_nq.ReadAsync(
+                client->fd, client->req.GetData() + client->req.GetSize(),
+                client->bytes_needed, static_cast<State*>(client));
             if (err) {
-                logger_error(m_logger, "about to read req failed: [%s].", strerror(-err));
+                logger_error(m_logger, "about to read req failed: [%s].",
+                             strerror(-err));
                 PutClient(client);
             }
             return;
@@ -376,13 +384,13 @@ void ConnectionManager::HandleClientReading(int64_t res, void* client_ptr) {
 // client's refcount was increased before calling *Async()
 void ConnectionManager::ProcessNewAndReading(int64_t res, void* tag) {
     auto state = static_cast<State*>(tag);
-    if (state->value == State::ACCEPT) {
+    if (state->value == State::SERVER_ACCEPT) {
         auto svr = static_cast<InternalServer*>(state);
         HandleAccept(res, svr);
         return;
     }
 
-    if (state->value == State::READ_REQ) {
+    if (state->value == State::CLIENT_READ_REQ) {
         auto client = static_cast<InternalClient*>(state);
         HandleClientReading(res, client);
         return;

@@ -9,7 +9,8 @@ namespace netkit { namespace epoll {
 
 class NotificationQueueImpl final : public NotificationQueue {
 public:
-    NotificationQueueImpl() : m_epfd(-1), m_event_idx(0), m_nr_valid_event(0), m_logger(nullptr) {}
+    NotificationQueueImpl()
+        : m_epfd(-1), m_event_idx(0), m_nr_valid_event(0), m_logger(nullptr) {}
     ~NotificationQueueImpl() {
         Destroy();
     }
@@ -24,7 +25,7 @@ public:
     int CloseAsync(int64_t fd, void* tag) override;
     int NotifyAsync(NotificationQueueImpl*, int res, void* tag);
 
-    int Next(int64_t* res, void** tag, TimeVal* timeout) override;
+    int Next(int64_t* res, void** tag, const TimeVal* timeout) override;
 
 private:
     static constexpr uint32_t MAX_EVENTS = 64;

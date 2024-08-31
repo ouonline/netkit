@@ -34,7 +34,7 @@ void NotificationQueueImpl::Destroy() {
     }
 }
 
-int NotificationQueueImpl::Next(int64_t* res, void** tag, TimeVal* timeout) {
+int NotificationQueueImpl::Next(int64_t* res, void** tag, const TimeVal* timeout) {
     struct io_uring_cqe* cqe = nullptr;
 
     if (timeout) {
@@ -53,7 +53,8 @@ int NotificationQueueImpl::Next(int64_t* res, void** tag, TimeVal* timeout) {
                 return ret;
             }
             if (ret < 0) {
-                logger_error(m_logger, "wait cqe with timeout failed: [%s].", strerror(-ret));
+                logger_error(m_logger, "wait cqe with timeout failed: [%s].",
+                             strerror(-ret));
                 return ret;
             }
         }
@@ -113,38 +114,47 @@ int NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
 }
 
 int NotificationQueueImpl::AcceptAsync(int64_t fd, void* tag) {
-    return GenericAsync(&m_ring, m_logger, [fd, tag](struct io_uring_sqe* sqe) -> void {
-        io_uring_prep_accept(sqe, fd, nullptr, nullptr, 0);
-        io_uring_sqe_set_data(sqe, tag);
-    });
+    return GenericAsync(&m_ring, m_logger,
+                        [fd, tag](struct io_uring_sqe* sqe) -> void {
+                            io_uring_prep_accept(sqe, fd, nullptr, nullptr, 0);
+                            io_uring_sqe_set_data(sqe, tag);
+                        });
 }
 
-int NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
-    return GenericAsync(&m_ring, m_logger, [fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
-        io_uring_prep_read(sqe, fd, buf, sz, -1);
-        io_uring_sqe_set_data(sqe, tag);
-    });
+int NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz,
+                                     void* tag) {
+    return GenericAsync(&m_ring, m_logger,
+                        [fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
+                            io_uring_prep_read(sqe, fd, buf, sz, -1);
+                            io_uring_sqe_set_data(sqe, tag);
+                        });
 }
 
-int NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
-    return GenericAsync(&m_ring, m_logger, [fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
-        io_uring_prep_write(sqe, fd, buf, sz, -1);
-        io_uring_sqe_set_data(sqe, tag);
-    });
+int NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz,
+                                      void* tag) {
+    return GenericAsync(&m_ring, m_logger,
+                        [fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
+                            io_uring_prep_write(sqe, fd, buf, sz, -1);
+                            io_uring_sqe_set_data(sqe, tag);
+                        });
 }
 
 int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
-    return GenericAsync(&m_ring, m_logger, [fd, tag](struct io_uring_sqe* sqe) -> void {
-        io_uring_prep_close(sqe, fd);
-        io_uring_sqe_set_data(sqe, tag);
-    });
+    return GenericAsync(&m_ring, m_logger,
+                        [fd, tag](struct io_uring_sqe* sqe) -> void {
+                            io_uring_prep_close(sqe, fd);
+                            io_uring_sqe_set_data(sqe, tag);
+                        });
 }
 
-int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res, void* tag) {
+int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res,
+                                       void* tag) {
 #ifdef NETKIT_IOURING_ENABLE_RING_MSG
-    return GenericAsync(&m_ring, m_logger, [nq, res, tag](struct io_uring_sqe* sqe) -> void {
-        io_uring_prep_msg_ring(sqe, nq->m_ring.ring_fd, res, (uint64_t)tag, 0);
-    });
+    return GenericAsync(&m_ring, m_logger,
+                        [nq, res, tag](struct io_uring_sqe* sqe) -> void {
+                            io_uring_prep_msg_ring(sqe, nq->m_ring.ring_fd,
+                                                   res, (uint64_t)tag, 0);
+                        });
 #else
     (void)nq;
     (void)res;

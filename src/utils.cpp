@@ -9,7 +9,8 @@ using namespace std;
 
 namespace netkit { namespace utils {
 
-static int GetHostInfo(const char* host, uint16_t port, struct addrinfo** info, Logger* logger) {
+static int GetHostInfo(const char* host, uint16_t port, struct addrinfo** info,
+                       Logger* logger) {
     char buf[8];
     struct addrinfo hints;
 

@@ -13,7 +13,8 @@ namespace netkit {
 
 struct InternalClient final : public State {
     InternalClient(int _fd, const std::shared_ptr<RequestHandler>& h)
-        : fd(_fd), handler(h), bytes_needed(0), bytes_sent(0), current_sending_res(nullptr) {
+        : fd(_fd), handler(h), bytes_needed(0), bytes_sent(0)
+        , current_sending_res(nullptr) {
         utils::GenConnectionInfo(fd, &info);
         refcount.store(0, std::memory_order_relaxed);
         handler->OnConnected(info);

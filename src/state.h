@@ -6,8 +6,8 @@ namespace netkit {
 struct State {
     enum Value {
         UNKNOWN,
-        ACCEPT,
-        READ_REQ,
+        SERVER_ACCEPT,
+        CLIENT_READ_REQ,
     } value;
     State(Value v = UNKNOWN) : value(v) {}
     virtual ~State() {}

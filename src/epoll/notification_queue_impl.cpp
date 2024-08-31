@@ -49,7 +49,8 @@ struct EventHandler {
     bool keep_alive;
 };
 
-static int DoEpollUpdate(int epfd, uint32_t flags, EventHandler* handler, int fd, Logger* logger) {
+static int DoEpollUpdate(int epfd, uint32_t flags, EventHandler* handler,
+                         int fd, Logger* logger) {
     struct epoll_event ev;
     ev.events = flags;
     ev.data.ptr = handler;
@@ -59,11 +60,13 @@ static int DoEpollUpdate(int epfd, uint32_t flags, EventHandler* handler, int fd
         if (errno == EEXIST) {
             ret = epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev);
             if (ret != 0) {
-                logger_error(logger, "epoll mod server fd [%d] failed: [%s].", fd, strerror(errno));
+                logger_error(logger, "epoll mod server fd [%d] failed: [%s].",
+                             fd, strerror(errno));
                 return -errno;
             }
         } else {
-            logger_error(logger, "epoll add server fd [%d] failed: [%s].", fd, strerror(errno));
+            logger_error(logger, "epoll add server fd [%d] failed: [%s].",
+                         fd, strerror(errno));
             return -errno;
         }
     }
@@ -73,7 +76,8 @@ static int DoEpollUpdate(int epfd, uint32_t flags, EventHandler* handler, int fd
 
 struct AcceptHandler final : public EventHandler {
 public:
-    AcceptHandler(int svr_fd, void* t, bool keep_alive) : EventHandler(svr_fd, t, keep_alive) {}
+    AcceptHandler(int svr_fd, void* t, bool keep_alive)
+        : EventHandler(svr_fd, t, keep_alive) {}
     int64_t In() override {
         int cfd = accept(fd, nullptr, nullptr);
         if (cfd <= 0) {
@@ -91,7 +95,8 @@ int NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
 
     auto ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev);
     if (ret != 0) {
-        logger_error(m_logger, "epoll add server fd [%d] failed: [%s].", fd, strerror(errno));
+        logger_error(m_logger, "epoll add server fd [%d] failed: [%s].",
+                     fd, strerror(errno));
         delete handler;
         return -errno;
     }
@@ -111,7 +116,8 @@ int NotificationQueueImpl::AcceptAsync(int64_t fd, void* tag) {
 
 struct ReadHandler final : public EventHandler {
 public:
-    ReadHandler(int cfd, void* buf, uint64_t sz, void* t) : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
+    ReadHandler(int cfd, void* buf, uint64_t sz, void* t)
+        : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
     int64_t In() override {
         auto nbytes = read(fd, m_buf, m_sz);
         if (nbytes == -1) {
@@ -137,7 +143,8 @@ int NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, void* t
 
 struct WriteHandler final : public EventHandler {
 public:
-    WriteHandler(int cfd, const void* buf, uint64_t sz, void* t) : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
+    WriteHandler(int cfd, const void* buf, uint64_t sz, void* t)
+        : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
     int64_t Out() override {
         auto nbytes = write(fd, m_buf, m_sz);
         if (nbytes == -1) {
@@ -218,7 +225,7 @@ int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res, void*
     return 0;
 }
 
-int NotificationQueueImpl::Next(int64_t* res, void** tag, TimeVal* timeout) {
+int NotificationQueueImpl::Next(int64_t* res, void** tag, const TimeVal* timeout) {
     if (m_event_idx >= m_nr_valid_event) {
         int ts;
         if (timeout) {
