@@ -14,7 +14,7 @@ int Sender::SendAsync(Buffer&& buf, const function<void(int)>& cb) {
         return -ENOMEM;
     }
 
-    res->data = buf.Detach();
+    res->data = std::move(buf);
     res->client = m_client;
     res->callback = cb;
     GetClient(m_client);

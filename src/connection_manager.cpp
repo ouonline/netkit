@@ -22,8 +22,8 @@ void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
 
     if (!client->current_sending_res) {
         client->current_sending_res = response;
-        err = m_wr_nq.SendAsync(client->fd_for_writing, qbuf_data(&response->data),
-                                qbuf_size(&response->data), tag);
+        err = m_wr_nq.SendAsync(client->fd_for_writing, response->data.GetData(),
+                                response->data.GetSize(), tag);
         if (err) {
             logger_error(m_logger, "send data failed: [%s].", strerror(-err));
             goto out;
@@ -52,11 +52,11 @@ void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
     }
 
     client->bytes_sent += res;
-    if (client->bytes_sent < qbuf_size(&response->data)) {
+    if (client->bytes_sent < response->data.GetSize()) {
         err = m_wr_nq.SendAsync(
             client->fd_for_writing,
-            (const char*)qbuf_data(&response->data) + client->bytes_sent,
-            qbuf_size(&response->data) - client->bytes_sent, tag);
+            response->data.GetData() + client->bytes_sent,
+            response->data.GetSize() - client->bytes_sent, tag);
         if (!err) {
             return;
         }
@@ -79,8 +79,8 @@ void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
         return;
     }
 
-    err = m_wr_nq.SendAsync(client->fd_for_writing, qbuf_data(&response->data),
-                            qbuf_size(&response->data), response);
+    err = m_wr_nq.SendAsync(client->fd_for_writing, response->data.GetData(),
+                            response->data.GetSize(), response);
     if (!err) {
         return;
     }

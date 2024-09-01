@@ -60,12 +60,6 @@ public:
         return qbuf_append(&m_data, data, len);
     }
 
-    QBuf Detach() {
-        QBuf ret;
-        qbuf_move_construct(&m_data, &ret);
-        return ret;
-    }
-
 private:
     QBuf m_data;
 
