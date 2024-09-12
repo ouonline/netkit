@@ -1,5 +1,5 @@
-#ifndef __NETKIT_REQUEST_HANDLER_H__
-#define __NETKIT_REQUEST_HANDLER_H__
+#ifndef __NETKIT_HANDLER_H__
+#define __NETKIT_HANDLER_H__
 
 #include "buffer.h"
 #include "sender.h"
@@ -21,9 +21,9 @@ enum ReqStat {
     MORE_DATA_WITH_SIZE = 2,
 };
 
-class RequestHandler {
+class Handler {
 public:
-    virtual ~RequestHandler() {}
+    virtual ~Handler() {}
     virtual void OnConnected(Sender*) = 0;
     virtual void OnDisconnected(const ConnectionInfo&) = 0;
     virtual ReqStat Check(const Buffer&, uint64_t* req_bytes) = 0;

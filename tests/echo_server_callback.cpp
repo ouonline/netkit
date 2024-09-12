@@ -5,7 +5,7 @@ using namespace netkit;
 #include <cstring> // strerror()
 using namespace std;
 
-class EchoServerHandler final : public RequestHandler {
+class EchoServerHandler final : public Handler {
 public:
     EchoServerHandler(Logger* logger) : m_logger(logger) {}
 
@@ -45,13 +45,13 @@ private:
     Logger* m_logger;
 };
 
-class EchoServerFactory final : public RequestHandlerFactory {
+class EchoServerFactory final : public HandlerFactory {
 public:
     EchoServerFactory(Logger* logger) : m_logger(logger) {}
-    RequestHandler* Create() override {
+    Handler* Create() override {
         return new EchoServerHandler(m_logger);
     }
-    void Destroy(RequestHandler* p) override {
+    void Destroy(Handler* p) override {
         delete p;
     }
 

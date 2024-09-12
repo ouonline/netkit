@@ -2,7 +2,7 @@
 #define __NETKIT_EVENT_MANAGER_H__
 
 #include "nq_utils.h"
-#include "request_handler_factory.h"
+#include "handler_factory.h"
 #include "threadkit/threadpool.h"
 #include <thread>
 #include <memory>
@@ -16,16 +16,16 @@ public:
 
     int Init();
     int AddServer(const char* addr, uint16_t port,
-                  const std::shared_ptr<RequestHandlerFactory>&);
+                  const std::shared_ptr<HandlerFactory>&);
     int AddClient(const char* addr, uint16_t port,
-                  const std::shared_ptr<RequestHandler>&);
+                  const std::shared_ptr<Handler>&);
     /* will be deleted if `err` == -errno < 0 */
     int AddTimer(const TimeVal& delay, const TimeVal& interval,
                  const std::function<void(int err, uint64_t nr_expiration)>& handler);
     void Loop();
 
 private:
-    int DoAddClient(int64_t new_fd, const std::shared_ptr<RequestHandler>&);
+    int DoAddClient(int64_t new_fd, const std::shared_ptr<Handler>&);
     void ProcessNewAndReading(int64_t, void* tag);
     void HandleTimerEvent(int64_t, void* timer_handler);
     void HandleAccept(int64_t new_fd, void* svr);

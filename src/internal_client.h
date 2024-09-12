@@ -1,7 +1,7 @@
 #ifndef __NETKIT_INTERNAL_CLIENT_H__
 #define __NETKIT_INTERNAL_CLIENT_H__
 
-#include "netkit/request_handler.h"
+#include "netkit/handler.h"
 #include "netkit/utils.h"
 #include "threadkit/mpsc_queue.h"
 #include "response.h"
@@ -12,7 +12,7 @@
 namespace netkit {
 
 struct InternalClient final : public State {
-    InternalClient(int _fd, const std::shared_ptr<RequestHandler>& h)
+    InternalClient(int _fd, const std::shared_ptr<Handler>& h)
         : refcount(0), handler(h)
         , fd_for_reading(_fd), bytes_needed(0)
         , fd_for_writing(_fd), bytes_sent(0), current_sending_res(nullptr) {
@@ -37,7 +37,7 @@ struct InternalClient final : public State {
     }
 
     std::atomic<uint32_t> refcount;
-    std::shared_ptr<RequestHandler> handler;
+    std::shared_ptr<Handler> handler;
     ConnectionInfo info;
 
     // `fd_for_reading` and `fd_for_writing` are identical.

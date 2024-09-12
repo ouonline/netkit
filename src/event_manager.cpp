@@ -191,7 +191,7 @@ int EventManager::Init() {
 }
 
 int EventManager::DoAddClient(int64_t new_fd,
-                              const shared_ptr<RequestHandler>& handler) {
+                              const shared_ptr<Handler>& handler) {
     auto client = new InternalClient(new_fd, handler);
     if (!client) {
         logger_error(m_logger, "create InternalClient failed: [%s].",
@@ -225,7 +225,7 @@ int EventManager::DoAddClient(int64_t new_fd,
 }
 
 int EventManager::AddServer(const char* addr, uint16_t port,
-                            const shared_ptr<RequestHandlerFactory>& factory) {
+                            const shared_ptr<HandlerFactory>& factory) {
     int fd = utils::CreateTcpServerFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "create server for [%s:%u] failed: [%s].",
@@ -254,7 +254,7 @@ int EventManager::AddServer(const char* addr, uint16_t port,
 }
 
 int EventManager::AddClient(const char* addr, uint16_t port,
-                            const shared_ptr<RequestHandler>& h) {
+                            const shared_ptr<Handler>& h) {
     int fd = utils::CreateTcpClientFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "connect to [%s:%u] failed: [%s].", addr, port,
@@ -303,9 +303,9 @@ void EventManager::HandleAccept(int64_t new_fd, void* svr_ptr) {
         return;
     }
 
-    auto handler = shared_ptr<RequestHandler>(
+    auto handler = shared_ptr<Handler>(
         svr->factory->Create(),
-        [f = svr->factory](RequestHandler* h) -> void {
+        [f = svr->factory](Handler* h) -> void {
             f->Destroy(h);
         });
 
