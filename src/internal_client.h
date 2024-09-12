@@ -17,7 +17,6 @@ struct InternalClient final : public State {
         , fd_for_reading(_fd), bytes_needed(0)
         , fd_for_writing(_fd), bytes_sent(0), current_sending_res(nullptr) {
         utils::GenConnectionInfo(_fd, &info);
-        handler->OnConnected(info);
     }
 
     ~InternalClient() {

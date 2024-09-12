@@ -24,7 +24,7 @@ enum ReqStat {
 class RequestHandler {
 public:
     virtual ~RequestHandler() {}
-    virtual void OnConnected(const ConnectionInfo&) = 0;
+    virtual void OnConnected(Sender*) = 0;
     virtual void OnDisconnected(const ConnectionInfo&) = 0;
     virtual ReqStat Check(const Buffer&, uint64_t* req_bytes) = 0;
     virtual void Process(Buffer&&, Sender*) = 0;

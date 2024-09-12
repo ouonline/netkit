@@ -13,7 +13,8 @@ public:
         logger_info(m_logger, "[server] session destroyed.");
     }
 
-    void OnConnected(const ConnectionInfo& info) override {
+    void OnConnected(Sender* sender) override {
+        const ConnectionInfo& info = sender->GetConnectionInfo();
         logger_info(m_logger, "[server] client [%s:%u] connected.",
                     info.remote_addr.c_str(), info.remote_port);
     }
@@ -76,7 +77,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    auto err = mgr.StartServer(host, port, make_shared<EchoServerFactory>(&logger.l));
+    auto err = mgr.AddServer(host, port, make_shared<EchoServerFactory>(&logger.l));
     if (err) {
         logger_error(&logger.l, "add server failed: [%s].", strerror(-err));
         return -1;

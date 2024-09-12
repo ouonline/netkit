@@ -14,8 +14,10 @@ public:
     ConnectionManager(Logger* logger) : m_logger(logger) {}
 
     int Init();
-    int StartServer(const char* addr, uint16_t port,
-                    const std::shared_ptr<RequestHandlerFactory>&);
+    int AddServer(const char* addr, uint16_t port,
+                  const std::shared_ptr<RequestHandlerFactory>&);
+    int AddClient(const char* addr, uint16_t port,
+                  const std::shared_ptr<RequestHandler>&);
     void Loop();
 
 private:

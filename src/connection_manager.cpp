@@ -152,6 +152,11 @@ int ConnectionManager::DoAddClient(int64_t new_fd,
         return -ENOMEM;
     }
 
+    {
+        Sender sender(client, &m_wr_nq, &m_new_rd_nq);
+        handler->OnConnected(&sender);
+    }
+
     auto err = client->req.Reserve(REQ_BUF_EXPAND_SIZE);
     if (err) {
         logger_error(m_logger, "reserve [%lu] bytes for request failed: [%s].",
@@ -171,8 +176,8 @@ int ConnectionManager::DoAddClient(int64_t new_fd,
     return err;
 }
 
-int ConnectionManager::StartServer(const char* addr, uint16_t port,
-                                   const shared_ptr<RequestHandlerFactory>& factory) {
+int ConnectionManager::AddServer(const char* addr, uint16_t port,
+                                 const shared_ptr<RequestHandlerFactory>& factory) {
     int fd = utils::CreateTcpServerFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "create server for [%s:%u] failed: [%s].",
@@ -198,6 +203,18 @@ int ConnectionManager::StartServer(const char* addr, uint16_t port,
     }
 
     return 0;
+}
+
+int ConnectionManager::AddClient(const char* addr, uint16_t port,
+                                 const shared_ptr<RequestHandler>& h) {
+    int fd = utils::CreateTcpClientFd(addr, port, m_logger);
+    if (fd < 0) {
+        logger_error(m_logger, "connect to [%s:%u] failed: [%s].", addr, port,
+                     strerror(fd));
+        return fd;
+    }
+
+    return DoAddClient(fd, h);
 }
 
 class ProcessReqTask final : public ThreadTask {
