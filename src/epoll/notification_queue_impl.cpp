@@ -179,6 +179,60 @@ public:
     int64_t res;
 };
 
+struct ReadHandler final : public EventHandler {
+public:
+    ReadHandler(int cfd, void* buf, uint64_t sz, void* t)
+        : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
+    int64_t In() override {
+        auto nbytes = read(fd, m_buf, m_sz);
+        if (nbytes == -1) {
+            return -errno;
+        }
+        return nbytes;
+    }
+
+private:
+    void* m_buf;
+    uint64_t m_sz;
+};
+
+int NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
+    auto handler = new ReadHandler(fd, buf, sz, tag);
+    auto ret = DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
+    if (ret != 0) {
+        logger_error(m_logger, "DoEpollUpdate in ReadAsync() failed.");
+        delete handler;
+    }
+    return ret;
+}
+
+struct WriteHandler final : public EventHandler {
+public:
+    WriteHandler(int cfd, const void* buf, uint64_t sz, void* t)
+        : EventHandler(cfd, t, false), m_buf(buf), m_sz(sz) {}
+    int64_t Out() override {
+        auto nbytes = write(fd, m_buf, m_sz);
+        if (nbytes == -1) {
+            return -errno;
+        }
+        return nbytes;
+    }
+
+private:
+    const void* m_buf;
+    uint64_t m_sz;
+};
+
+int NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
+    auto handler = new WriteHandler(fd, buf, sz, tag);
+    auto ret = DoEpollUpdate(m_epfd, EPOLLOUT | EPOLLONESHOT, handler, fd, m_logger);
+    if (ret != 0) {
+        logger_error(m_logger, "DoEpollUpdate in WriteAsync() failed.");
+        delete handler;
+    }
+    return ret;
+}
+
 int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
     int efd = eventfd(0, EFD_CLOEXEC);
     if (efd < 0) {

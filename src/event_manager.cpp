@@ -1,10 +1,12 @@
-#include "netkit/connection_manager.h"
+#include "netkit/event_manager.h"
 #include "netkit/utils.h"
 #include "internal_server.h"
 #include "internal_client.h"
+#include "internal_timer_handler.h"
 #include "state.h"
 #include <cstring>
 #include <unistd.h>
+#include <sys/timerfd.h>
 using namespace std;
 
 #include "threadkit/threadpool.h"
@@ -14,8 +16,54 @@ using namespace threadkit;
 
 namespace netkit {
 
+int EventManager::AddTimer(const TimeVal& delay, const TimeVal& interval,
+                           const function<void(int, uint64_t)>& handler) {
+    int fd = timerfd_create(CLOCK_BOOTTIME, TFD_NONBLOCK | TFD_CLOEXEC);
+    if (fd < 0) {
+        logger_error(m_logger, "create timerfd failed: [%s].", strerror(errno));
+        return -errno;
+    }
+
+    auto h = new InternalTimerHandler(fd, handler);
+    if (!h) {
+        logger_error(m_logger, "allocate InternalTimerHandler failed: [%s].",
+                     strerror(ENOMEM));
+        close(fd);
+        return -ENOMEM;
+    }
+
+    const struct itimerspec ts = {
+        .it_interval = {
+            .tv_sec = interval.tv_sec,
+            .tv_nsec = interval.tv_usec * 1000,
+        },
+        .it_value = {
+            .tv_sec = delay.tv_sec,
+            .tv_nsec = delay.tv_usec * 1000,
+        },
+    };
+
+    int err = timerfd_settime(fd, 0, &ts, nullptr);
+    if (err) {
+        logger_error(m_logger, "timerfd_settime failed: [%s].", strerror(errno));
+        delete h;
+        return -errno;
+    }
+
+    err = m_new_rd_nq.ReadAsync(fd, &h->nr_expiration, sizeof(uint64_t),
+                                static_cast<State*>(h));
+    if (err) {
+        logger_error(m_logger, "about to read from timerfd failed: [%s].",
+                     strerror(-err));
+        delete h;
+        return err;
+    }
+
+    return 0;
+}
+
 // client's refcount was increased before calling this function
-void ConnectionManager::ProcessWriting(int64_t res, void* tag) {
+void EventManager::ProcessWriting(int64_t res, void* tag) {
     auto response = static_cast<Response*>(tag);
     auto client = response->client;
     int err = 0;
@@ -94,7 +142,7 @@ out:
     PutClient(client);
 }
 
-int ConnectionManager::Init() {
+int EventManager::Init() {
     auto ok = m_thread_pool.Init();
     if (!ok) {
         logger_error(m_logger, "init threadpool failed: [%s].", strerror(ENOMEM));
@@ -142,8 +190,8 @@ int ConnectionManager::Init() {
     return 0;
 }
 
-int ConnectionManager::DoAddClient(int64_t new_fd,
-                                   const shared_ptr<RequestHandler>& handler) {
+int EventManager::DoAddClient(int64_t new_fd,
+                              const shared_ptr<RequestHandler>& handler) {
     auto client = new InternalClient(new_fd, handler);
     if (!client) {
         logger_error(m_logger, "create InternalClient failed: [%s].",
@@ -176,8 +224,8 @@ int ConnectionManager::DoAddClient(int64_t new_fd,
     return err;
 }
 
-int ConnectionManager::AddServer(const char* addr, uint16_t port,
-                                 const shared_ptr<RequestHandlerFactory>& factory) {
+int EventManager::AddServer(const char* addr, uint16_t port,
+                            const shared_ptr<RequestHandlerFactory>& factory) {
     int fd = utils::CreateTcpServerFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "create server for [%s:%u] failed: [%s].",
@@ -205,8 +253,8 @@ int ConnectionManager::AddServer(const char* addr, uint16_t port,
     return 0;
 }
 
-int ConnectionManager::AddClient(const char* addr, uint16_t port,
-                                 const shared_ptr<RequestHandler>& h) {
+int EventManager::AddClient(const char* addr, uint16_t port,
+                            const shared_ptr<RequestHandler>& h) {
     int fd = utils::CreateTcpClientFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "connect to [%s:%u] failed: [%s].", addr, port,
@@ -246,7 +294,7 @@ static void TaskDeleter(ThreadTask* t) {
     delete t;
 }
 
-void ConnectionManager::HandleAccept(int64_t new_fd, void* svr_ptr) {
+void EventManager::HandleAccept(int64_t new_fd, void* svr_ptr) {
     auto svr = static_cast<InternalServer*>(svr_ptr);
 
     if (new_fd <= 0) {
@@ -265,7 +313,7 @@ void ConnectionManager::HandleAccept(int64_t new_fd, void* svr_ptr) {
 }
 
 // client's refcount was increased before calling this function
-void ConnectionManager::HandleInvalidRequest(void* client_ptr) {
+void EventManager::HandleInvalidRequest(void* client_ptr) {
     auto client = static_cast<InternalClient*>(client_ptr);
     logger_error(m_logger, "invalid request from [%s:%u].",
                  client->info.remote_addr.c_str(), client->info.remote_port);
@@ -273,7 +321,7 @@ void ConnectionManager::HandleInvalidRequest(void* client_ptr) {
 }
 
 // client's refcount was increased before calling this function
-void ConnectionManager::HandleMoreDataRequest(void* client_ptr, uint64_t expand_size) {
+void EventManager::HandleMoreDataRequest(void* client_ptr, uint64_t expand_size) {
     auto client = static_cast<InternalClient*>(client_ptr);
     auto req = &client->req;
     auto err = req->Reserve(req->GetSize() + expand_size);
@@ -298,7 +346,7 @@ errout:
 }
 
 // client's refcount was increased before calling this function
-void ConnectionManager::HandleClientRequest(void* client_ptr) {
+void EventManager::HandleClientRequest(void* client_ptr) {
     auto client = static_cast<InternalClient*>(client_ptr);
 
 again:
@@ -360,7 +408,7 @@ errout:
 }
 
 // client's refcount was increased before calling this function
-void ConnectionManager::HandleClientReading(int64_t res, void* client_ptr) {
+void EventManager::HandleClientReading(int64_t res, void* client_ptr) {
     auto client = static_cast<InternalClient*>(client_ptr);
 
     if (res < 0) {
@@ -400,8 +448,31 @@ void ConnectionManager::HandleClientReading(int64_t res, void* client_ptr) {
     HandleClientRequest(client);
 }
 
+void EventManager::HandleTimerEvent(int64_t res, void* h) {
+    auto handler = static_cast<InternalTimerHandler*>(h);
+
+    if (res < 0) {
+        logger_error(m_logger, "get timer event failed: [%s].", strerror(-res));
+        handler->handler(res, 0);
+        delete handler;
+        return;
+    }
+
+    handler->handler(0, handler->nr_expiration);
+    handler->nr_expiration = 0;
+
+    int err = m_new_rd_nq.ReadAsync(handler->fd, &handler->nr_expiration,
+                                    sizeof(uint64_t), static_cast<State*>(handler));
+    if (err) {
+        logger_error(m_logger, "about to read from timerfd failed: [%s].",
+                     strerror(-err));
+        handler->handler(err, 0);
+        delete handler;
+    }
+}
+
 // client's refcount was increased before calling *Async()
-void ConnectionManager::ProcessNewAndReading(int64_t res, void* tag) {
+void EventManager::ProcessNewAndReading(int64_t res, void* tag) {
     auto state = static_cast<State*>(tag);
     if (state->value == State::SERVER_ACCEPT) {
         auto svr = static_cast<InternalServer*>(state);
@@ -415,10 +486,16 @@ void ConnectionManager::ProcessNewAndReading(int64_t res, void* tag) {
         return;
     }
 
+    if (state->value == State::TIMER) {
+        auto handler = static_cast<InternalTimerHandler*>(state);
+        HandleTimerEvent(res, handler);
+        return;
+    }
+
     logger_error(m_logger, "unknown state [%u].", state->value);
 }
 
-void ConnectionManager::Loop() {
+void EventManager::Loop() {
     while (true) {
         int64_t res = 0;
         void* tag = nullptr;

@@ -12,3 +12,6 @@ target_link_libraries(echo_server_callback PRIVATE netkit_static)
 
 add_executable(stress_test_echo_client stress_test_echo_client.cpp)
 target_link_libraries(stress_test_echo_client PRIVATE netkit_static)
+
+add_executable(test_timer test_timer.cpp)
+target_link_libraries(test_timer PRIVATE netkit_static)

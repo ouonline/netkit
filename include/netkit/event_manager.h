@@ -1,28 +1,33 @@
-#ifndef __NETKIT_CONNECTION_MANAGER_H__
-#define __NETKIT_CONNECTION_MANAGER_H__
+#ifndef __NETKIT_EVENT_MANAGER_H__
+#define __NETKIT_EVENT_MANAGER_H__
 
 #include "nq_utils.h"
 #include "request_handler_factory.h"
 #include "threadkit/threadpool.h"
 #include <thread>
 #include <memory>
+#include <functional>
 
 namespace netkit {
 
-class ConnectionManager final {
+class EventManager final {
 public:
-    ConnectionManager(Logger* logger) : m_logger(logger) {}
+    EventManager(Logger* logger) : m_logger(logger) {}
 
     int Init();
     int AddServer(const char* addr, uint16_t port,
                   const std::shared_ptr<RequestHandlerFactory>&);
     int AddClient(const char* addr, uint16_t port,
                   const std::shared_ptr<RequestHandler>&);
+    /* will be deleted if `err` == -errno < 0 */
+    int AddTimer(const TimeVal& delay, const TimeVal& interval,
+                 const std::function<void(int err, uint64_t nr_expiration)>& handler);
     void Loop();
 
 private:
     int DoAddClient(int64_t new_fd, const std::shared_ptr<RequestHandler>&);
     void ProcessNewAndReading(int64_t, void* tag);
+    void HandleTimerEvent(int64_t, void* timer_handler);
     void HandleAccept(int64_t new_fd, void* svr);
     void HandleClientReading(int64_t, void* client);
     void HandleClientRequest(void* client);
@@ -52,10 +57,10 @@ private:
     NotificationQueueImpl m_new_rd_nq;
 
 private:
-    ConnectionManager(ConnectionManager&&) = delete;
-    ConnectionManager(const ConnectionManager&) = delete;
-    ConnectionManager& operator=(ConnectionManager&&) = delete;
-    ConnectionManager& operator=(const ConnectionManager&) = delete;
+    EventManager(EventManager&&) = delete;
+    EventManager(const EventManager&) = delete;
+    void operator=(EventManager&&) = delete;
+    void operator=(const EventManager&) = delete;
 };
 
 }

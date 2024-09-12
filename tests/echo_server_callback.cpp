@@ -1,4 +1,4 @@
-#include "netkit/connection_manager.h"
+#include "netkit/event_manager.h"
 using namespace netkit;
 
 #include "logger/stdout_logger.h"
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
     const char* host = argv[1];
     const uint16_t port = atol(argv[2]);
 
-    ConnectionManager mgr(&logger.l);
+    EventManager mgr(&logger.l);
     if (mgr.Init() != 0) {
         logger_error(&logger.l, "init manager failed.");
         return -1;
