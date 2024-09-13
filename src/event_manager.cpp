@@ -321,10 +321,17 @@ void EventManager::HandleInvalidRequest(void* client_ptr) {
 }
 
 // client's refcount was increased before calling this function
-void EventManager::HandleMoreDataRequest(void* client_ptr, uint64_t expand_size) {
+void EventManager::HandleMoreDataRequest(void* client_ptr, uint64_t req_bytes) {
     auto client = static_cast<InternalClient*>(client_ptr);
     auto req = &client->req;
-    auto err = req->Reserve(req->GetSize() + expand_size);
+
+    if (req_bytes == 0) {
+        req_bytes = REQ_BUF_EXPAND_SIZE;
+    } else {
+        client->bytes_left = req_bytes;
+    }
+
+    auto err = req->Reserve(req->GetSize() + req_bytes);
     if (err) {
         logger_error(m_logger, "allocate buffer for request failed: [%s].",
                      strerror(-err));
@@ -333,7 +340,7 @@ void EventManager::HandleMoreDataRequest(void* client_ptr, uint64_t expand_size)
 
     err = m_new_rd_nq.RecvAsync(client->fd_for_reading,
                                 (char*)req->GetData() + req->GetSize(),
-                                expand_size, static_cast<State*>(client));
+                                req_bytes, static_cast<State*>(client));
     if (err) {
         logger_error(m_logger, "about to recv data failed: [%s].", strerror(-err));
         goto errout;
@@ -359,19 +366,13 @@ again:
     }
 
     if (req_stat == ReqStat::MORE_DATA) {
-        HandleMoreDataRequest(client, REQ_BUF_EXPAND_SIZE);
-        return;
-    }
-
-    if (req_stat == ReqStat::MORE_DATA_WITH_SIZE) {
-        client->bytes_needed = req_bytes;
         HandleMoreDataRequest(client, req_bytes);
         return;
     }
 
     // valid request
 
-    client->bytes_needed = 0;
+    client->bytes_left = 0;
 
     Buffer req_to_be_processed;
     if (req_bytes < client->req.GetSize()) {
@@ -397,7 +398,7 @@ again:
     m_thread_pool.AddTask(task);
 
     if (client->req.IsEmpty()) {
-        HandleMoreDataRequest(client, REQ_BUF_EXPAND_SIZE);
+        HandleMoreDataRequest(client, 0);
         return;
     }
 
@@ -429,13 +430,13 @@ void EventManager::HandleClientReading(int64_t res, void* client_ptr) {
     client->req.Resize(client->req.GetSize() + res);
 
     // we already have a HandleClientRequest() before
-    if (client->bytes_needed > 0) {
-        client->bytes_needed -= res;
-        if (client->bytes_needed > 0) {
+    if (client->bytes_left > 0) {
+        client->bytes_left -= res;
+        if (client->bytes_left > 0) {
             auto err = m_new_rd_nq.RecvAsync(
                 client->fd_for_reading,
                 client->req.GetData() + client->req.GetSize(),
-                client->bytes_needed, static_cast<State*>(client));
+                client->bytes_left, static_cast<State*>(client));
             if (err) {
                 logger_error(m_logger, "about to recv req failed: [%s].",
                              strerror(-err));

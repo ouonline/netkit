@@ -14,7 +14,7 @@ namespace netkit {
 struct InternalClient final : public State {
     InternalClient(int _fd, const std::shared_ptr<Handler>& h)
         : refcount(0), handler(h)
-        , fd_for_reading(_fd), bytes_needed(0)
+        , fd_for_reading(_fd), bytes_left(0)
         , fd_for_writing(_fd), bytes_sent(0), current_sending_res(nullptr) {
         utils::GenConnectionInfo(_fd, &info);
     }
@@ -47,7 +47,7 @@ struct InternalClient final : public State {
     alignas(threadkit::CACHELINE_SIZE)
 
     const int fd_for_reading;
-    uint64_t bytes_needed;
+    uint64_t bytes_left;
     Buffer req;
 
     // ----- writing ----- //

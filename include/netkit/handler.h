@@ -7,18 +7,22 @@
 namespace netkit {
 
 enum ReqStat {
-    // invalid request
+    /* invalid request */
     INVALID = -1,
 
-    // ok, and `req_bytes` is set to the total size of the request.
-    // note that `req_bytes` may be less than the size of buffer.
+    /*
+      ok, and `req_bytes` is set to the total size of the request.
+      note that `req_bytes` may be less than the size of buffer.
+    */
     VALID = 0,
 
-    // more data required. `req_bytes` is ignored.
-    MORE_DATA = 1,
+    /*
+      more data required.
 
-    // more data required. `req_bytes` is set to bytes needed in current stage.
-    MORE_DATA_WITH_SIZE = 2,
+      `req_bytes` is set to the number of bytes left at the current stage,
+      or is set to 0 if the number of bytes cannot be determined.
+    */
+    MORE_DATA = 1,
 };
 
 class Handler {
