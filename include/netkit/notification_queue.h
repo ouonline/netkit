@@ -48,6 +48,7 @@ public:
                      passed to `SendAsync()`.
        - CLOSE: `res` is the return value of `close()` or -errno, `tag` is the value
                 passed to `CloseAsync()`.
+       - NOTIFY: `res` is 0 and `tag` is nullptr.
 
        @param `timtout` waits until at least one event arrives, timeout reaches, or
        some error occurs. `nullptr` for blocking without timeout.

@@ -24,8 +24,6 @@ struct InternalClient final : public State {
             close(fd_for_reading);
         }
 
-        handler->OnDisconnected(info);
-
         delete current_sending_res;
         while (true) {
             auto node = res_queue.PopNode();
@@ -34,6 +32,8 @@ struct InternalClient final : public State {
             }
             delete static_cast<Response*>(node);
         }
+
+        handler->OnDisconnected(info);
     }
 
     std::atomic<uint32_t> refcount;

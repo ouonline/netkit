@@ -10,6 +10,9 @@ target_link_libraries(echo_client PRIVATE netkit_static)
 add_executable(echo_server_callback echo_server_callback.cpp)
 target_link_libraries(echo_server_callback PRIVATE netkit_static)
 
+add_executable(echo_client_callback echo_client_callback.cpp)
+target_link_libraries(echo_client_callback PRIVATE netkit_static)
+
 add_executable(stress_test_echo_client stress_test_echo_client.cpp)
 target_link_libraries(stress_test_echo_client PRIVATE netkit_static)
 

@@ -190,19 +190,13 @@ int EventManager::Init() {
     return 0;
 }
 
-int EventManager::DoAddClient(int64_t new_fd,
-                              const shared_ptr<Handler>& handler) {
+int EventManager::DoAddClient(int64_t new_fd, const shared_ptr<Handler>& handler) {
     auto client = new InternalClient(new_fd, handler);
     if (!client) {
         logger_error(m_logger, "create InternalClient failed: [%s].",
                      strerror(ENOMEM));
         close(new_fd);
         return -ENOMEM;
-    }
-
-    {
-        Sender sender(client, &m_wr_nq, &m_new_rd_nq);
-        handler->OnConnected(&sender);
     }
 
     auto err = client->req.Reserve(REQ_BUF_EXPAND_SIZE);
@@ -213,8 +207,16 @@ int EventManager::DoAddClient(int64_t new_fd,
         return err;
     }
 
-    client->value = State::CLIENT_READ_REQ;
+    // retain the client
     GetClient(client);
+
+    {
+        // sender will call GetClient() if SendAsync() is called
+        Sender sender(client, &m_wr_nq, &m_new_rd_nq);
+        handler->OnConnected(&sender);
+    }
+
+    client->value = State::CLIENT_READ_REQ;
     err = m_new_rd_nq.RecvAsync(client->fd_for_reading, client->req.GetData(),
                                 REQ_BUF_EXPAND_SIZE, static_cast<State*>(client));
     if (err) {
@@ -253,8 +255,7 @@ int EventManager::AddServer(const char* addr, uint16_t port,
     return 0;
 }
 
-int EventManager::AddClient(const char* addr, uint16_t port,
-                            const shared_ptr<Handler>& h) {
+int EventManager::AddClient(const char* addr, uint16_t port, const shared_ptr<Handler>& h) {
     int fd = utils::CreateTcpClientFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "connect to [%s:%u] failed: [%s].", addr, port,
@@ -504,6 +505,10 @@ void EventManager::Loop() {
         if (err != 0) {
             logger_error(m_logger, "get event failed: [%s].", strerror(-err));
             break;
+        }
+
+        if (res == 0 && !tag) { // is a NotifyAsync() event
+            continue;
         }
 
         ProcessNewAndReading(res, tag);
