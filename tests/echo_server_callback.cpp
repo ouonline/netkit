@@ -10,18 +10,18 @@ public:
     EchoServerHandler(Logger* logger) : m_logger(logger) {}
 
     ~EchoServerHandler() {
-        logger_info(m_logger, "[server] session destroyed.");
+        logger_info(m_logger, "[server] session [%p] destroyed.", this);
     }
 
-    void OnConnected(Sender* sender) override {
-        const ConnectionInfo& info = sender->GetConnectionInfo();
+    void OnConnected(const ConnectionInfo& info, Buffer*) override {
+        m_info = info;
         logger_info(m_logger, "[server] client [%s:%u] connected.",
                     info.remote_addr.c_str(), info.remote_port);
     }
 
-    void OnDisconnected(const ConnectionInfo& info) override {
+    void OnDisconnected() override {
         logger_info(m_logger, "[server] client [%s:%u] disconnected.",
-                    info.remote_addr.c_str(), info.remote_port);
+                    m_info.remote_addr.c_str(), m_info.remote_port);
     }
 
     ReqStat Check(const Buffer& req, uint64_t* size) override {
@@ -29,20 +29,17 @@ public:
         return ReqStat::VALID;
     }
 
-    void Process(Buffer&& req, Sender* sender) override {
-        const ConnectionInfo& info = sender->GetConnectionInfo();
+    void Process(Buffer&& req, Buffer* res) override {
         logger_info(m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
-                    info.local_addr.c_str(), info.local_port,
-                    info.remote_addr.c_str(), info.remote_port,
+                    m_info.local_addr.c_str(), m_info.local_port,
+                    m_info.remote_addr.c_str(), m_info.remote_port,
                     req.GetSize(), req.GetData());
-        auto err = sender->SendAsync(std::move(req));
-        if (err) {
-            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
-        }
+        *res = std::move(req);
     }
 
 private:
     Logger* m_logger;
+    ConnectionInfo m_info;
 };
 
 class EchoServerFactory final : public HandlerFactory {

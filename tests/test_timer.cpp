@@ -24,10 +24,9 @@ int main(void) {
         .tv_sec = 1,
         .tv_usec = 0,
     };
-    auto err = mgr.AddTimer(delay, interval,
-                            [](int err, uint64_t nr_expiration) -> void {
-                                cout << "expired event: " << nr_expiration << endl;
-                            });
+    auto err = mgr.AddTimer(delay, interval, [](int32_t val) -> void {
+        cout << "expired event: " << val << endl;
+    });
     if (err) {
         logger_error(&logger.l, "add timer failed: [%s].", strerror(-err));
         return -1;

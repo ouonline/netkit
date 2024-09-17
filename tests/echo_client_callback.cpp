@@ -2,7 +2,9 @@
 using namespace netkit;
 
 #include "logger/stdout_logger.h"
-#include <cstring> // strerror()
+
+#include <string.h> // strerror()
+#include <unistd.h>
 using namespace std;
 
 class EchoClientHandler final : public Handler {
@@ -13,8 +15,8 @@ public:
         logger_info(m_logger, "[client] cient destroyed.");
     }
 
-    void OnConnected(Sender* sender) override {
-        const ConnectionInfo& info = sender->GetConnectionInfo();
+    void OnConnected(const ConnectionInfo& info, Buffer* res) override {
+        m_info = info;
         logger_info(m_logger, "[client] connect to server [%s:%u].",
                     info.remote_addr.c_str(), info.remote_port);
 
@@ -30,17 +32,13 @@ public:
                     info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port,
                     buf.GetSize(), buf.GetData());
-
+        *res = std::move(buf);
         sleep(1);
-        err = sender->SendAsync(std::move(buf));
-        if (err) {
-            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
-        }
     }
 
-    void OnDisconnected(const ConnectionInfo& info) override {
+    void OnDisconnected() override {
         logger_info(m_logger, "[client] client [%s:%u] disconnected.",
-                    info.local_addr.c_str(), info.local_port);
+                    m_info.local_addr.c_str(), m_info.local_port);
     }
 
     ReqStat Check(const Buffer& req, uint64_t* size) override {
@@ -48,33 +46,29 @@ public:
         return ReqStat::VALID;
     }
 
-    void Process(Buffer&& buf, Sender* sender) override {
-        const ConnectionInfo& info = sender->GetConnectionInfo();
+    void Process(Buffer&& req, Buffer* res) override {
         logger_info(m_logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
-                    info.remote_addr.c_str(), info.remote_port,
-                    info.local_addr.c_str(), info.local_port,
-                    buf.GetSize(), buf.GetData());
+                    m_info.remote_addr.c_str(), m_info.remote_port,
+                    m_info.local_addr.c_str(), m_info.local_port,
+                    req.GetSize(), req.GetData());
 
-        int err = buf.Reserve(10);
+        int err = req.Reserve(10);
         if (err) {
             logger_error(m_logger, "Reserve buffer failed: [%s].", strerror(-err));
             return;
         }
 
-        buf.Append("\0", 1);
-        auto num = atol(buf.GetData());
-        auto len = snprintf(buf.GetData(), 10, "%ld", num + 1);
-        buf.Resize(len);
-
+        req.Append("\0", 1);
+        auto num = atol(req.GetData());
+        auto len = snprintf(req.GetData(), 10, "%ld", num + 1);
+        req.Resize(len);
+        *res = std::move(req);
         sleep(1);
-        err = sender->SendAsync(std::move(buf));
-        if (err) {
-            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
-        }
     }
 
 private:
     Logger* m_logger;
+    ConnectionInfo m_info;
 };
 
 int main(int argc, char* argv[]) {

@@ -9,9 +9,10 @@
 namespace netkit { namespace iouring {
 
 struct NotificationQueueOptions final {
-    uint32_t queue_size = 1024;
     /** @brief creates a kernel thread to poll the SQ ring */
-    bool enable_kernel_polling = false;
+    bool enable_kernel_polling = true;
+    /** @brief max number of notifications in queue */
+    uint32_t queue_size = 1024;
 };
 
 class alignas(threadkit::CACHELINE_SIZE) NotificationQueueImpl final

@@ -3,7 +3,6 @@
 
 #include "nq_utils.h"
 #include "handler_factory.h"
-#include "threadkit/threadpool.h"
 #include <thread>
 #include <memory>
 #include <functional>
@@ -14,44 +13,53 @@ class EventManager final {
 public:
     EventManager(Logger* logger) : m_logger(logger) {}
 
+    /** the following functions return 0 or -errno */
+
     int Init();
     int AddServer(const char* addr, uint16_t port,
                   const std::shared_ptr<HandlerFactory>&);
     int AddClient(const char* addr, uint16_t port,
                   const std::shared_ptr<Handler>&);
-    /* will be deleted if `err` == -errno < 0 */
+
+    /* timer will be deleted if `err` == -errno < 0 */
     int AddTimer(const TimeVal& delay, const TimeVal& interval,
-                 const std::function<void(int err, uint64_t nr_expiration)>& handler);
+                 /*
+                   `val` < 0: error occurs and `val` == -errno
+                   `val` > 0: the number of expiration
+                 */
+                 const std::function<void(int32_t val)>& handler);
+
     void Loop();
 
 private:
     int DoAddClient(int64_t new_fd, const std::shared_ptr<Handler>&);
-    void ProcessNewAndReading(int64_t, void* tag);
-    void HandleTimerEvent(int64_t, void* timer_handler);
-    void HandleAccept(int64_t new_fd, void* svr);
-    void HandleClientReading(int64_t, void* client);
-    void HandleClientRequest(void* client);
-    void HandleInvalidRequest(void* client);
-    void HandleMoreDataRequest(void* client, uint64_t expand_size);
     void ProcessWriting(int64_t, void* tag);
+    void ProcessNewAndReading(int64_t, void* tag);
+    /* |-- */ void HandleTimerExpired(int64_t res, void* state_ptr);
+    /* |-- */ void HandleTimerNext(void* timer_ptr);
+    /* |-- */ void HandleAccept(int64_t new_fd, void* svr_ptr);
+    /* |-+ */ void HandleClientReading(int64_t, void* client_ptr);
+    /*   |-- */ void HandleInvalidRequest(void* client_ptr);
+    /*   |-- */ void HandleMoreDataRequest(void* client_ptr, uint64_t expand_size);
+    /*   |__ */ bool HandleValidRequest(void* client_ptr, uint64_t req_bytes);
 
 private:
     alignas(threadkit::CACHELINE_SIZE)
 
-    threadkit::ThreadPool m_thread_pool;
     Logger* m_logger;
 
     alignas(threadkit::CACHELINE_SIZE)
 
-    // for writing events
-    NotificationQueueImpl m_wr_nq;
-
+    NotificationQueueImpl m_wr_nq; // for writing events
     std::thread m_writing_thread;
 
-    // for sending events to writing thread. one nq per thread.
-    std::unique_ptr<NotificationQueueImpl[]> m_signal_nq_list;
-
     alignas(threadkit::CACHELINE_SIZE)
+
+    std::unique_ptr<NotificationQueueImpl[]> m_worker_nq_list;
+    std::vector<std::thread> m_worker_thread_list;
+
+    uint32_t m_current_worker_idx = 0;
+    uint32_t m_worker_num = 0;
 
     // for new connection and reading events
     NotificationQueueImpl m_new_rd_nq;

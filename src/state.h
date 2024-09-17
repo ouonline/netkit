@@ -4,14 +4,15 @@
 namespace netkit {
 
 struct State {
-    enum Value {
+    enum {
         UNKNOWN,
         SERVER_ACCEPT,
         CLIENT_READ_REQ,
-        TIMER,
-    } value;
-    State(Value v = UNKNOWN) : value(v) {}
-    virtual ~State() {}
+        WORKER_PROCESS_REQ,
+        TIMER_EXPIRED,
+        TIMER_NEXT,
+    };
+    int value = UNKNOWN;
 };
 
 }
