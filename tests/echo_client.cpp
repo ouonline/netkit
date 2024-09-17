@@ -122,8 +122,9 @@ int main(int argc, char* argv[]) {
 
     NotificationQueueImpl nq;
     auto rc = InitNq(&nq, &logger.l);
-    if (rc != 0) {
-        logger_error(&logger.l, "init notification queue failed.");
+    if (rc < 0) {
+        logger_error(&logger.l, "init notification queue failed: [%s].",
+                     strerror(-rc));
         return -1;
     }
 

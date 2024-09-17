@@ -13,19 +13,22 @@ class EventManager final {
 public:
     EventManager(Logger* logger) : m_logger(logger) {}
 
-    /** the following functions return 0 or -errno */
-
+    /** returns 0 or -errno */
     int Init();
+
+    /** returns -errno or index of the server */
     int AddServer(const char* addr, uint16_t port,
                   const std::shared_ptr<HandlerFactory>&);
+
+    /** returns -errno or index of the client */
     int AddClient(const char* addr, uint16_t port,
                   const std::shared_ptr<Handler>&);
 
-    /* timer will be deleted if `err` == -errno < 0 */
+    /** returns -errno or index of the timer. timer will be deleted if error occurs */
     int AddTimer(const TimeVal& delay, const TimeVal& interval,
                  /*
                    `val` < 0: error occurs and `val` == -errno
-                   `val` > 0: the number of expiration
+                   `val` > 0: the number of expirations
                  */
                  const std::function<void(int32_t val)>& handler);
 

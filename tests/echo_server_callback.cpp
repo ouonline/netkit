@@ -69,13 +69,14 @@ int main(int argc, char* argv[]) {
     const uint16_t port = atol(argv[2]);
 
     EventManager mgr(&logger.l);
-    if (mgr.Init() != 0) {
-        logger_error(&logger.l, "init manager failed.");
+    auto err = mgr.Init();
+    if (err < 0) {
+        logger_error(&logger.l, "init manager failed: [%s].", strerror(-err));
         return -1;
     }
 
-    auto err = mgr.AddServer(host, port, make_shared<EchoServerFactory>(&logger.l));
-    if (err) {
+    err = mgr.AddServer(host, port, make_shared<EchoServerFactory>(&logger.l));
+    if (err < 0) {
         logger_error(&logger.l, "add server failed: [%s].", strerror(-err));
         return -1;
     }

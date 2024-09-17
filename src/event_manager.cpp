@@ -58,7 +58,7 @@ int EventManager::AddTimer(const TimeVal& delay, const TimeVal& interval,
         return err;
     }
 
-    return 0;
+    return fd;
 }
 
 // client's refcount was increased before calling this function
@@ -295,7 +295,7 @@ int EventManager::DoAddClient(int64_t new_fd, const shared_ptr<Handler>& handler
         return err;
     }
 
-    return 0;
+    return new_fd;
 }
 
 int EventManager::AddServer(const char* addr, uint16_t port,
@@ -324,7 +324,7 @@ int EventManager::AddServer(const char* addr, uint16_t port,
         return err;
     }
 
-    return 0;
+    return fd;
 }
 
 int EventManager::AddClient(const char* addr, uint16_t port, const shared_ptr<Handler>& h) {

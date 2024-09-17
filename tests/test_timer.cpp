@@ -11,8 +11,9 @@ int main(void) {
     stdout_logger_init(&logger);
 
     EventManager mgr(&logger.l);
-    if (mgr.Init() != 0) {
-        logger_error(&logger.l, "init manager failed.");
+    auto err = mgr.Init();
+    if (err < 0) {
+        logger_error(&logger.l, "init manager failed: [%s].", strerror(-err));
         return -1;
     }
 
@@ -24,10 +25,10 @@ int main(void) {
         .tv_sec = 1,
         .tv_usec = 0,
     };
-    auto err = mgr.AddTimer(delay, interval, [](int32_t val) -> void {
+    err = mgr.AddTimer(delay, interval, [](int32_t val) -> void {
         cout << "expired event: " << val << endl;
     });
-    if (err) {
+    if (err < 0) {
         logger_error(&logger.l, "add timer failed: [%s].", strerror(-err));
         return -1;
     }
