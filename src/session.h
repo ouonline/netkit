@@ -4,26 +4,24 @@
 #include "state.h"
 #include "netkit/buffer.h"
 #include "threadkit/mpsc_queue.h"
+#include <functional>
 
 namespace netkit {
 
 struct InternalClient;
 
-// NOTE: we place a MPSCQueue::Node after this struct so as to avoid multiple inheritance
 struct Session final : public State {
     Buffer data;
     InternalClient* client;
+    std::function<void(int err)> sent_callback;
 };
 
-Session* CreateSession(void);
-void DestroySession(Session*);
-
-inline threadkit::MPSCQueue::Node* GetNodeFromSession(Session* session) {
-    return (threadkit::MPSCQueue::Node*)((uint64_t)session + sizeof(Session));
+inline Session* CreateSession(void) {
+    return new Session();
 }
 
-inline Session* GetSessionFromNode(threadkit::MPSCQueue::Node* node) {
-    return (Session*)((uint64_t)node - sizeof(Session));
+inline void DestroySession(Session* s) {
+    delete s;
 }
 
 }

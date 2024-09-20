@@ -4,7 +4,6 @@ using namespace netkit;
 #include "logger/stdout_logger.h"
 
 #include <string.h> // strerror()
-#include <unistd.h>
 using namespace std;
 
 class EchoClientHandler final : public Handler {
@@ -15,26 +14,38 @@ public:
         logger_info(m_logger, "[client] cient destroyed.");
     }
 
-    void OnConnected(Connection* conn, Buffer* res) override {
+    void OnConnected(Connection* conn, Buffer*) override {
         m_conn = conn;
         const ConnectionInfo& info = conn->GetInfo();
         logger_info(m_logger, "[client] connect to server [%s:%u].",
                     info.remote_addr.c_str(), info.remote_port);
 
-        Buffer buf;
-        int err = buf.Append("0", 1);
-        if (err) {
-            logger_error(m_logger, "prepare init data failed: [%s].",
-                         strerror(-err));
-            return;
-        }
-
-        logger_info(m_logger, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
-                    info.local_addr.c_str(), info.local_port,
-                    info.remote_addr.c_str(), info.remote_port,
-                    buf.GetSize(), buf.GetData());
-        *res = std::move(buf);
-        sleep(1);
+        const TimeVal delay = {
+            .tv_sec = 2,
+            .tv_usec = 0,
+        };
+        const TimeVal interval = {
+            .tv_sec = 1,
+            .tv_usec = 0,
+        };
+        conn->AddTimer(delay, interval, [&info, l = m_logger, counter = &m_counter]
+                       (int32_t val, Buffer* out) -> void {
+            if (val < 0) {
+                logger_error(l, "error: [%s].", strerror(-val));
+                return;
+            }
+            auto s = std::to_string(*counter);
+            ++(*counter);
+            int err = out->Append(s.data(), s.size());
+            if (err) {
+                logger_error(l, "prepare init data failed: [%s].", strerror(-err));
+                return;
+            }
+            logger_info(l, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
+                        info.local_addr.c_str(), info.local_port,
+                        info.remote_addr.c_str(), info.remote_port,
+                        out->GetSize(), out->GetData());
+        });
     }
 
     void OnDisconnected() override {
@@ -48,30 +59,18 @@ public:
         return ReqStat::VALID;
     }
 
-    void Process(Buffer&& req, Buffer* res) override {
+    void Process(Buffer&& req, Buffer*) override {
         const ConnectionInfo& info = m_conn->GetInfo();
         logger_info(m_logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
                     info.remote_addr.c_str(), info.remote_port,
                     info.local_addr.c_str(), info.local_port,
                     req.GetSize(), req.GetData());
-
-        int err = req.Reserve(10);
-        if (err) {
-            logger_error(m_logger, "Reserve buffer failed: [%s].", strerror(-err));
-            return;
-        }
-
-        req.Append("\0", 1);
-        auto num = atol(req.GetData());
-        auto len = snprintf(req.GetData(), 10, "%ld", num + 1);
-        req.Resize(len);
-        *res = std::move(req);
-        sleep(1);
     }
 
 private:
     Logger* m_logger;
     Connection* m_conn;
+    uint32_t m_counter = 0;
 };
 
 int main(int argc, char* argv[]) {

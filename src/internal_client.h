@@ -2,22 +2,26 @@
 #define __NETKIT_INTERNAL_CLIENT_H__
 
 #include "netkit/handler.h"
-#include "netkit/connection_info.h"
-#include "threadkit/mpsc_queue.h"
+#include "netkit/connection.h"
 #include "state.h"
 #include "session.h"
 #include <atomic>
 #include <memory>
+#include <queue>
 
 namespace netkit {
 
 struct InternalClient final : public State {
-    InternalClient(int fd, const std::shared_ptr<Handler>&);
+    InternalClient(int fd, const std::shared_ptr<Handler>& h,
+                   NotificationQueueImpl* new_rd_nq, Logger* l)
+        : refcount(0), handler(h), conn(fd, new_rd_nq, this, l)
+        , fd_for_reading(fd), bytes_left(0)
+        , fd_for_writing(fd), bytes_sent(0), current_sending(nullptr) {}
     ~InternalClient();
 
     std::atomic<uint32_t> refcount;
     std::shared_ptr<Handler> handler;
-    ConnectionInfo info;
+    Connection conn;
 
     // `fd_for_reading` and `fd_for_writing` are identical.
 
@@ -36,11 +40,12 @@ struct InternalClient final : public State {
     const int fd_for_writing;
     uint64_t bytes_sent;
     Session* current_sending;
-    threadkit::MPSCQueue res_queue;
+    std::queue<Session*> send_queue;
 };
 
-inline InternalClient* CreateInternalClient(int fd, const std::shared_ptr<Handler>& h) {
-    return new InternalClient(fd, h);
+inline InternalClient* CreateInternalClient(int fd, const std::shared_ptr<Handler>& h,
+                                            NotificationQueueImpl* new_rd_nq, Logger* l) {
+    return new InternalClient(fd, h, new_rd_nq, l);
 }
 
 inline void DestroyInternalClient(InternalClient* c) {
@@ -54,7 +59,7 @@ inline void GetClient(InternalClient* c) {
 inline void PutClient(InternalClient* c) {
     auto prev = c->refcount.fetch_sub(1, std::memory_order_acq_rel);
     if (prev == 1) {
-        delete c;
+        DestroyInternalClient(c);
     }
 }
 

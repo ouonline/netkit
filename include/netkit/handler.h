@@ -2,7 +2,8 @@
 #define __NETKIT_HANDLER_H__
 
 #include "buffer.h"
-#include "connection_info.h"
+#include "connection.h"
+#include <functional>
 
 namespace netkit {
 
@@ -28,7 +29,8 @@ enum ReqStat {
 class Handler {
 public:
     virtual ~Handler() {}
-    virtual void OnConnected(const ConnectionInfo&, Buffer*) = 0;
+    /* `Connection` can be used during lifetime */
+    virtual void OnConnected(Connection*, Buffer*) = 0;
     virtual void OnDisconnected() = 0;
     virtual ReqStat Check(const Buffer&, uint64_t* req_bytes) = 0;
     virtual void Process(Buffer&& req, Buffer* res) = 0;

@@ -3,6 +3,7 @@
 using namespace netkit;
 
 #include "logger/stdout_logger.h"
+#include <string.h> // strerror()
 #include <unistd.h> // sleep()/close()
 using namespace std;
 

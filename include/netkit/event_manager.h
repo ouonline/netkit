@@ -5,7 +5,6 @@
 #include "handler_factory.h"
 #include <thread>
 #include <memory>
-#include <functional>
 
 namespace netkit {
 
@@ -17,26 +16,15 @@ public:
     int Init();
 
     /** returns -errno or index of the server */
-    int AddServer(const char* addr, uint16_t port,
-                  const std::shared_ptr<HandlerFactory>&);
+    int AddServer(const char* addr, uint16_t port, const std::shared_ptr<HandlerFactory>&);
 
     /** returns -errno or index of the client */
-    int AddClient(const char* addr, uint16_t port,
-                  const std::shared_ptr<Handler>&);
-
-    /** returns -errno or index of the timer. timer will be deleted if error occurs */
-    int AddTimer(const TimeVal& delay, const TimeVal& interval,
-                 /*
-                   `val` < 0: error occurs and `val` == -errno
-                   `val` > 0: the number of expirations
-                 */
-                 const std::function<void(int32_t val)>& handler);
+    int AddClient(const char* addr, uint16_t port, const std::shared_ptr<Handler>&);
 
     void Loop();
 
 private:
     int DoAddClient(int64_t new_fd, const std::shared_ptr<Handler>&);
-    void ProcessWriting(int64_t, void* tag);
     void ProcessNewAndReading(int64_t, void* tag);
     /* |-- */ void HandleTimerExpired(int64_t res, void* state_ptr);
     /* |-- */ void HandleTimerNext(void* timer_ptr);
@@ -53,19 +41,23 @@ private:
 
     alignas(threadkit::CACHELINE_SIZE)
 
-    NotificationQueueImpl m_wr_nq; // for writing events
+    // for writing events
+    NotificationQueueImpl* m_wr_nq = nullptr;
+
     std::thread m_writing_thread;
 
     alignas(threadkit::CACHELINE_SIZE)
 
-    std::unique_ptr<NotificationQueueImpl[]> m_worker_nq_list;
-    std::vector<std::thread> m_worker_thread_list;
-
-    uint32_t m_current_worker_idx = 0;
-    uint32_t m_worker_num = 0;
-
     // for new connection and reading events
     NotificationQueueImpl m_new_rd_nq;
+
+    // is read by new_rd_nq for dispatching tasks
+    std::vector<NotificationQueueImpl*> m_worker_nq_list;
+
+    std::vector<std::thread> m_worker_thread_list;
+
+    uint32_t m_worker_num = 0;
+    uint32_t m_current_worker_idx = 0;
 
 private:
     EventManager(EventManager&&) = delete;

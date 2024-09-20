@@ -7,21 +7,23 @@ using namespace std;
 
 class EchoServerHandler final : public Handler {
 public:
-    EchoServerHandler(Logger* logger) : m_logger(logger) {}
+    EchoServerHandler(Logger* logger) : m_logger(logger), m_conn(nullptr) {}
 
     ~EchoServerHandler() {
         logger_info(m_logger, "[server] session [%p] destroyed.", this);
     }
 
-    void OnConnected(const ConnectionInfo& info, Buffer*) override {
-        m_info = info;
+    void OnConnected(Connection* conn, Buffer*) override {
+        m_conn = conn;
+        const ConnectionInfo& info = conn->GetInfo();
         logger_info(m_logger, "[server] client [%s:%u] connected.",
                     info.remote_addr.c_str(), info.remote_port);
     }
 
     void OnDisconnected() override {
+        const ConnectionInfo& info = m_conn->GetInfo();
         logger_info(m_logger, "[server] client [%s:%u] disconnected.",
-                    m_info.remote_addr.c_str(), m_info.remote_port);
+                    info.remote_addr.c_str(), info.remote_port);
     }
 
     ReqStat Check(const Buffer& req, uint64_t* size) override {
@@ -30,16 +32,17 @@ public:
     }
 
     void Process(Buffer&& req, Buffer* res) override {
+        const ConnectionInfo& info = m_conn->GetInfo();
         logger_info(m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
-                    m_info.local_addr.c_str(), m_info.local_port,
-                    m_info.remote_addr.c_str(), m_info.remote_port,
+                    info.local_addr.c_str(), info.local_port,
+                    info.remote_addr.c_str(), info.remote_port,
                     req.GetSize(), req.GetData());
         *res = std::move(req);
     }
 
 private:
     Logger* m_logger;
-    ConnectionInfo m_info;
+    Connection* m_conn;
 };
 
 class EchoServerFactory final : public HandlerFactory {

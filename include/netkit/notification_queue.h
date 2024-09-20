@@ -1,12 +1,10 @@
 #ifndef __NETKIT_NOTIFICATION_QUEUE_H__
 #define __NETKIT_NOTIFICATION_QUEUE_H__
 
+#include "timeval.h"
 #include <stdint.h>
-#include <time.h>
 
 namespace netkit {
-
-typedef struct timeval TimeVal;
 
 class NotificationQueue {
 public:

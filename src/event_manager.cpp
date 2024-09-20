@@ -1,68 +1,22 @@
 #include "netkit/event_manager.h"
-#include "netkit/utils.h"
 #include "internal_server.h"
 #include "internal_client.h"
 #include "internal_timer.h"
-#include "state.h"
+#include "internal_utils.h"
 #include <cstring>
-#include <unistd.h>
-#include <sys/timerfd.h>
 #include <assert.h>
 using namespace std;
+
+#include "threadkit/event_count.h"
+using namespace threadkit;
 
 #define REQ_BUF_EXPAND_SIZE 1024
 
 namespace netkit {
 
-int EventManager::AddTimer(const TimeVal& delay, const TimeVal& interval,
-                           const function<void(int32_t)>& handler) {
-    int fd = timerfd_create(CLOCK_BOOTTIME, TFD_NONBLOCK | TFD_CLOEXEC);
-    if (fd < 0) {
-        logger_error(m_logger, "create timerfd failed: [%s].", strerror(errno));
-        return -errno;
-    }
-
-    auto timer = CreateInternalTimer(fd, handler);
-    if (!timer) {
-        logger_error(m_logger, "allocate InternalTimer failed: [%s].",
-                     strerror(ENOMEM));
-        close(fd);
-        return -ENOMEM;
-    }
-
-    const struct itimerspec ts = {
-        .it_interval = {
-            .tv_sec = interval.tv_sec,
-            .tv_nsec = interval.tv_usec * 1000,
-        },
-        .it_value = {
-            .tv_sec = delay.tv_sec,
-            .tv_nsec = delay.tv_usec * 1000,
-        },
-    };
-
-    int err = timerfd_settime(fd, 0, &ts, nullptr);
-    if (err) {
-        logger_error(m_logger, "timerfd_settime failed: [%s].", strerror(errno));
-        DestroyInternalTimer(timer);
-        return -errno;
-    }
-
-    timer->value = State::TIMER_EXPIRED;
-    err = m_new_rd_nq.ReadAsync(fd, &timer->nr_expiration, sizeof(uint64_t),
-                                static_cast<State*>(timer));
-    if (err) {
-        logger_error(m_logger, "about to read from timerfd failed: [%s].",
-                     strerror(-err));
-        DestroyInternalTimer(timer);
-        return err;
-    }
-
-    return fd;
-}
-
 // client's refcount was increased before calling this function
-void EventManager::ProcessWriting(int64_t res, void* tag) {
+static void ProcessWriting(NotificationQueueImpl* wr_nq, int64_t res, void* tag,
+                           Logger* logger) {
     auto session = static_cast<Session*>(tag);
     auto client = session->client;
 
@@ -73,15 +27,14 @@ void EventManager::ProcessWriting(int64_t res, void* tag) {
 
     if (session != client->current_sending) {
         // `client->current_sending` is being sent. should wait in the queue.
-        auto node = GetNodeFromSession(session);
-        client->res_queue.Push(node);
-        goto out;
+        client->send_queue.push(session);
+        goto end;
     }
 
     if (res < 0) {
-        logger_error(m_logger, "send data to client [%s:%u] failed: [%s].",
-                     client->info.remote_addr.c_str(),
-                     client->info.remote_port, strerror(-res));
+        const ConnectionInfo& info = client->conn.GetInfo();
+        logger_error(logger, "send data to client [%s:%u] failed: [%s].",
+                     info.remote_addr.c_str(), info.remote_port, strerror(-res));
         goto out;
     }
 
@@ -93,30 +46,42 @@ void EventManager::ProcessWriting(int64_t res, void* tag) {
     client->bytes_sent += res;
     if (client->bytes_sent == session->data.GetSize()) {
         client->bytes_sent = 0;
+
+        if (session->sent_callback) {
+            session->sent_callback(0);
+        }
         DestroySession(session);
 
-        auto node = client->res_queue.PopNode();
-        if (!node) {
+        if (client->send_queue.empty()) {
             client->current_sending = nullptr;
-            goto out;
+            goto end;
         }
 
-        session = GetSessionFromNode(node);
+        session = client->send_queue.front();
         client->current_sending = session;
+        client->send_queue.pop();
     }
 
 send_data:
-    res = m_wr_nq.SendAsync(client->fd_for_writing,
-                            session->data.GetData() + client->bytes_sent,
-                            session->data.GetSize() - client->bytes_sent,
-                            session);
-    if (!res) {
+    res = wr_nq->SendAsync(client->fd_for_writing,
+                           session->data.GetData() + client->bytes_sent,
+                           session->data.GetSize() - client->bytes_sent,
+                           session);
+    if (res == 0) {
         return;
     }
 
-    logger_error(m_logger, "send data failed: [%s].", strerror(-res));
+    logger_error(logger, "send data failed: [%s].", strerror(-res));
 
 out:
+    if (session->sent_callback) {
+        session->sent_callback(res);
+    }
+    if (client->current_sending == session) {
+        client->current_sending = nullptr;
+    }
+    DestroySession(session);
+end:
     PutClient(client);
 }
 
@@ -145,15 +110,42 @@ end:
     PutClient(client);
 }
 
-static void WorkerProcessTimer(InternalTimer* timer, int64_t res, NotificationQueueImpl* nq,
-                               NotificationQueueImpl* new_rd_nq, Logger* logger) {
+// client's refcount was increased before calling this function
+static void WorkerProcessTimer(InternalTimer* timer, int64_t res,
+                               NotificationQueueImpl* nq,
+                               NotificationQueueImpl* new_rd_nq,
+                               NotificationQueueImpl* wr_nq,
+                               Logger* logger) {
+    Buffer buf;
+    auto client = timer->client;
+
     if (res < 0) {
         logger_error(logger, "get timer failed: [%s].", strerror(-res));
         goto errout;
     }
 
-    timer->handler(timer->nr_expiration);
+    timer->callback(timer->nr_expiration, &buf);
     timer->nr_expiration = 0;
+
+    if (!buf.IsEmpty()) {
+        auto session = CreateSession();
+        session->data = std::move(buf);
+        session->client = client;
+        session->sent_callback = [timer](int err) -> void {
+            if (err) {
+                timer->sent_errno = err;
+            }
+        };
+
+        GetClient(client);
+        int err = nq->NotifyAsync(wr_nq, 0, session);
+        if (err) {
+            logger_error(logger, "about to send buffer from timer failed: [%s].",
+                         strerror(-err));
+            PutClient(client);
+            goto errout;
+        }
+    }
 
     timer->value =State::TIMER_NEXT;
     res = nq->NotifyAsync(new_rd_nq, 0, timer);
@@ -165,17 +157,39 @@ static void WorkerProcessTimer(InternalTimer* timer, int64_t res, NotificationQu
                  strerror(-res));
 
 errout:
-    timer->handler(res);
+    timer->callback(res, nullptr);
     DestroyInternalTimer(timer);
+    PutClient(client);
 }
 
 // client's refcount was increased before calling this function
-static void WorkerThread(NotificationQueueImpl* nq, NotificationQueueImpl* new_rd_nq,
-                         NotificationQueueImpl* wr_nq, Logger* logger) {
+static void WorkerThread(NotificationQueueImpl** worker_nq_pptr,
+                         NotificationQueueImpl* new_rd_nq,
+                         NotificationQueueImpl* wr_nq,
+                         atomic<uint32_t>* counter, uint32_t max_count,
+                         EventCount* cond, int* retcode, Logger* logger) {
+    *retcode = utils::InitThreadLocalNq(logger);
+    if ((*retcode)) {
+        logger_error(logger, "InitThreadLocalNq failed: [%s].",
+                     strerror(-(*retcode)));
+        auto prev = counter->fetch_add(1, std::memory_order_acquire);
+        if (prev + 1 == max_count) {
+            cond->NotifyOne();
+        }
+        return;
+    }
+
+    auto nq = utils::GetThreadLocalNq();
+    *worker_nq_pptr = nq; // saved in EventManager
+    auto prev = counter->fetch_add(1, std::memory_order_acquire);
+    if (prev + 1 == max_count) {
+        cond->NotifyOne();
+    }
+
     while (true) {
         int64_t res = 0;
         void* tag = nullptr;
-        auto err = nq->Next(&res, &tag, nullptr);
+        int err = nq->Next(&res, &tag, nullptr);
         if (err) {
             logger_error(logger, "get event failed: [%s].", strerror(-err));
             break;
@@ -187,65 +201,96 @@ static void WorkerThread(NotificationQueueImpl* nq, NotificationQueueImpl* new_r
             WorkerProcessReq(session, nq, wr_nq, logger);
         } else if (state->value == State::TIMER_EXPIRED) {
             auto timer = static_cast<InternalTimer*>(state);
-            WorkerProcessTimer(timer, res, nq, new_rd_nq, logger);
+            WorkerProcessTimer(timer, res, nq, new_rd_nq, wr_nq, logger);
         } else {
             logger_fatal(logger, "unsupported state [%d].", state->value);
         }
     }
 }
 
-int EventManager::Init() {
-    auto err = InitNq(&m_wr_nq, m_logger);
-    if (err) {
-        logger_error(m_logger, "init writing notification queue failed: [%s].",
-                     strerror(-err));
-        return err;
+static void WritingThread(NotificationQueueImpl** wr_nq_pptr, atomic<uint32_t>* counter,
+                          EventCount* cond, int* retcode, Logger* logger) {
+    *retcode = utils::InitThreadLocalNq(logger);
+    if (*retcode) {
+        logger_error(logger, "init thread local notification queue failed: [%s].",
+                     strerror(-(*retcode)));
+        counter->store(1, std::memory_order_release);
+        cond->NotifyOne();
+        return;
     }
 
-    m_writing_thread = thread([this]() -> void {
-        while (true) {
-            int64_t res = 0;
-            void* tag = nullptr;
-            auto err = m_wr_nq.Next(&res, &tag, nullptr);
-            if (err) {
-                logger_error(m_logger, "get event failed: [%s].", strerror(-err));
-                break;
-            }
+    auto wr_nq = utils::GetThreadLocalNq();
+    *wr_nq_pptr = wr_nq; // saved in EventManager
+    counter->store(1, std::memory_order_release);
+    cond->NotifyOne();
 
-            ProcessWriting(res, tag);
+    while (true) {
+        int64_t res = 0;
+        void* tag = nullptr;
+        int err = wr_nq->Next(&res, &tag, nullptr);
+        if (err) {
+            logger_error(logger, "get event failed: [%s].", strerror(-err));
+            break;
         }
+
+        ProcessWriting(wr_nq, res, tag, logger);
+    }
+}
+
+int EventManager::Init() {
+    int retcode;
+    EventCount cond;
+
+    atomic<uint32_t> finished_count = {0};
+    m_writing_thread = thread(WritingThread, &m_wr_nq, &finished_count, &cond,
+                              &retcode, m_logger);
+    cond.Wait([&finished_count]() -> bool {
+        return (finished_count.load(std::memory_order_acquire) > 0);
     });
 
-    m_worker_num = std::max(std::thread::hardware_concurrency(), 2u) - 1;
-
-    m_worker_nq_list = make_unique<NotificationQueueImpl[]>(m_worker_num);
-    for (uint32_t i = 0; i < m_worker_num; ++i) {
-        err = InitNq(&m_worker_nq_list[i], m_logger);
-        if (err) {
-            logger_error(m_logger, "init signal notification queue failed: [%s].",
-                         strerror(-err));
-            return err;
-        }
+    if (!m_wr_nq) {
+        logger_error(m_logger, "init writing notification queue failed.",
+                     strerror(-retcode));
+        return retcode;
     }
 
-    m_worker_thread_list.reserve(m_worker_num);
-    for (uint32_t i = 0; i < m_worker_num; ++i) {
-        m_worker_thread_list.emplace_back(
-            thread(WorkerThread, &m_worker_nq_list[i], &m_new_rd_nq, &m_wr_nq, m_logger));
-    }
-
-    err = InitNq(&m_new_rd_nq, m_logger);
+    int err = InitNq(&m_new_rd_nq, m_logger);
     if (err) {
         logger_error(m_logger, "init new and recving notification queue failed: [%s].",
                      strerror(-err));
         return err;
     }
 
+    m_worker_num = std::max(std::thread::hardware_concurrency(), 2u) - 1;
+    m_worker_nq_list.resize(m_worker_num, nullptr);
+
+    vector<int> retcode_list(m_worker_num, 0);
+    finished_count.store(0, std::memory_order_release);
+
+    m_worker_thread_list.reserve(m_worker_num);
+    for (uint32_t idx = 0; idx < m_worker_num; ++idx) {
+        m_worker_thread_list.emplace_back(
+            thread(WorkerThread, &m_worker_nq_list[idx], &m_new_rd_nq, m_wr_nq,
+                   &finished_count, m_worker_num, &cond, &retcode_list[idx], m_logger));
+    }
+
+    cond.Wait([&finished_count, worker_num = m_worker_num]() -> bool {
+        return (finished_count.load(std::memory_order_acquire) == worker_num);
+    });
+
+    for (uint32_t i = 0; i < m_worker_num; ++i) {
+        if (retcode_list[i] != 0) {
+            logger_error(m_logger, "init thread [%u] failed: [%s].", i,
+                         strerror(-retcode_list[i]));
+            return retcode_list[i];
+        }
+    }
+
     return 0;
 }
 
 int EventManager::DoAddClient(int64_t new_fd, const shared_ptr<Handler>& handler) {
-    auto client = CreateInternalClient(new_fd, handler);
+    auto client = CreateInternalClient(new_fd, handler, &m_new_rd_nq, m_logger);
     if (!client) {
         logger_error(m_logger, "create InternalClient failed: [%s].",
                      strerror(ENOMEM));
@@ -265,7 +310,7 @@ int EventManager::DoAddClient(int64_t new_fd, const shared_ptr<Handler>& handler
     GetClient(client);
 
     Buffer buf;
-    handler->OnConnected(client->info, &buf);
+    handler->OnConnected(&client->conn, &buf);
     if (!buf.IsEmpty()) {
         auto session = CreateSession();
         if (!session) {
@@ -277,7 +322,7 @@ int EventManager::DoAddClient(int64_t new_fd, const shared_ptr<Handler>& handler
         GetClient(client);
         session->data = std::move(buf);
         session->client = client;
-        err = m_new_rd_nq.NotifyAsync(&m_wr_nq, 0, session);
+        err = m_new_rd_nq.NotifyAsync(m_wr_nq, 0, session);
         if (err) {
             logger_error(m_logger, "about to send data failed: [%s].", strerror(-err));
             DestroySession(session);
@@ -359,8 +404,9 @@ void EventManager::HandleAccept(int64_t new_fd, void* svr_ptr) {
 // client's refcount was increased before calling this function
 void EventManager::HandleInvalidRequest(void* client_ptr) {
     auto client = static_cast<InternalClient*>(client_ptr);
+    const ConnectionInfo& info = client->conn.GetInfo();
     logger_error(m_logger, "invalid request from [%s:%u].",
-                 client->info.remote_addr.c_str(), client->info.remote_port);
+                 info.remote_addr.c_str(), info.remote_port);
     PutClient(client);
 }
 
@@ -431,7 +477,7 @@ bool EventManager::HandleValidRequest(void* client_ptr, uint64_t req_bytes) {
     session->client = client;
 
     GetClient(client);
-    err = m_new_rd_nq.NotifyAsync(&m_worker_nq_list[m_current_worker_idx], 0, session);
+    err = m_new_rd_nq.NotifyAsync(m_worker_nq_list[m_current_worker_idx], 0, session);
     if (err) {
         logger_error(m_logger, "send request to worker thread failed: [%s].",
                      strerror(-err));
@@ -460,9 +506,9 @@ void EventManager::HandleClientReading(int64_t res, void* client_ptr) {
     auto client = static_cast<InternalClient*>(client_ptr);
 
     if (res < 0) {
+        const ConnectionInfo& info = client->conn.GetInfo();
         logger_error(m_logger, "recv data from client [%s:%u] failed: [%s].",
-                     client->info.remote_addr.c_str(),
-                     client->info.remote_port, strerror(-res));
+                     info.remote_addr.c_str(), info.remote_port, strerror(-res));
         PutClient(client);
         return;
     }
@@ -514,6 +560,7 @@ again:
     }
 }
 
+// client's refcount was increased before calling this function
 void EventManager::HandleTimerExpired(int64_t res, void* state_ptr) {
     auto state = static_cast<State*>(state_ptr);
     auto timer = static_cast<InternalTimer*>(state);
@@ -523,7 +570,12 @@ void EventManager::HandleTimerExpired(int64_t res, void* state_ptr) {
         goto errout;
     }
 
-    res = m_new_rd_nq.NotifyAsync(&m_worker_nq_list[m_current_worker_idx],
+    if (timer->sent_errno) {
+        res = timer->sent_errno;
+        goto errout;
+    }
+
+    res = m_new_rd_nq.NotifyAsync(m_worker_nq_list[m_current_worker_idx],
                                   res, state_ptr);
     if (!res) {
         return;
@@ -533,20 +585,38 @@ void EventManager::HandleTimerExpired(int64_t res, void* state_ptr) {
                  strerror(-res));
 
 errout:
-    timer->handler(res);
+    auto client = timer->client;
+    timer->callback(res, nullptr);
     DestroyInternalTimer(timer);
+    PutClient(client);
 }
 
-void EventManager::HandleTimerNext(void* timer_ptr) {
-    auto timer = static_cast<InternalTimer*>(timer_ptr);
-    timer->value = State::TIMER_EXPIRED;
-    int err = m_new_rd_nq.ReadAsync(timer->fd, &timer->nr_expiration, sizeof(uint64_t),
-                                    static_cast<State*>(timer));
-    if (err) {
-        logger_error(m_logger, "about to read from timerfd failed: [%s].",
-                     strerror(-err));
-        DestroyInternalTimer(timer);
+// client's refcount was increased before calling this function
+void EventManager::HandleTimerNext(void* state_ptr) {
+    int err = 0;
+    auto state = static_cast<State*>(state_ptr);
+    auto timer = static_cast<InternalTimer*>(state);
+
+    if (timer->sent_errno) {
+        err = timer->sent_errno;
+        goto errout;
     }
+
+    timer->value = State::TIMER_EXPIRED;
+    err = m_new_rd_nq.ReadAsync(timer->fd, &timer->nr_expiration, sizeof(uint64_t),
+                                static_cast<State*>(timer));
+    if (!err) {
+        return;
+    }
+
+    logger_error(m_logger, "about to read from timerfd failed: [%s].",
+                 strerror(-err));
+
+errout:
+    auto client = timer->client;
+    timer->callback(err, nullptr);
+    DestroyInternalTimer(timer);
+    PutClient(client);
 }
 
 void EventManager::ProcessNewAndReading(int64_t res, void* tag) {

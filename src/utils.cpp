@@ -1,7 +1,6 @@
 #include "netkit/utils.h"
 #include <cstring> // memset()
 #include <cstdio> // snprintf()
-#include <fcntl.h>
 #include <netdb.h>
 #include <unistd.h> // close()
 #include <arpa/inet.h>
