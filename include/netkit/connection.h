@@ -16,7 +16,7 @@ public:
         utils::GenConnectionInfo(fd, &m_info);
     }
 
-    const ConnectionInfo& GetInfo() const {
+    const ConnectionInfo& info() const {
         return m_info;
     }
 

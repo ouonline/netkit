@@ -17,7 +17,7 @@ public:
 
     void OnConnected(Connection* conn, Buffer* res) override {
         m_conn = conn;
-        const ConnectionInfo& info = conn->GetInfo();
+        const ConnectionInfo& info = conn->info();
         logger_info(m_logger, "[client] connect to server [%s:%u].",
                     info.remote_addr.c_str(), info.remote_port);
 
@@ -32,28 +32,28 @@ public:
         logger_info(m_logger, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
                     info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port,
-                    buf.GetSize(), buf.GetData());
+                    buf.size(), buf.data());
         *res = std::move(buf);
         sleep(1);
     }
 
     void OnDisconnected() override {
-        const ConnectionInfo& info = m_conn->GetInfo();
+        const ConnectionInfo& info = m_conn->info();
         logger_info(m_logger, "[client] client [%s:%u] disconnected.",
                     info.local_addr.c_str(), info.local_port);
     }
 
     ReqStat Check(const Buffer& req, uint64_t* size) override {
-        *size = req.GetSize();
+        *size = req.size();
         return ReqStat::VALID;
     }
 
     void Process(Buffer&& req, Buffer* res) override {
-        const ConnectionInfo& info = m_conn->GetInfo();
+        const ConnectionInfo& info = m_conn->info();
         logger_info(m_logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
                     info.remote_addr.c_str(), info.remote_port,
                     info.local_addr.c_str(), info.local_port,
-                    req.GetSize(), req.GetData());
+                    req.size(), req.data());
 
         int err = req.Reserve(10);
         if (err) {
@@ -62,8 +62,8 @@ public:
         }
 
         req.Append("\0", 1);
-        auto num = atol(req.GetData());
-        auto len = snprintf(req.GetData(), 10, "%ld", num + 1);
+        auto num = atol(req.data());
+        auto len = snprintf(req.data(), 10, "%ld", num + 1);
         req.Resize(len);
         *res = std::move(req);
         sleep(1);

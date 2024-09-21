@@ -32,7 +32,7 @@ static void ProcessWriting(NotificationQueueImpl* wr_nq, int64_t res, void* tag,
     }
 
     if (res < 0) {
-        const ConnectionInfo& info = client->conn.GetInfo();
+        const ConnectionInfo& info = client->conn.info();
         logger_error(logger, "send data to client [%s:%u] failed: [%s].",
                      info.remote_addr.c_str(), info.remote_port, strerror(-res));
         goto out;
@@ -44,7 +44,7 @@ static void ProcessWriting(NotificationQueueImpl* wr_nq, int64_t res, void* tag,
     }
 
     client->bytes_sent += res;
-    if (client->bytes_sent == session->data.GetSize()) {
+    if (client->bytes_sent == session->data.size()) {
         client->bytes_sent = 0;
 
         if (session->sent_callback) {
@@ -64,8 +64,8 @@ static void ProcessWriting(NotificationQueueImpl* wr_nq, int64_t res, void* tag,
 
 send_data:
     res = wr_nq->SendAsync(client->fd_for_writing,
-                           session->data.GetData() + client->bytes_sent,
-                           session->data.GetSize() - client->bytes_sent,
+                           session->data.data() + client->bytes_sent,
+                           session->data.size() - client->bytes_sent,
                            session);
     if (res == 0) {
         return;
@@ -332,7 +332,7 @@ int EventManager::DoAddClient(int64_t new_fd, const shared_ptr<Handler>& handler
     }
 
     client->value = State::CLIENT_READ_REQ;
-    err = m_new_rd_nq.RecvAsync(client->fd_for_reading, client->req.GetData(),
+    err = m_new_rd_nq.RecvAsync(client->fd_for_reading, client->req.data(),
                                 REQ_BUF_EXPAND_SIZE, static_cast<State*>(client));
     if (err) {
         logger_error(m_logger, "about to recv data failed: [%s].", strerror(-err));
@@ -404,7 +404,7 @@ void EventManager::HandleAccept(int64_t new_fd, void* svr_ptr) {
 // client's refcount was increased before calling this function
 void EventManager::HandleInvalidRequest(void* client_ptr) {
     auto client = static_cast<InternalClient*>(client_ptr);
-    const ConnectionInfo& info = client->conn.GetInfo();
+    const ConnectionInfo& info = client->conn.info();
     logger_error(m_logger, "invalid request from [%s:%u].",
                  info.remote_addr.c_str(), info.remote_port);
     PutClient(client);
@@ -423,7 +423,7 @@ void EventManager::HandleMoreDataRequest(void* client_ptr, uint64_t req_bytes) {
         client->bytes_left = req_bytes;
     }
 
-    auto err = req->Reserve(req->GetSize() + req_bytes);
+    auto err = req->Reserve(req->size() + req_bytes);
     if (err) {
         logger_error(m_logger, "allocate buffer for request failed: [%s].",
                      strerror(-err));
@@ -431,7 +431,7 @@ void EventManager::HandleMoreDataRequest(void* client_ptr, uint64_t req_bytes) {
     }
 
     err = m_new_rd_nq.RecvAsync(client->fd_for_reading,
-                                (char*)req->GetData() + req->GetSize(),
+                                (char*)req->data() + req->size(),
                                 req_bytes, static_cast<State*>(client));
     if (err) {
         logger_error(m_logger, "about to recv data failed: [%s].", strerror(-err));
@@ -452,12 +452,12 @@ bool EventManager::HandleValidRequest(void* client_ptr, uint64_t req_bytes) {
     auto client = static_cast<InternalClient*>(client_ptr);
 
     assert(client->bytes_left == 0);
-    assert(client->req.GetSize() >= req_bytes);
+    assert(client->req.size() >= req_bytes);
 
     Buffer req_to_be_processed;
-    if (req_bytes < client->req.GetSize()) {
-        err = req_to_be_processed.Assign(client->req.GetData() + req_bytes,
-                                         client->req.GetSize() - req_bytes);
+    if (req_bytes < client->req.size()) {
+        err = req_to_be_processed.Assign(client->req.data() + req_bytes,
+                                         client->req.size() - req_bytes);
         if (err) {
             logger_error(m_logger, "move request data failed: [%s].", strerror(-err));
             goto errout;
@@ -506,7 +506,7 @@ void EventManager::HandleClientReading(int64_t res, void* client_ptr) {
     auto client = static_cast<InternalClient*>(client_ptr);
 
     if (res < 0) {
-        const ConnectionInfo& info = client->conn.GetInfo();
+        const ConnectionInfo& info = client->conn.info();
         logger_error(m_logger, "recv data from client [%s:%u] failed: [%s].",
                      info.remote_addr.c_str(), info.remote_port, strerror(-res));
         PutClient(client);
@@ -520,7 +520,7 @@ void EventManager::HandleClientReading(int64_t res, void* client_ptr) {
 
     // resize req to the real size after recving.
     // the real size is less than we reserved before recving.
-    client->req.Resize(client->req.GetSize() + res);
+    client->req.Resize(client->req.size() + res);
 
     // we already have a HandleClientRequest() before
     if (client->bytes_left > 0) {
@@ -529,7 +529,7 @@ void EventManager::HandleClientReading(int64_t res, void* client_ptr) {
         if (client->bytes_left > 0) {
             auto err = m_new_rd_nq.RecvAsync(
                 client->fd_for_reading,
-                client->req.GetData() + client->req.GetSize(),
+                client->req.data() + client->req.size(),
                 client->bytes_left, static_cast<State*>(client));
             if (err) {
                 logger_error(m_logger, "about to recv req failed: [%s].",
@@ -565,6 +565,9 @@ void EventManager::HandleTimerExpired(int64_t res, void* state_ptr) {
     auto state = static_cast<State*>(state_ptr);
     auto timer = static_cast<InternalTimer*>(state);
 
+    logger_trace(m_logger, "timer [%p] with fd [%d] expired.",
+                 timer, timer->fd);
+
     if (res < 0) {
         logger_error(m_logger, "get timer event failed: [%s].", strerror(-res));
         goto errout;
@@ -575,6 +578,8 @@ void EventManager::HandleTimerExpired(int64_t res, void* state_ptr) {
         goto errout;
     }
 
+    logger_trace(m_logger, "send timer [%p] with fd [%d] to worker thread [%u].",
+                 timer, timer->fd, m_current_worker_idx);
     res = m_new_rd_nq.NotifyAsync(m_worker_nq_list[m_current_worker_idx],
                                   res, state_ptr);
     if (!res) {
@@ -597,6 +602,8 @@ void EventManager::HandleTimerNext(void* state_ptr) {
     auto state = static_cast<State*>(state_ptr);
     auto timer = static_cast<InternalTimer*>(state);
 
+    logger_trace(m_logger, "recv timer [%p] with fd [%d].", timer, timer->fd);
+
     if (timer->sent_errno) {
         err = timer->sent_errno;
         goto errout;
@@ -613,6 +620,8 @@ void EventManager::HandleTimerNext(void* state_ptr) {
                  strerror(-err));
 
 errout:
+    logger_trace(m_logger, "error [%s]. destroy timer [%p] with fd [%d].",
+                 strerror(-err), timer, timer->fd);
     auto client = timer->client;
     timer->callback(err, nullptr);
     DestroyInternalTimer(timer);

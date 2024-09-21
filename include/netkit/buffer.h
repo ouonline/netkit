@@ -29,14 +29,14 @@ public:
         qbuf_move(&b, &m_data);
     }
 
-    char* GetData() {
+    char* data() {
         return (char*)qbuf_data(&m_data);
     }
-    const char* GetData() const {
+    const char* data() const {
         return (const char*)qbuf_data(&m_data);
     }
 
-    uint32_t GetSize() const {
+    uint32_t size() const {
         return qbuf_size(&m_data);
     }
 
@@ -58,6 +58,17 @@ public:
 
     int Append(const char* data, uint64_t len) {
         return qbuf_append(&m_data, data, len);
+    }
+
+    int Append(const Buffer& b) {
+        if (!b.IsEmpty()) {
+            return qbuf_append(&m_data, b.data(), b.size());
+        }
+        return 0;
+    }
+
+    void Clear() {
+        qbuf_clear(&m_data);
     }
 
 private:

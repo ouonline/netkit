@@ -3,7 +3,6 @@
 
 #include "state.h"
 #include "netkit/buffer.h"
-#include "threadkit/mpsc_queue.h"
 #include <functional>
 
 namespace netkit {

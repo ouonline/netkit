@@ -2,13 +2,12 @@
 #define __NETKIT_EPOLL_NOTIFICATION_QUEUE_IMPL_H__
 
 #include "netkit/notification_queue.h"
-#include "threadkit/common.h"
 #include "logger/logger.h"
 #include <sys/epoll.h>
 
 namespace netkit { namespace epoll {
 
-class alignas(threadkit::CACHELINE_SIZE) NotificationQueueImpl final
+class NotificationQueueImpl final
     : public NotificationQueue {
 public:
     NotificationQueueImpl()

@@ -11,8 +11,8 @@ int AddTimer(const TimeVal& delay, const TimeVal& interval,
              const function<void(int32_t, Buffer*)>& cb,
              NotificationQueueImpl* nq, InternalClient* client,
              Logger* logger) {
-    if (interval.tv_sec == 0 && interval.tv_usec == 0) {
-        logger_error(logger, "interval == 0 is not supported.");
+    if (delay.tv_sec == 0 && delay.tv_usec == 0) {
+        logger_error(logger, "delay == 0 is not supported.");
         return -EINVAL;
     }
 
@@ -67,6 +67,7 @@ int AddTimer(const TimeVal& delay, const TimeVal& interval,
         return err;
     }
 
+    logger_trace(logger, "add timer [%p] with fd [%d] ok.", timer, fd);
     return fd;
 }
 

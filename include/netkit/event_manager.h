@@ -3,6 +3,7 @@
 
 #include "nq_utils.h"
 #include "handler_factory.h"
+#include "threadkit/common.h"
 #include <thread>
 #include <memory>
 

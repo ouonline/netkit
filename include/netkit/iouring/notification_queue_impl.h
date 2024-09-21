@@ -2,7 +2,6 @@
 #define __NETKIT_IOURING_NOTIFICATION_QUEUE_IMPL_H__
 
 #include "netkit/notification_queue.h"
-#include "threadkit/common.h"
 #include "logger/logger.h"
 #include "liburing.h"
 
@@ -15,7 +14,7 @@ struct NotificationQueueOptions final {
     uint32_t queue_size = 1024;
 };
 
-class alignas(threadkit::CACHELINE_SIZE) NotificationQueueImpl final
+class NotificationQueueImpl final
     : public NotificationQueue {
 public:
     NotificationQueueImpl() : m_logger(nullptr) {}

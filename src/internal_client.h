@@ -3,6 +3,7 @@
 
 #include "netkit/handler.h"
 #include "netkit/connection.h"
+#include "threadkit/common.h"
 #include "state.h"
 #include "session.h"
 #include <atomic>

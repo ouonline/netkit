@@ -15,28 +15,28 @@ public:
 
     void OnConnected(Connection* conn, Buffer*) override {
         m_conn = conn;
-        const ConnectionInfo& info = conn->GetInfo();
+        const ConnectionInfo& info = conn->info();
         logger_info(m_logger, "[server] client [%s:%u] connected.",
                     info.remote_addr.c_str(), info.remote_port);
     }
 
     void OnDisconnected() override {
-        const ConnectionInfo& info = m_conn->GetInfo();
+        const ConnectionInfo& info = m_conn->info();
         logger_info(m_logger, "[server] client [%s:%u] disconnected.",
                     info.remote_addr.c_str(), info.remote_port);
     }
 
     ReqStat Check(const Buffer& req, uint64_t* size) override {
-        *size = req.GetSize();
+        *size = req.size();
         return ReqStat::VALID;
     }
 
     void Process(Buffer&& req, Buffer* res) override {
-        const ConnectionInfo& info = m_conn->GetInfo();
+        const ConnectionInfo& info = m_conn->info();
         logger_info(m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
                     info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port,
-                    req.GetSize(), req.GetData());
+                    req.size(), req.data());
         *res = std::move(req);
     }
 
