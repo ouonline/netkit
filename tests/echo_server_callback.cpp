@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
     const uint16_t port = atol(argv[2]);
 
     EventManager mgr(&logger.l);
-    auto err = mgr.Init();
+    auto err = mgr.Init(EventManager::Options());
     if (err < 0) {
         logger_error(&logger.l, "init manager failed: [%s].", strerror(-err));
         return -1;

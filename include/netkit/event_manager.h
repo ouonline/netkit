@@ -11,10 +11,15 @@ namespace netkit {
 
 class EventManager final {
 public:
+    struct Options final {
+        uint32_t worker_num = 0;
+    };
+
+public:
     EventManager(Logger* logger) : m_logger(logger) {}
 
     /** returns 0 or -errno */
-    int Init();
+    int Init(const Options&);
 
     /** returns -errno or index of the server */
     int AddServer(const char* addr, uint16_t port, const std::shared_ptr<HandlerFactory>&);

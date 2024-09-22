@@ -237,7 +237,13 @@ static void WritingThread(NotificationQueueImpl** wr_nq_pptr, atomic<uint32_t>* 
     }
 }
 
-int EventManager::Init() {
+int EventManager::Init(const Options& options) {
+    if (options.worker_num > 0) {
+        m_worker_num = options.worker_num;
+    } else {
+        m_worker_num = std::max(std::thread::hardware_concurrency(), 2u) - 1;
+    }
+
     int retcode;
     EventCount cond;
 
@@ -261,7 +267,6 @@ int EventManager::Init() {
         return err;
     }
 
-    m_worker_num = std::max(std::thread::hardware_concurrency(), 2u) - 1;
     m_worker_nq_list.resize(m_worker_num, nullptr);
 
     vector<int> retcode_list(m_worker_num, 0);
