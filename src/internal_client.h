@@ -14,8 +14,9 @@ namespace netkit {
 
 struct InternalClient final : public State {
     InternalClient(int fd, const std::shared_ptr<Handler>& h,
-                   NotificationQueueImpl* new_rd_nq, Logger* l)
-        : refcount(0), handler(h), conn(fd, new_rd_nq, this, l)
+                   NotificationQueueImpl* new_rd_nq,
+                   NotificationQueueImpl* wr_nq, Logger* l)
+        : refcount(0), handler(h), conn(fd, new_rd_nq, wr_nq, this, l)
         , fd_for_reading(fd), bytes_left(0)
         , fd_for_writing(fd), bytes_sent(0), current_sending(nullptr) {}
     ~InternalClient();
@@ -45,8 +46,9 @@ struct InternalClient final : public State {
 };
 
 inline InternalClient* CreateInternalClient(int fd, const std::shared_ptr<Handler>& h,
-                                            NotificationQueueImpl* new_rd_nq, Logger* l) {
-    return new InternalClient(fd, h, new_rd_nq, l);
+                                            NotificationQueueImpl* new_rd_nq,
+                                            NotificationQueueImpl* wr_nq, Logger* l) {
+    return new InternalClient(fd, h, new_rd_nq, wr_nq, l);
 }
 
 inline void DestroyInternalClient(InternalClient* c) {

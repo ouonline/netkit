@@ -13,7 +13,7 @@ public:
         logger_info(m_logger, "[server] session [%p] destroyed.", this);
     }
 
-    void OnConnected(Connection* conn, Buffer*) override {
+    void OnConnected(Connection* conn) override {
         m_conn = conn;
         const ConnectionInfo& info = conn->info();
         logger_info(m_logger, "[server] client [%s:%u] connected.",
@@ -31,13 +31,16 @@ public:
         return ReqStat::VALID;
     }
 
-    void Process(Buffer&& req, Buffer* res) override {
+    void Process(Buffer&& req) override {
         const ConnectionInfo& info = m_conn->info();
         logger_info(m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
                     info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port,
                     req.size(), req.data());
-        *res = std::move(req);
+        int err = m_conn->SendAsync(std::move(req));
+        if (err) {
+            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
+        }
     }
 
 private:

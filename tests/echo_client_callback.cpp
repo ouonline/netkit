@@ -15,7 +15,7 @@ public:
         logger_info(m_logger, "[client] cient destroyed.");
     }
 
-    void OnConnected(Connection* conn, Buffer* res) override {
+    void OnConnected(Connection* conn) override {
         m_conn = conn;
         const ConnectionInfo& info = conn->info();
         logger_info(m_logger, "[client] connect to server [%s:%u].",
@@ -33,7 +33,12 @@ public:
                     info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port,
                     buf.size(), buf.data());
-        *res = std::move(buf);
+
+        err = conn->SendAsync(std::move(buf));
+        if (err) {
+            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
+        }
+
         sleep(1);
     }
 
@@ -48,7 +53,7 @@ public:
         return ReqStat::VALID;
     }
 
-    void Process(Buffer&& req, Buffer* res) override {
+    void Process(Buffer&& req) override {
         const ConnectionInfo& info = m_conn->info();
         logger_info(m_logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
                     info.remote_addr.c_str(), info.remote_port,
@@ -65,7 +70,12 @@ public:
         auto num = atol(req.data());
         auto len = snprintf(req.data(), 10, "%ld", num + 1);
         req.Resize(len);
-        *res = std::move(req);
+
+        err = m_conn->SendAsync(std::move(req));
+        if (err) {
+            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
+        }
+
         sleep(1);
     }
 

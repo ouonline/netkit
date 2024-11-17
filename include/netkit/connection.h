@@ -11,8 +11,9 @@ namespace netkit {
 
 class Connection final {
 public:
-    Connection(int fd, NotificationQueueImpl* new_rd_nq, void* client_ptr, Logger* l)
-        : m_new_rd_nq(new_rd_nq), m_client_ptr(client_ptr), m_logger(l) {
+    Connection(int fd, NotificationQueueImpl* new_rd_nq, NotificationQueueImpl* wr_nq,
+               void* client_ptr, Logger* l)
+        : m_new_rd_nq(new_rd_nq), m_wr_nq(wr_nq), m_client_ptr(client_ptr), m_logger(l) {
         utils::GenConnectionInfo(fd, &m_info);
     }
 
@@ -29,9 +30,12 @@ public:
                  */
                  const std::function<void(int32_t val, netkit::Buffer* out)>&);
 
+    int SendAsync(Buffer&&);
+
 private:
     ConnectionInfo m_info;
     NotificationQueueImpl* m_new_rd_nq;
+    NotificationQueueImpl* m_wr_nq;
     void* m_client_ptr;
     Logger* m_logger;
 };

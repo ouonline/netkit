@@ -86,26 +86,9 @@ end:
 }
 
 // client's refcount was increased before calling this function
-static void WorkerProcessReq(Session* session, NotificationQueueImpl* nq,
-                             NotificationQueueImpl* wr_nq, Logger* logger) {
-    int err = 0;
+static void WorkerProcessReq(Session* session) {
     auto client = session->client;
-
-    Buffer res_data;
-    client->handler->Process(std::move(session->data), &res_data);
-    if (res_data.IsEmpty()) {
-        goto end;
-    }
-
-    session->data = std::move(res_data);
-    err = nq->NotifyAsync(wr_nq, 0, session);
-    if (!err) {
-        return;
-    }
-
-    logger_error(logger, "notify sending queue failed: [%s].", strerror(-err));
-
-end:
+    client->handler->Process(std::move(session->data));
     DestroySession(session);
     PutClient(client);
 }
@@ -198,7 +181,7 @@ static void WorkerThread(NotificationQueueImpl** worker_nq_pptr,
         auto state = static_cast<State*>(tag);
         if (state->value == State::WORKER_PROCESS_REQ) {
             auto session = static_cast<Session*>(state);
-            WorkerProcessReq(session, nq, wr_nq, logger);
+            WorkerProcessReq(session);
         } else if (state->value == State::TIMER_EXPIRED) {
             auto timer = static_cast<InternalTimer*>(state);
             WorkerProcessTimer(timer, res, nq, new_rd_nq, wr_nq, logger);
@@ -295,7 +278,7 @@ int EventManager::Init(const Options& options) {
 }
 
 int EventManager::DoAddClient(int64_t new_fd, const shared_ptr<Handler>& handler) {
-    auto client = CreateInternalClient(new_fd, handler, &m_new_rd_nq, m_logger);
+    auto client = CreateInternalClient(new_fd, handler, &m_new_rd_nq, m_wr_nq, m_logger);
     if (!client) {
         logger_error(m_logger, "create InternalClient failed: [%s].",
                      strerror(ENOMEM));
@@ -314,27 +297,7 @@ int EventManager::DoAddClient(int64_t new_fd, const shared_ptr<Handler>& handler
     // retain the client for RecvAsync()
     GetClient(client);
 
-    Buffer buf;
-    handler->OnConnected(&client->conn, &buf);
-    if (!buf.IsEmpty()) {
-        auto session = CreateSession();
-        if (!session) {
-            logger_error(m_logger, "create Session failed: [%s].", strerror(ENOMEM));
-            DestroyInternalClient(client); // ok
-            return -ENOMEM;
-        }
-
-        GetClient(client);
-        session->data = std::move(buf);
-        session->client = client;
-        err = m_new_rd_nq.NotifyAsync(m_wr_nq, 0, session);
-        if (err) {
-            logger_error(m_logger, "about to send data failed: [%s].", strerror(-err));
-            DestroySession(session);
-            DestroyInternalClient(client); // ok
-            return err;
-        }
-    }
+    handler->OnConnected(&client->conn);
 
     client->value = State::CLIENT_READ_REQ;
     err = m_new_rd_nq.RecvAsync(client->fd_for_reading, client->req.data(),

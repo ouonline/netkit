@@ -14,15 +14,16 @@ public:
         logger_info(m_logger, "[client] cient destroyed.");
     }
 
-    void OnConnected(Connection* conn, Buffer* out) override {
+    void OnConnected(Connection* conn) override {
         m_conn = conn;
         const ConnectionInfo& info = conn->info();
         logger_info(m_logger, "[client] connect to server [%s:%u].",
                     info.remote_addr.c_str(), info.remote_port);
 
+        Buffer out;
         auto s = std::to_string(m_counter);
         ++m_counter;
-        int err = out->Append(s.data(), s.size());
+        int err = out.Append(s.data(), s.size());
         if (err) {
             logger_error(m_logger, "prepare init data failed: [%s].", strerror(-err));
             return;
@@ -30,7 +31,12 @@ public:
         logger_info(m_logger, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
                     info.local_addr.c_str(), info.local_port,
                     info.remote_addr.c_str(), info.remote_port,
-                    out->size(), out->data());
+                    out.size(), out.data());
+
+        err = conn->SendAsync(std::move(out));
+        if (err) {
+            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
+        }
     }
 
     void OnDisconnected() override {
@@ -44,7 +50,7 @@ public:
         return ReqStat::VALID;
     }
 
-    void Process(Buffer&& req, Buffer*) override {
+    void Process(Buffer&& req) override {
         const ConnectionInfo& info = m_conn->info();
         logger_info(m_logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
                     info.remote_addr.c_str(), info.remote_port,
