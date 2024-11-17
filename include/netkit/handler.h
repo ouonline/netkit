@@ -30,7 +30,7 @@ class Handler {
 public:
     virtual ~Handler() {}
     /* `Connection` can be used during lifetime */
-    virtual void OnConnected(Connection*) = 0;
+    virtual int OnConnected(Connection*) = 0;
     virtual void OnDisconnected() = 0;
     virtual ReqStat Check(const Buffer&, uint64_t* req_bytes) = 0;
     virtual void Process(Buffer&& req) = 0;

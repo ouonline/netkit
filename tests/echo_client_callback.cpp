@@ -15,7 +15,7 @@ public:
         logger_info(m_logger, "[client] cient destroyed.");
     }
 
-    void OnConnected(Connection* conn) override {
+    int OnConnected(Connection* conn) override {
         m_conn = conn;
         const ConnectionInfo& info = conn->info();
         logger_info(m_logger, "[client] connect to server [%s:%u].",
@@ -26,7 +26,7 @@ public:
         if (err) {
             logger_error(m_logger, "prepare init data failed: [%s].",
                          strerror(-err));
-            return;
+            return err;
         }
 
         logger_info(m_logger, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
@@ -37,6 +37,7 @@ public:
         err = conn->SendAsync(std::move(buf));
         if (err) {
             logger_error(m_logger, "send data failed: [%s].", strerror(-err));
+            return err;
         }
 
         sleep(1);

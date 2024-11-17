@@ -13,11 +13,12 @@ public:
         logger_info(m_logger, "[server] session [%p] destroyed.", this);
     }
 
-    void OnConnected(Connection* conn) override {
+    int OnConnected(Connection* conn) override {
         m_conn = conn;
         const ConnectionInfo& info = conn->info();
         logger_info(m_logger, "[server] client [%s:%u] connected.",
                     info.remote_addr.c_str(), info.remote_port);
+        return 0;
     }
 
     void OnDisconnected() override {

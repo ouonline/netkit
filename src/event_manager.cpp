@@ -279,7 +279,11 @@ int EventManager::DoAddClient(int64_t new_fd, const shared_ptr<Handler>& handler
     // retain the client for RecvAsync()
     GetClient(client);
 
-    handler->OnConnected(&client->conn);
+    err = handler->OnConnected(&client->conn);
+    if (err) {
+        PutClient(client);
+        return err;
+    }
 
     client->value = State::CLIENT_READ_REQ;
     err = m_new_rd_nq.RecvAsync(client->fd_for_reading, client->req.data(),
