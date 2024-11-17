@@ -26,9 +26,8 @@ public:
                  /*
                    `val` < 0: error occurs and `val` == -errno
                    `val` > 0: the number of expirations
-                   `out`: data needed to be sent in this connection
                  */
-                 const std::function<void(int32_t val, netkit::Buffer* out)>&);
+                 const std::function<int(int32_t val)>&);
 
     int SendAsync(Buffer&&);
 

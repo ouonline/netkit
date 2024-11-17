@@ -97,7 +97,6 @@ static void WorkerProcessReq(Session* session) {
 static void WorkerProcessTimer(InternalTimer* timer, int64_t res,
                                NotificationQueueImpl* nq,
                                NotificationQueueImpl* new_rd_nq,
-                               NotificationQueueImpl* wr_nq,
                                Logger* logger) {
     Buffer buf;
     auto client = timer->client;
@@ -107,29 +106,14 @@ static void WorkerProcessTimer(InternalTimer* timer, int64_t res,
         goto errout;
     }
 
-    timer->callback(timer->nr_expiration, &buf);
-    timer->nr_expiration = 0;
-
-    if (!buf.IsEmpty()) {
-        auto session = CreateSession();
-        session->data = std::move(buf);
-        session->client = client;
-        session->sent_callback = [timer](int err) -> void {
-            if (err) {
-                timer->sent_errno = err;
-            }
-        };
-
-        GetClient(client);
-        int err = nq->NotifyAsync(wr_nq, 0, session);
-        if (err) {
-            logger_error(logger, "about to send buffer from timer failed: [%s].",
-                         strerror(-err));
-            PutClient(client);
-            goto errout;
-        }
+    res = timer->callback(timer->nr_expiration);
+    if (res) {
+        logger_error(logger, "about to send buffer from timer failed: [%s].",
+                     strerror(-res));
+        goto errout;
     }
 
+    timer->nr_expiration = 0;
     timer->value =State::TIMER_NEXT;
     res = nq->NotifyAsync(new_rd_nq, 0, timer);
     if (!res) {
@@ -140,7 +124,6 @@ static void WorkerProcessTimer(InternalTimer* timer, int64_t res,
                  strerror(-res));
 
 errout:
-    timer->callback(res, nullptr);
     DestroyInternalTimer(timer);
     PutClient(client);
 }
@@ -148,7 +131,6 @@ errout:
 // client's refcount was increased before calling this function
 static void WorkerThread(NotificationQueueImpl** worker_nq_pptr,
                          NotificationQueueImpl* new_rd_nq,
-                         NotificationQueueImpl* wr_nq,
                          atomic<uint32_t>* counter, uint32_t max_count,
                          EventCount* cond, int* retcode, Logger* logger) {
     *retcode = utils::InitThreadLocalNq(logger);
@@ -184,7 +166,7 @@ static void WorkerThread(NotificationQueueImpl** worker_nq_pptr,
             WorkerProcessReq(session);
         } else if (state->value == State::TIMER_EXPIRED) {
             auto timer = static_cast<InternalTimer*>(state);
-            WorkerProcessTimer(timer, res, nq, new_rd_nq, wr_nq, logger);
+            WorkerProcessTimer(timer, res, nq, new_rd_nq, logger);
         } else {
             logger_fatal(logger, "unsupported state [%d].", state->value);
         }
@@ -258,7 +240,7 @@ int EventManager::Init(const Options& options) {
     m_worker_thread_list.reserve(m_worker_num);
     for (uint32_t idx = 0; idx < m_worker_num; ++idx) {
         m_worker_thread_list.emplace_back(
-            thread(WorkerThread, &m_worker_nq_list[idx], &m_new_rd_nq, m_wr_nq,
+            thread(WorkerThread, &m_worker_nq_list[idx], &m_new_rd_nq,
                    &finished_count, m_worker_num, &cond, &retcode_list[idx], m_logger));
     }
 
@@ -541,11 +523,6 @@ void EventManager::HandleTimerExpired(int64_t res, void* state_ptr) {
         goto errout;
     }
 
-    if (timer->sent_errno) {
-        res = timer->sent_errno;
-        goto errout;
-    }
-
     logger_trace(m_logger, "send timer [%p] with fd [%d] to worker thread [%u].",
                  timer, timer->fd, m_current_worker_idx);
     res = m_new_rd_nq.NotifyAsync(m_worker_nq_list[m_current_worker_idx],
@@ -559,7 +536,7 @@ void EventManager::HandleTimerExpired(int64_t res, void* state_ptr) {
 
 errout:
     auto client = timer->client;
-    timer->callback(res, nullptr);
+    timer->callback(res);
     DestroyInternalTimer(timer);
     PutClient(client);
 }
@@ -572,11 +549,6 @@ void EventManager::HandleTimerNext(void* state_ptr) {
 
     logger_trace(m_logger, "recv timer [%p] with fd [%d].", timer, timer->fd);
 
-    if (timer->sent_errno) {
-        err = timer->sent_errno;
-        goto errout;
-    }
-
     timer->value = State::TIMER_EXPIRED;
     err = m_new_rd_nq.ReadAsync(timer->fd, &timer->nr_expiration, sizeof(uint64_t),
                                 static_cast<State*>(timer));
@@ -586,12 +558,10 @@ void EventManager::HandleTimerNext(void* state_ptr) {
 
     logger_error(m_logger, "about to read from timerfd failed: [%s].",
                  strerror(-err));
-
-errout:
     logger_trace(m_logger, "error [%s]. destroy timer [%p] with fd [%d].",
                  strerror(-err), timer, timer->fd);
     auto client = timer->client;
-    timer->callback(err, nullptr);
+    timer->callback(err);
     DestroyInternalTimer(timer);
     PutClient(client);
 }

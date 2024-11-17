@@ -7,9 +7,8 @@
 namespace netkit {
 
 struct InternalTimer final : public State {
-    InternalTimer(int _fd, InternalClient* c,
-                  const std::function<void(int32_t, Buffer*)>& cb)
-        : fd(_fd), sent_errno(0), client(c), callback(cb) {}
+    InternalTimer(int _fd, InternalClient* c, const std::function<int(int32_t)>& cb)
+        : fd(_fd), client(c), callback(cb) {}
     ~InternalTimer() {
         if (fd > 0) {
             close(fd);
@@ -17,14 +16,13 @@ struct InternalTimer final : public State {
     }
 
     int fd;
-    int32_t sent_errno;
     uint64_t nr_expiration = 0;
     InternalClient* client;
-    std::function<void(int32_t val, Buffer* out)> callback;
+    std::function<int(int32_t val)> callback;
 };
 
 inline InternalTimer* CreateInternalTimer(
-    int fd, InternalClient* c, const std::function<void(int32_t, Buffer*)>& cb) {
+    int fd, InternalClient* c, const std::function<int(int32_t)>& cb) {
     return new InternalTimer(fd, c, cb);
 }
 

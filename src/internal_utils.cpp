@@ -7,10 +7,8 @@ using namespace std;
 
 namespace netkit { namespace utils {
 
-int AddTimer(const TimeVal& delay, const TimeVal& interval,
-             const function<void(int32_t, Buffer*)>& cb,
-             NotificationQueueImpl* nq, InternalClient* client,
-             Logger* logger) {
+int AddTimer(const TimeVal& delay, const TimeVal& interval, const function<int(int32_t)>& cb,
+             NotificationQueueImpl* nq, InternalClient* client, Logger* logger) {
     if (delay.tv_sec == 0 && delay.tv_usec == 0) {
         logger_error(logger, "delay == 0 is not supported.");
         return -EINVAL;
@@ -61,7 +59,7 @@ int AddTimer(const TimeVal& delay, const TimeVal& interval,
     if (err) {
         logger_error(logger, "about to read from timerfd failed: [%s].",
                      strerror(-err));
-        timer->callback(err, nullptr);
+        timer->callback(err);
         DestroyInternalTimer(timer);
         PutClient(client);
         return err;

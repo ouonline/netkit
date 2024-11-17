@@ -2,7 +2,6 @@
 #define __NETKIT_INTERNAL_UTILS_H__
 
 #include "netkit/nq_utils.h"
-#include "netkit/buffer.h"
 #include "internal_client.h"
 #include <functional>
 
@@ -18,9 +17,8 @@ int AddTimer(const TimeVal& delay, const TimeVal& interval,
              /*
                `val` < 0: error occurs and `val` == -errno
                `val` > 0: the number of expirations
-               `out`: data needed to be sent in this connection
              */
-             const std::function<void(int32_t val, Buffer* out)>&,
+             const std::function<int(int32_t val)>&,
              NotificationQueueImpl*, InternalClient*, Logger*);
 
 }}
