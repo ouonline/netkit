@@ -14,6 +14,33 @@ using namespace threadkit;
 
 namespace netkit {
 
+void EventManager::Destroy() {
+    if (m_worker_nq_list.empty()) {
+        return;
+    }
+
+    int err = utils::InitThreadLocalNq(m_logger);
+    if (err) {
+        logger_error(m_logger, "InitThreadLocalNq failed: [%s].", strerror(-err));
+        return;
+    }
+
+    auto nq = utils::GetThreadLocalNq();
+    for (auto it = m_worker_nq_list.begin(); it != m_worker_nq_list.end(); ++it) {
+        nq->NotifyAsync(*it, 0, nullptr);
+    }
+    m_worker_nq_list.clear();
+
+    nq->NotifyAsync(m_wr_nq, 0, nullptr);
+
+    for (auto it = m_worker_thread_list.begin(); it != m_worker_thread_list.end(); ++it) {
+        it->join();
+    }
+    m_writing_thread.join();
+
+    nq->NotifyAsync(&m_new_rd_nq, 0, nullptr);
+}
+
 // client's refcount was increased before calling this function
 static void ProcessWriting(NotificationQueueImpl* wr_nq, int64_t res, void* tag,
                            Logger* logger) {
@@ -159,6 +186,9 @@ static void WorkerThread(NotificationQueueImpl** worker_nq_pptr,
             logger_error(logger, "get event failed: [%s].", strerror(-err));
             break;
         }
+        if (!tag) {
+            break;
+        }
 
         auto state = static_cast<State*>(tag);
         if (state->value == State::WORKER_PROCESS_REQ) {
@@ -195,6 +225,9 @@ static void WritingThread(NotificationQueueImpl** wr_nq_pptr, atomic<uint32_t>* 
         int err = wr_nq->Next(&res, &tag, nullptr);
         if (err) {
             logger_error(logger, "get event failed: [%s].", strerror(-err));
+            break;
+        }
+        if (!tag) {
             break;
         }
 
@@ -302,7 +335,7 @@ int EventManager::AddServer(const char* addr, uint16_t port,
     int fd = utils::CreateTcpServerFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "create server for [%s:%u] failed: [%s].",
-                     addr, port, strerror(fd));
+                     addr, port, strerror(-fd));
         return fd;
     }
 
@@ -330,7 +363,7 @@ int EventManager::AddClient(const char* addr, uint16_t port, const shared_ptr<Ha
     int fd = utils::CreateTcpClientFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "connect to [%s:%u] failed: [%s].", addr, port,
-                     strerror(fd));
+                     strerror(-fd));
         return fd;
     }
 
@@ -608,6 +641,9 @@ void EventManager::Loop() {
         auto err = m_new_rd_nq.Next(&res, &tag, nullptr);
         if (err != 0) {
             logger_error(m_logger, "get event failed: [%s].", strerror(-err));
+            break;
+        }
+        if (!tag) {
             break;
         }
 

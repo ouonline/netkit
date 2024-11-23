@@ -41,6 +41,7 @@ public:
         }
 
         sleep(1);
+        return 0;
     }
 
     void OnDisconnected() override {
@@ -106,7 +107,7 @@ int main(int argc, char* argv[]) {
 
     err = mgr.AddClient(host, port, make_shared<EchoClientHandler>(&logger.l));
     if (err < 0) {
-        logger_error(&logger.l, "add server failed: [%s].", strerror(-err));
+        logger_error(&logger.l, "add client failed: [%s].", strerror(-err));
         return -1;
     }
 

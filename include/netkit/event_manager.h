@@ -17,9 +17,14 @@ public:
 
 public:
     EventManager(Logger* logger) : m_logger(logger) {}
+    ~EventManager() {
+        Destroy();
+    }
 
     /** returns 0 or -errno */
     int Init(const Options&);
+
+    void Destroy();
 
     /** returns -errno or index of the server */
     int AddServer(const char* addr, uint16_t port, const std::shared_ptr<HandlerFactory>&);
@@ -44,6 +49,7 @@ private:
     alignas(threadkit::CACHELINE_SIZE)
 
     Logger* m_logger;
+    std::vector<std::thread> m_worker_thread_list;
 
     alignas(threadkit::CACHELINE_SIZE)
 
@@ -60,8 +66,7 @@ private:
     // is read by new_rd_nq for dispatching tasks
     std::vector<NotificationQueueImpl*> m_worker_nq_list;
 
-    std::vector<std::thread> m_worker_thread_list;
-
+    // used by new_rd_nq
     uint32_t m_worker_num = 0;
     uint32_t m_current_worker_idx = 0;
 
