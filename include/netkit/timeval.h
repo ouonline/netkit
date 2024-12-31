@@ -1,11 +1,11 @@
 #ifndef __NETKIT_TIMEVAL_H__
 #define __NETKIT_TIMEVAL_H__
 
-#include <time.h>
+#include "threadkit/timeval.h"
 
 namespace netkit {
 
-typedef struct timeval TimeVal;
+using TimeVal = threadkit::TimeVal;
 
 }
 
