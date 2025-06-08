@@ -65,7 +65,6 @@ int AddTimer(const TimeVal& delay, const TimeVal& interval, const function<int(i
         return err;
     }
 
-    logger_trace(logger, "add timer [%p] with fd [%d] ok.", timer, fd);
     return fd;
 }
 

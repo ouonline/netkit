@@ -552,16 +552,11 @@ void EventManager::HandleTimerExpired(int64_t res, void* state_ptr) {
     auto state = static_cast<State*>(state_ptr);
     auto timer = static_cast<InternalTimer*>(state);
 
-    logger_trace(m_logger, "timer [%p] with fd [%d] expired.",
-                 timer, timer->fd);
-
     if (res < 0) {
         logger_error(m_logger, "get timer event failed: [%s].", strerror(-res));
         goto errout;
     }
 
-    logger_trace(m_logger, "send timer [%p] with fd [%d] to worker thread [%u].",
-                 timer, timer->fd, m_current_worker_idx);
     res = m_new_rd_nq.NotifyAsync(m_worker_nq_list[m_current_worker_idx],
                                   res, state_ptr);
     if (!res) {
@@ -584,8 +579,6 @@ void EventManager::HandleTimerNext(void* state_ptr) {
     auto state = static_cast<State*>(state_ptr);
     auto timer = static_cast<InternalTimer*>(state);
 
-    logger_trace(m_logger, "recv timer [%p] with fd [%d].", timer, timer->fd);
-
     timer->value = State::TIMER_EXPIRED;
     err = m_new_rd_nq.ReadAsync(timer->fd, &timer->nr_expiration, sizeof(uint64_t),
                                 static_cast<State*>(timer));
@@ -595,8 +588,6 @@ void EventManager::HandleTimerNext(void* state_ptr) {
 
     logger_error(m_logger, "about to read from timerfd failed: [%s].",
                  strerror(-err));
-    logger_trace(m_logger, "error [%s]. destroy timer [%p] with fd [%d].",
-                 strerror(-err), timer, timer->fd);
     auto client = timer->client;
     timer->callback(err);
     DestroyInternalTimer(timer);
