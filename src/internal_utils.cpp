@@ -10,7 +10,7 @@ namespace netkit { namespace utils {
 int AddTimer(const TimeVal& delay, const TimeVal& interval, const function<int(int32_t)>& cb,
              NotificationQueueImpl* nq, InternalClient* client, Logger* logger) {
     if (delay.tv_sec == 0 && delay.tv_usec == 0) {
-        logger_error(logger, "delay == 0 is not supported.");
+        logger_error(logger, "delay == 0 means disarming this timer and is not allowed currently.");
         return -EINVAL;
     }
 
@@ -65,7 +65,7 @@ int AddTimer(const TimeVal& delay, const TimeVal& interval, const function<int(i
         return err;
     }
 
-    return fd;
+    return 0;
 }
 
 thread_local bool g_nq_inited = false;
