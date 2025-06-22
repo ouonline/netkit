@@ -9,11 +9,16 @@
 
 namespace netkit {
 
+class InternalClient;
+
 class Connection final {
+private:
+    static void DummySentCallback(int) {}
+
 public:
     Connection(int fd, NotificationQueueImpl* new_rd_nq, NotificationQueueImpl* wr_nq,
-               void* client_ptr, Logger* l)
-        : m_new_rd_nq(new_rd_nq), m_wr_nq(wr_nq), m_client_ptr(client_ptr), m_logger(l) {
+               InternalClient* client, Logger* l)
+        : m_new_rd_nq(new_rd_nq), m_wr_nq(wr_nq), m_client(client), m_logger(l) {
         utils::GenConnectionInfo(fd, &m_info);
     }
 
@@ -29,13 +34,13 @@ public:
                  */
                  const std::function<int(int32_t val)>&);
 
-    int SendAsync(Buffer&&);
+    int SendAsync(Buffer&&, const std::function<void(int err)>& = DummySentCallback);
 
 private:
     ConnectionInfo m_info;
     NotificationQueueImpl* m_new_rd_nq;
     NotificationQueueImpl* m_wr_nq;
-    void* m_client_ptr;
+    InternalClient* m_client;
     Logger* m_logger;
 };
 

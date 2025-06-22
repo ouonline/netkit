@@ -141,7 +141,7 @@ static void WorkerProcessTimer(InternalTimer* timer, int64_t res,
     }
 
     timer->nr_expiration = 0;
-    timer->value =State::TIMER_NEXT;
+    timer->value = State::TIMER_NEXT;
     res = nq->NotifyAsync(new_rd_nq, 0, timer);
     if (!res) {
         return;
