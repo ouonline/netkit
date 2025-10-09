@@ -7,10 +7,13 @@ using namespace std;
 
 namespace netkit { namespace utils {
 
-int AddTimer(const TimeVal& delay, const TimeVal& interval, const function<int(int32_t)>& cb,
-             NotificationQueueImpl* nq, InternalClient* client, Logger* logger) {
+int AddTimer(const TimeVal& delay, const TimeVal& interval,
+             const function<int(int32_t)>& cb, NotificationQueueImpl* nq,
+             InternalClient* client, Logger* logger) {
     if (delay.tv_sec == 0 && delay.tv_usec == 0) {
-        logger_error(logger, "delay == 0 means disarming this timer and is not allowed currently.");
+        logger_error(logger,
+                     "delay == 0 means disarming this timer and is not allowed "
+                     "currently.");
         return -EINVAL;
     }
 
@@ -36,14 +39,16 @@ int AddTimer(const TimeVal& delay, const TimeVal& interval, const function<int(i
     }
 
     const struct itimerspec ts = {
-        .it_interval = {
-            .tv_sec = interval.tv_sec,
-            .tv_nsec = interval.tv_usec * 1000,
-        },
-        .it_value = {
-            .tv_sec = delay.tv_sec,
-            .tv_nsec = delay.tv_usec * 1000,
-        },
+        .it_interval =
+            {
+                .tv_sec = interval.tv_sec,
+                .tv_nsec = interval.tv_usec * 1000,
+            },
+        .it_value =
+            {
+                .tv_sec = delay.tv_sec,
+                .tv_nsec = delay.tv_usec * 1000,
+            },
     };
 
     err = timerfd_settime(fd, 0, &ts, nullptr);
@@ -55,7 +60,8 @@ int AddTimer(const TimeVal& delay, const TimeVal& interval, const function<int(i
 
     timer->value = State::TIMER_NEXT;
     GetClient(client);
-    err = utils::GetThreadLocalNq()->NotifyAsync(nq, 0, static_cast<State*>(timer));
+    err = utils::GetThreadLocalNq()->NotifyAsync(nq, 0,
+                                                 static_cast<State*>(timer));
     if (err) {
         logger_error(logger, "about to read from timerfd failed: [%s].",
                      strerror(-err));

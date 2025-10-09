@@ -7,7 +7,8 @@
 namespace netkit {
 
 struct InternalTimer final : public State {
-    InternalTimer(int _fd, InternalClient* c, const std::function<int(int32_t)>& cb)
+    InternalTimer(int _fd, InternalClient* c,
+                  const std::function<int(int32_t)>& cb)
         : fd(_fd), client(c), callback(cb) {}
     ~InternalTimer() {
         if (fd > 0) {

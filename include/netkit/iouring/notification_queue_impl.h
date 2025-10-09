@@ -14,8 +14,7 @@ struct NotificationQueueOptions final {
     uint32_t queue_size = 1024;
 };
 
-class NotificationQueueImpl final
-    : public NotificationQueue {
+class NotificationQueueImpl final : public NotificationQueue {
 public:
     NotificationQueueImpl() : m_logger(nullptr) {}
     ~NotificationQueueImpl() {
@@ -30,7 +29,8 @@ public:
     int RecvAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
     int SendAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
     int ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
-    int WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
+    int WriteAsync(int64_t fd, const void* buf, uint64_t sz,
+                   void* tag) override;
     int CloseAsync(int64_t fd, void* tag) override;
     int NotifyAsync(NotificationQueueImpl*, int res, void* tag);
 

@@ -29,10 +29,10 @@ public:
             return err;
         }
 
-        logger_info(m_logger, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
-                    info.local_addr.c_str(), info.local_port,
-                    info.remote_addr.c_str(), info.remote_port,
-                    buf.size(), buf.data());
+        logger_info(
+            m_logger, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
+            info.local_addr.c_str(), info.local_port, info.remote_addr.c_str(),
+            info.remote_port, buf.size(), buf.data());
 
         err = conn->SendAsync(std::move(buf));
         if (err) {
@@ -57,14 +57,15 @@ public:
 
     void Process(Buffer&& req) override {
         const ConnectionInfo& info = m_conn->info();
-        logger_info(m_logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
-                    info.remote_addr.c_str(), info.remote_port,
-                    info.local_addr.c_str(), info.local_port,
-                    req.size(), req.data());
+        logger_info(
+            m_logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
+            info.remote_addr.c_str(), info.remote_port, info.local_addr.c_str(),
+            info.local_port, req.size(), req.data());
 
         int err = req.Reserve(10);
         if (err) {
-            logger_error(m_logger, "Reserve buffer failed: [%s].", strerror(-err));
+            logger_error(m_logger, "Reserve buffer failed: [%s].",
+                         strerror(-err));
             return;
         }
 

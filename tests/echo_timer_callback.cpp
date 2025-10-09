@@ -25,13 +25,14 @@ public:
         ++m_counter;
         int err = out.Append(s.data(), s.size());
         if (err) {
-            logger_error(m_logger, "prepare init data failed: [%s].", strerror(-err));
+            logger_error(m_logger, "prepare init data failed: [%s].",
+                         strerror(-err));
             return err;
         }
-        logger_info(m_logger, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
-                    info.local_addr.c_str(), info.local_port,
-                    info.remote_addr.c_str(), info.remote_port,
-                    out.size(), out.data());
+        logger_info(
+            m_logger, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
+            info.local_addr.c_str(), info.local_port, info.remote_addr.c_str(),
+            info.remote_port, out.size(), out.data());
 
         err = conn->SendAsync(std::move(out));
         if (err) {
@@ -53,10 +54,10 @@ public:
 
     void Process(Buffer&& req) override {
         const ConnectionInfo& info = m_conn->info();
-        logger_info(m_logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
-                    info.remote_addr.c_str(), info.remote_port,
-                    info.local_addr.c_str(), info.local_port,
-                    req.size(), req.data());
+        logger_info(
+            m_logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
+            info.remote_addr.c_str(), info.remote_port, info.local_addr.c_str(),
+            info.local_port, req.size(), req.data());
 
         if (m_counter == 1) {
             const TimeVal delay = {
@@ -67,29 +68,34 @@ public:
                 .tv_sec = 1,
                 .tv_usec = 0,
             };
-            m_conn->AddTimer(delay, interval, [&info, l = m_logger, counter = &m_counter, conn = m_conn]
-                             (int32_t val) -> int {
-                if (val < 0) {
-                    logger_error(l, "error: [%s].", strerror(-val));
-                    return val;
-                }
+            m_conn->AddTimer(
+                delay, interval,
+                [&info, l = m_logger, counter = &m_counter,
+                 conn = m_conn](int32_t val) -> int {
+                    if (val < 0) {
+                        logger_error(l, "error: [%s].", strerror(-val));
+                        return val;
+                    }
 
-                Buffer out;
-                auto s = std::to_string(*counter);
-                ++(*counter);
-                int err = out.Append(s.data(), s.size());
-                if (err) {
-                    logger_error(l, "prepare init data failed: [%s].", strerror(-err));
-                    return err;
-                }
+                    Buffer out;
+                    auto s = std::to_string(*counter);
+                    ++(*counter);
+                    int err = out.Append(s.data(), s.size());
+                    if (err) {
+                        logger_error(l, "prepare init data failed: [%s].",
+                                     strerror(-err));
+                        return err;
+                    }
 
-                logger_info(l, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
-                            info.local_addr.c_str(), info.local_port,
-                            info.remote_addr.c_str(), info.remote_port,
-                            out.size(), out.data());
+                    logger_info(l,
+                                "[client] client [%s:%u] ==> server [%s:%u] "
+                                "data [%.*s]",
+                                info.local_addr.c_str(), info.local_port,
+                                info.remote_addr.c_str(), info.remote_port,
+                                out.size(), out.data());
 
-                return conn->SendAsync(std::move(out));
-            });
+                    return conn->SendAsync(std::move(out));
+                });
         }
     }
 

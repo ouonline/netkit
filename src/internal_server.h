@@ -22,7 +22,8 @@ struct InternalServer final : public State {
     std::shared_ptr<HandlerFactory> factory;
 };
 
-inline InternalServer* CreateInternalServer(int fd, const std::shared_ptr<HandlerFactory>& f) {
+inline InternalServer* CreateInternalServer(
+    int fd, const std::shared_ptr<HandlerFactory>& f) {
     return new InternalServer(fd, f);
 }
 

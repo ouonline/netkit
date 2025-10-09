@@ -86,10 +86,11 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
                 }
             } else {
                 logger_info(
-                    logger, "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]",
+                    logger,
+                    "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]",
                     info.remote_addr.c_str(), info.remote_port,
-                    info.local_addr.c_str(), info.local_port,
-                    res, session->buf);
+                    info.local_addr.c_str(), info.local_port, res,
+                    session->buf);
                 session->value = State::SEND_RES;
                 rc = nq->SendAsync(session->fd, session->buf, res, tag);
                 if (rc != 0) {
@@ -111,7 +112,8 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
                 delete session;
             } else {
                 session->value = State::RECV_REQ;
-                rc = nq->RecvAsync(session->fd, session->buf, ECHO_BUFFER_SIZE, tag);
+                rc = nq->RecvAsync(session->fd, session->buf, ECHO_BUFFER_SIZE,
+                                   tag);
                 if (rc != 0) {
                     logger_error(logger, "RecvAsync() failed.");
                 }

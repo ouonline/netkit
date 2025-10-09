@@ -18,8 +18,8 @@ int AddTimer(const TimeVal& delay, const TimeVal& interval,
                `val` < 0: error occurs and `val` == -errno
                `val` > 0: the number of expirations
              */
-             const std::function<int(int32_t val)>&,
-             NotificationQueueImpl*, InternalClient*, Logger*);
+             const std::function<int(int32_t val)>&, NotificationQueueImpl*,
+             InternalClient*, Logger*);
 
 }}
 

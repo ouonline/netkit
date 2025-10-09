@@ -21,19 +21,22 @@ void EventManager::Destroy() {
 
     int err = utils::InitThreadLocalNq(m_logger);
     if (err) {
-        logger_error(m_logger, "InitThreadLocalNq failed: [%s].", strerror(-err));
+        logger_error(m_logger, "InitThreadLocalNq failed: [%s].",
+                     strerror(-err));
         return;
     }
 
     auto nq = utils::GetThreadLocalNq();
-    for (auto it = m_worker_nq_list.begin(); it != m_worker_nq_list.end(); ++it) {
+    for (auto it = m_worker_nq_list.begin(); it != m_worker_nq_list.end();
+         ++it) {
         nq->NotifyAsync(*it, 0, nullptr);
     }
     m_worker_nq_list.clear();
 
     nq->NotifyAsync(m_wr_nq, 0, nullptr);
 
-    for (auto it = m_worker_thread_list.begin(); it != m_worker_thread_list.end(); ++it) {
+    for (auto it = m_worker_thread_list.begin();
+         it != m_worker_thread_list.end(); ++it) {
         it->join();
     }
     m_writing_thread.join();
@@ -61,7 +64,8 @@ static void ProcessWriting(NotificationQueueImpl* wr_nq, int64_t res, void* tag,
     if (res < 0) {
         const ConnectionInfo& info = client->conn.info();
         logger_error(logger, "send data to client [%s:%u] failed: [%s].",
-                     info.remote_addr.c_str(), info.remote_port, strerror(-res));
+                     info.remote_addr.c_str(), info.remote_port,
+                     strerror(-res));
         goto out;
     }
 
@@ -92,8 +96,7 @@ static void ProcessWriting(NotificationQueueImpl* wr_nq, int64_t res, void* tag,
 send_data:
     res = wr_nq->SendAsync(client->fd_for_writing,
                            session->data.data() + client->bytes_sent,
-                           session->data.size() - client->bytes_sent,
-                           session);
+                           session->data.size() - client->bytes_sent, session);
     if (res == 0) {
         return;
     }
@@ -203,11 +206,13 @@ static void WorkerThread(NotificationQueueImpl** worker_nq_pptr,
     }
 }
 
-static void WritingThread(NotificationQueueImpl** wr_nq_pptr, atomic<uint32_t>* counter,
-                          EventCount* cond, int* retcode, Logger* logger) {
+static void WritingThread(NotificationQueueImpl** wr_nq_pptr,
+                          atomic<uint32_t>* counter, EventCount* cond,
+                          int* retcode, Logger* logger) {
     *retcode = utils::InitThreadLocalNq(logger);
     if (*retcode) {
-        logger_error(logger, "init thread local notification queue failed: [%s].",
+        logger_error(logger,
+                     "init thread local notification queue failed: [%s].",
                      strerror(-(*retcode)));
         counter->store(1, std::memory_order_release);
         cond->NotifyOne();
@@ -260,7 +265,8 @@ int EventManager::Init(const Options& options) {
 
     int err = InitNq(&m_new_rd_nq, m_logger);
     if (err) {
-        logger_error(m_logger, "init new and recving notification queue failed: [%s].",
+        logger_error(m_logger,
+                     "init new and recving notification queue failed: [%s].",
                      strerror(-err));
         return err;
     }
@@ -272,9 +278,9 @@ int EventManager::Init(const Options& options) {
 
     m_worker_thread_list.reserve(m_worker_num);
     for (uint32_t idx = 0; idx < m_worker_num; ++idx) {
-        m_worker_thread_list.emplace_back(
-            thread(WorkerThread, &m_worker_nq_list[idx], &m_new_rd_nq,
-                   &finished_count, m_worker_num, &cond, &retcode_list[idx], m_logger));
+        m_worker_thread_list.emplace_back(thread(
+            WorkerThread, &m_worker_nq_list[idx], &m_new_rd_nq, &finished_count,
+            m_worker_num, &cond, &retcode_list[idx], m_logger));
     }
 
     cond.Wait([&finished_count, worker_num = m_worker_num]() -> bool {
@@ -292,8 +298,10 @@ int EventManager::Init(const Options& options) {
     return 0;
 }
 
-int EventManager::DoAddClient(int64_t new_fd, const shared_ptr<Handler>& handler) {
-    auto client = CreateInternalClient(new_fd, handler, &m_new_rd_nq, m_wr_nq, m_logger);
+int EventManager::DoAddClient(int64_t new_fd,
+                              const shared_ptr<Handler>& handler) {
+    auto client =
+        CreateInternalClient(new_fd, handler, &m_new_rd_nq, m_wr_nq, m_logger);
     if (!client) {
         logger_error(m_logger, "create InternalClient failed: [%s].",
                      strerror(ENOMEM));
@@ -319,10 +327,12 @@ int EventManager::DoAddClient(int64_t new_fd, const shared_ptr<Handler>& handler
     }
 
     client->value = State::CLIENT_READ_REQ;
-    err = m_new_rd_nq.RecvAsync(client->fd_for_reading, client->req.data(),
-                                REQ_BUF_EXPAND_SIZE, static_cast<State*>(client));
+    err =
+        m_new_rd_nq.RecvAsync(client->fd_for_reading, client->req.data(),
+                              REQ_BUF_EXPAND_SIZE, static_cast<State*>(client));
     if (err) {
-        logger_error(m_logger, "about to recv data failed: [%s].", strerror(-err));
+        logger_error(m_logger, "about to recv data failed: [%s].",
+                     strerror(-err));
         PutClient(client);
         return err;
     }
@@ -334,16 +344,17 @@ int EventManager::AddServer(const char* addr, uint16_t port,
                             const shared_ptr<HandlerFactory>& factory) {
     int fd = utils::CreateTcpServerFd(addr, port, m_logger);
     if (fd < 0) {
-        logger_error(m_logger, "create server for [%s:%u] failed: [%s].",
-                     addr, port, strerror(-fd));
+        logger_error(m_logger, "create server for [%s:%u] failed: [%s].", addr,
+                     port, strerror(-fd));
         return fd;
     }
 
     auto svr = CreateInternalServer(fd, factory);
     if (!svr) {
         close(fd);
-        logger_error(m_logger, "create InternalServer for [%s:%u] failed: [%s].",
-                     addr, port, strerror(ENOMEM));
+        logger_error(m_logger,
+                     "create InternalServer for [%s:%u] failed: [%s].", addr,
+                     port, strerror(ENOMEM));
         return -ENOMEM;
     }
 
@@ -359,7 +370,8 @@ int EventManager::AddServer(const char* addr, uint16_t port,
     return fd;
 }
 
-int EventManager::AddClient(const char* addr, uint16_t port, const shared_ptr<Handler>& h) {
+int EventManager::AddClient(const char* addr, uint16_t port,
+                            const shared_ptr<Handler>& h) {
     int fd = utils::CreateTcpClientFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "connect to [%s:%u] failed: [%s].", addr, port,
@@ -379,11 +391,10 @@ void EventManager::HandleAccept(int64_t new_fd, void* svr_ptr) {
         return;
     }
 
-    auto handler = shared_ptr<Handler>(
-        svr->factory->Create(),
-        [f = svr->factory](Handler* h) -> void {
-            f->Destroy(h);
-        });
+    auto handler = shared_ptr<Handler>(svr->factory->Create(),
+                                       [f = svr->factory](Handler* h) -> void {
+                                           f->Destroy(h);
+                                       });
 
     DoAddClient(new_fd, handler);
 }
@@ -418,10 +429,11 @@ void EventManager::HandleMoreDataRequest(void* client_ptr, uint64_t req_bytes) {
     }
 
     err = m_new_rd_nq.RecvAsync(client->fd_for_reading,
-                                (char*)req->data() + req->size(),
-                                req_bytes, static_cast<State*>(client));
+                                (char*)req->data() + req->size(), req_bytes,
+                                static_cast<State*>(client));
     if (err) {
-        logger_error(m_logger, "about to recv data failed: [%s].", strerror(-err));
+        logger_error(m_logger, "about to recv data failed: [%s].",
+                     strerror(-err));
         goto errout;
     }
 
@@ -446,7 +458,8 @@ bool EventManager::HandleValidRequest(void* client_ptr, uint64_t req_bytes) {
         err = req_to_be_processed.Assign(client->req.data() + req_bytes,
                                          client->req.size() - req_bytes);
         if (err) {
-            logger_error(m_logger, "move request data failed: [%s].", strerror(-err));
+            logger_error(m_logger, "move request data failed: [%s].",
+                         strerror(-err));
             goto errout;
         }
         client->req.Resize(req_bytes);
@@ -455,7 +468,8 @@ bool EventManager::HandleValidRequest(void* client_ptr, uint64_t req_bytes) {
 
     session = CreateSession();
     if (!session) {
-        logger_error(m_logger, "allocate Session failed: [%s].", strerror(ENOMEM));
+        logger_error(m_logger, "allocate Session failed: [%s].",
+                     strerror(ENOMEM));
         goto errout;
     }
 
@@ -464,7 +478,8 @@ bool EventManager::HandleValidRequest(void* client_ptr, uint64_t req_bytes) {
     session->client = client;
 
     GetClient(client);
-    err = m_new_rd_nq.NotifyAsync(m_worker_nq_list[m_current_worker_idx], 0, session);
+    err = m_new_rd_nq.NotifyAsync(m_worker_nq_list[m_current_worker_idx], 0,
+                                  session);
     if (err) {
         logger_error(m_logger, "send request to worker thread failed: [%s].",
                      strerror(-err));
@@ -495,7 +510,8 @@ void EventManager::HandleClientReading(int64_t res, void* client_ptr) {
     if (res < 0) {
         const ConnectionInfo& info = client->conn.info();
         logger_error(m_logger, "recv data from client [%s:%u] failed: [%s].",
-                     info.remote_addr.c_str(), info.remote_port, strerror(-res));
+                     info.remote_addr.c_str(), info.remote_port,
+                     strerror(-res));
         PutClient(client);
         return;
     }
@@ -515,8 +531,7 @@ void EventManager::HandleClientReading(int64_t res, void* client_ptr) {
         client->bytes_left -= res;
         if (client->bytes_left > 0) {
             auto err = m_new_rd_nq.RecvAsync(
-                client->fd_for_reading,
-                client->req.data() + client->req.size(),
+                client->fd_for_reading, client->req.data() + client->req.size(),
                 client->bytes_left, static_cast<State*>(client));
             if (err) {
                 logger_error(m_logger, "about to recv req failed: [%s].",
@@ -557,8 +572,8 @@ void EventManager::HandleTimerExpired(int64_t res, void* state_ptr) {
         goto errout;
     }
 
-    res = m_new_rd_nq.NotifyAsync(m_worker_nq_list[m_current_worker_idx],
-                                  res, state_ptr);
+    res = m_new_rd_nq.NotifyAsync(m_worker_nq_list[m_current_worker_idx], res,
+                                  state_ptr);
     if (!res) {
         return;
     }
@@ -580,8 +595,8 @@ void EventManager::HandleTimerNext(void* state_ptr) {
     auto timer = static_cast<InternalTimer*>(state);
 
     timer->value = State::TIMER_EXPIRED;
-    err = m_new_rd_nq.ReadAsync(timer->fd, &timer->nr_expiration, sizeof(uint64_t),
-                                static_cast<State*>(timer));
+    err = m_new_rd_nq.ReadAsync(timer->fd, &timer->nr_expiration,
+                                sizeof(uint64_t), static_cast<State*>(timer));
     if (!err) {
         return;
     }

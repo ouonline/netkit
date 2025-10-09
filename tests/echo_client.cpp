@@ -43,7 +43,8 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
             }
 
             client->state = State::CLIENT_GET_RES;
-            rc = nq->RecvAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
+            rc = nq->RecvAsync(client->fd, client->buf, ECHO_BUFFER_SIZE,
+                               client);
             if (rc != 0) {
                 logger_error(logger, "RecvAsync() failed.");
             }
@@ -62,10 +63,11 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
                 break;
             }
 
-            logger_info(logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
-                        info.remote_addr.c_str(), info.remote_port,
-                        info.local_addr.c_str(), info.local_port,
-                        res, client->buf);
+            logger_info(
+                logger,
+                "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
+                info.remote_addr.c_str(), info.remote_port,
+                info.local_addr.c_str(), info.local_port, res, client->buf);
             sleep(1);
 
             if (res < ECHO_BUFFER_SIZE) {
@@ -94,7 +96,8 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
         }
         case State::CLIENT_DISCONNECTED: {
             logger_info(logger, "[client] client [%s:%u] closed.",
-                        client->info.local_addr.c_str(), client->info.local_port);
+                        client->info.local_addr.c_str(),
+                        client->info.local_port);
             client->state = State::CLIENT_END_LOOP;
             break;
         }

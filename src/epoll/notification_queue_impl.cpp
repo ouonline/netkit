@@ -63,8 +63,8 @@ static int DoEpollUpdate(int epfd, uint32_t flags, EventHandler* handler,
                 return -errno;
             }
         } else {
-            logger_error(logger, "epoll add server fd [%d] failed: [%s].",
-                         fd, strerror(errno));
+            logger_error(logger, "epoll add server fd [%d] failed: [%s].", fd,
+                         strerror(errno));
             return -errno;
         }
     }
@@ -93,8 +93,8 @@ int NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
 
     auto ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev);
     if (ret != 0) {
-        logger_error(m_logger, "epoll add server fd [%d] failed: [%s].",
-                     fd, strerror(errno));
+        logger_error(m_logger, "epoll add server fd [%d] failed: [%s].", fd,
+                     strerror(errno));
         delete handler;
         return -errno;
     }
@@ -104,7 +104,8 @@ int NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
 
 int NotificationQueueImpl::AcceptAsync(int64_t fd, void* tag) {
     auto handler = new AcceptHandler(fd, tag, false);
-    auto ret = DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
+    auto ret =
+        DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in AcceptAsync() failed.");
         delete handler;
@@ -129,9 +130,11 @@ private:
     uint64_t m_sz;
 };
 
-int NotificationQueueImpl::RecvAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
+int NotificationQueueImpl::RecvAsync(int64_t fd, void* buf, uint64_t sz,
+                                     void* tag) {
     auto handler = new RecvHandler(fd, buf, sz, tag);
-    auto ret = DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
+    auto ret =
+        DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in RecvAsync() failed.");
         delete handler;
@@ -156,9 +159,11 @@ private:
     uint64_t m_sz;
 };
 
-int NotificationQueueImpl::SendAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
+int NotificationQueueImpl::SendAsync(int64_t fd, const void* buf, uint64_t sz,
+                                     void* tag) {
     auto handler = new SendHandler(fd, buf, sz, tag);
-    auto ret = DoEpollUpdate(m_epfd, EPOLLOUT | EPOLLONESHOT, handler, fd, m_logger);
+    auto ret =
+        DoEpollUpdate(m_epfd, EPOLLOUT | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in SendAsync() failed.");
         delete handler;
@@ -196,9 +201,11 @@ private:
     uint64_t m_sz;
 };
 
-int NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) {
+int NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz,
+                                     void* tag) {
     auto handler = new ReadHandler(fd, buf, sz, tag);
-    auto ret = DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
+    auto ret =
+        DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in ReadAsync() failed.");
         delete handler;
@@ -223,9 +230,11 @@ private:
     uint64_t m_sz;
 };
 
-int NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) {
+int NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz,
+                                      void* tag) {
     auto handler = new WriteHandler(fd, buf, sz, tag);
-    auto ret = DoEpollUpdate(m_epfd, EPOLLOUT | EPOLLONESHOT, handler, fd, m_logger);
+    auto ret =
+        DoEpollUpdate(m_epfd, EPOLLOUT | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in WriteAsync() failed.");
         delete handler;
@@ -241,7 +250,8 @@ int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
     }
 
     auto handler = new EventfdHandler(efd, tag);
-    auto ret = DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, efd, m_logger);
+    auto ret =
+        DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, efd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in CloseAsync() failed.");
         delete handler;
@@ -255,7 +265,8 @@ int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
     return 0;
 }
 
-int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res, void* tag) {
+int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res,
+                                       void* tag) {
     int efd = eventfd(0, EFD_CLOEXEC);
     if (efd < 0) {
         logger_error(m_logger, "create eventfd failed: [%s].", strerror(errno));
@@ -263,7 +274,8 @@ int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res, void*
     }
 
     auto handler = new EventfdHandler(efd, tag);
-    auto ret = DoEpollUpdate(nq->m_epfd, EPOLLIN | EPOLLONESHOT, handler, efd, m_logger);
+    auto ret = DoEpollUpdate(nq->m_epfd, EPOLLIN | EPOLLONESHOT, handler, efd,
+                             m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in NotifyAsync() failed.");
         delete handler;
@@ -277,7 +289,8 @@ int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res, void*
     return 0;
 }
 
-int NotificationQueueImpl::Next(int64_t* res, void** tag, const TimeVal* timeout) {
+int NotificationQueueImpl::Next(int64_t* res, void** tag,
+                                const TimeVal* timeout) {
     if (m_event_idx >= m_nr_valid_event) {
         int ts;
         if (timeout) {
@@ -292,7 +305,8 @@ int NotificationQueueImpl::Next(int64_t* res, void** tag, const TimeVal* timeout
         m_nr_valid_event = epoll_wait(m_epfd, m_event_list, MAX_EVENTS, ts);
         if (m_nr_valid_event < 0) {
             if (errno != EAGAIN) {
-                logger_error(m_logger, "epoll_wait failed: %s", strerror(errno));
+                logger_error(m_logger, "epoll_wait failed: %s",
+                             strerror(errno));
             }
             return -errno;
         }
@@ -301,7 +315,8 @@ int NotificationQueueImpl::Next(int64_t* res, void** tag, const TimeVal* timeout
     }
 
     uint32_t events = m_event_list[m_event_idx].events;
-    auto handler = static_cast<EventHandler*>(m_event_list[m_event_idx].data.ptr);
+    auto handler =
+        static_cast<EventHandler*>(m_event_list[m_event_idx].data.ptr);
     ++m_event_idx;
 
     *tag = handler->tag;

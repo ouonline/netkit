@@ -27,10 +27,12 @@ public:
     void Destroy();
 
     /** returns -errno or index of the server */
-    int AddServer(const char* addr, uint16_t port, const std::shared_ptr<HandlerFactory>&);
+    int AddServer(const char* addr, uint16_t port,
+                  const std::shared_ptr<HandlerFactory>&);
 
     /** returns -errno or index of the client */
-    int AddClient(const char* addr, uint16_t port, const std::shared_ptr<Handler>&);
+    int AddClient(const char* addr, uint16_t port,
+                  const std::shared_ptr<Handler>&);
 
     void Loop();
 
@@ -42,26 +44,21 @@ private:
     /* |-- */ void HandleAccept(int64_t new_fd, void* svr_ptr);
     /* |-+ */ void HandleClientReading(int64_t, void* client_ptr);
     /*   |-- */ void HandleInvalidRequest(void* client_ptr);
-    /*   |-- */ void HandleMoreDataRequest(void* client_ptr, uint64_t expand_size);
+    /*   |-- */ void HandleMoreDataRequest(void* client_ptr,
+                                           uint64_t expand_size);
     /*   |__ */ bool HandleValidRequest(void* client_ptr, uint64_t req_bytes);
 
 private:
-    alignas(threadkit::CACHELINE_SIZE)
-
-    Logger* m_logger;
+    alignas(threadkit::CACHELINE_SIZE) Logger* m_logger;
     std::vector<std::thread> m_worker_thread_list;
 
-    alignas(threadkit::CACHELINE_SIZE)
-
     // for writing events
-    NotificationQueueImpl* m_wr_nq = nullptr;
+    alignas(threadkit::CACHELINE_SIZE) NotificationQueueImpl* m_wr_nq = nullptr;
 
     std::thread m_writing_thread;
 
-    alignas(threadkit::CACHELINE_SIZE)
-
     // for new connection and reading events
-    NotificationQueueImpl m_new_rd_nq;
+    alignas(threadkit::CACHELINE_SIZE) NotificationQueueImpl m_new_rd_nq;
 
     // is read by new_rd_nq for dispatching tasks
     std::vector<NotificationQueueImpl*> m_worker_nq_list;

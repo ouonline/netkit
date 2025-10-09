@@ -34,10 +34,10 @@ public:
 
     void Process(Buffer&& req) override {
         const ConnectionInfo& info = m_conn->info();
-        logger_info(m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
-                    info.local_addr.c_str(), info.local_port,
-                    info.remote_addr.c_str(), info.remote_port,
-                    req.size(), req.data());
+        logger_info(
+            m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
+            info.local_addr.c_str(), info.local_port, info.remote_addr.c_str(),
+            info.remote_port, req.size(), req.data());
         int err = m_conn->SendAsync(std::move(req));
         if (err) {
             logger_error(m_logger, "send data failed: [%s].", strerror(-err));

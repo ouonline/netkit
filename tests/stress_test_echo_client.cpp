@@ -75,7 +75,8 @@ int main(int argc, char* argv[]) {
     std::thread recv_thread([l = &logger.l, &client_list, &recv_nq]() -> void {
         for (auto it = client_list.begin(); it != client_list.end(); ++it) {
             auto client = &(*it);
-            recv_nq.RecvAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
+            recv_nq.RecvAsync(client->fd, client->buf, ECHO_BUFFER_SIZE,
+                              client);
         }
 
         while (true) {
@@ -88,7 +89,8 @@ int main(int argc, char* argv[]) {
             }
 
             auto client = static_cast<EchoClient*>(tag);
-            recv_nq.RecvAsync(client->fd, client->buf, ECHO_BUFFER_SIZE, client);
+            recv_nq.RecvAsync(client->fd, client->buf, ECHO_BUFFER_SIZE,
+                              client);
         }
     });
 

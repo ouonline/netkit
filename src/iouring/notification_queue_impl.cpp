@@ -5,7 +5,8 @@ using namespace std;
 
 namespace netkit { namespace iouring {
 
-int NotificationQueueImpl::Init(const NotificationQueueOptions& options, Logger* l) {
+int NotificationQueueImpl::Init(const NotificationQueueOptions& options,
+                                Logger* l) {
     if (m_logger) {
         return 0;
     }
@@ -33,7 +34,8 @@ void NotificationQueueImpl::Destroy() {
     }
 }
 
-int NotificationQueueImpl::Next(int64_t* res, void** tag, const TimeVal* timeout) {
+int NotificationQueueImpl::Next(int64_t* res, void** tag,
+                                const TimeVal* timeout) {
     struct io_uring_cqe* cqe = nullptr;
 
     if (timeout) {
@@ -81,7 +83,8 @@ static int GenericAsync(struct io_uring* ring, Logger* logger,
     if (!sqe) {
         ret = io_uring_submit(ring);
         if (ret < 0) {
-            logger_error(logger, "io_uring_submit failed: [%s].", strerror(-ret));
+            logger_error(logger, "io_uring_submit failed: [%s].",
+                         strerror(-ret));
             return ret;
         }
 
@@ -101,10 +104,11 @@ static int GenericAsync(struct io_uring* ring, Logger* logger,
 
 int NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
 #ifdef NETKIT_IOURING_ENABLE_MULTI_ACCEPT
-    return GenericAsync(&m_ring, m_logger, [fd, tag](struct io_uring_sqe* sqe) -> void {
-        io_uring_prep_multishot_accept(sqe, fd, nullptr, nullptr, 0);
-        io_uring_sqe_set_data(sqe, tag);
-    });
+    return GenericAsync(
+        &m_ring, m_logger, [fd, tag](struct io_uring_sqe* sqe) -> void {
+            io_uring_prep_multishot_accept(sqe, fd, nullptr, nullptr, 0);
+            io_uring_sqe_set_data(sqe, tag);
+        });
 #else
     (void)fd;
     (void)tag;
@@ -169,8 +173,8 @@ int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res,
 #ifdef NETKIT_IOURING_ENABLE_RING_MSG
     return GenericAsync(&m_ring, m_logger,
                         [nq, res, tag](struct io_uring_sqe* sqe) -> void {
-                            io_uring_prep_msg_ring(sqe, nq->m_ring.ring_fd,
-                                                   res, (uint64_t)tag, 0);
+                            io_uring_prep_msg_ring(sqe, nq->m_ring.ring_fd, res,
+                                                   (uint64_t)tag, 0);
                             // skips the successful notification for this ring
                             io_uring_sqe_set_flags(sqe, IOSQE_CQE_SKIP_SUCCESS);
                         });

@@ -7,8 +7,7 @@
 
 namespace netkit { namespace epoll {
 
-class NotificationQueueImpl final
-    : public NotificationQueue {
+class NotificationQueueImpl final : public NotificationQueue {
 public:
     NotificationQueueImpl()
         : m_epfd(-1), m_event_idx(0), m_nr_valid_event(0), m_logger(nullptr) {}
@@ -24,7 +23,8 @@ public:
     int RecvAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
     int SendAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
     int ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
-    int WriteAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
+    int WriteAsync(int64_t fd, const void* buf, uint64_t sz,
+                   void* tag) override;
     int CloseAsync(int64_t fd, void* tag) override;
     int NotifyAsync(NotificationQueueImpl*, int res, void* tag);
 
