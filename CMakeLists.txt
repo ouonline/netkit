@@ -92,6 +92,7 @@ macro(netkit_import_git_dep name repo commit)
     FetchContent_Declare(${name}
         GIT_REPOSITORY ${repo}
         GIT_TAG ${commit}
+        GIT_SHALLOW TRUE
         SOURCE_DIR ${NETKIT_DEPS_DIR}/${name}
         BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/${name}-build
         SUBBUILD_DIR ${NETKIT_DEPS_DIR}/${name}-subbuild)
@@ -103,7 +104,12 @@ if(NOT TARGET logger_static)
     set(LOGGER_BUILD_TESTS OFF)
     set(LOGGER_INSTALL ${NETKIT_INSTALL})
     set(LOGGER_HOLD_DEPS ${NETKIT_HOLD_DEPS})
-    netkit_import_git_dep(logger "https://github.com/ouonline/logger.git" master)
+    if(NETKIT_DEP_LOGGER_SOURCE_DIR)
+        add_subdirectory(${NETKIT_DEP_LOGGER_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/logger-build)
+        set(logger_SOURCE_DIR ${NETKIT_DEP_LOGGER_SOURCE_DIR})
+    else()
+        netkit_import_git_dep(logger "https://github.com/ouonline/logger.git" master)
+    endif()
 endif()
 
 if(NOT TARGET threadkit_static)
@@ -111,14 +117,23 @@ if(NOT TARGET threadkit_static)
     set(THREADKIT_BUILD_TESTS OFF)
     set(THREADKIT_INSTALL ${NETKIT_INSTALL})
     set(THREADKIT_HOLD_DEPS ${NETKIT_HOLD_DEPS})
-    netkit_import_git_dep(threadkit "https://github.com/ouonline/threadkit.git" master)
+    if(NETKIT_DEP_THREADKIT_SOURCE_DIR)
+        add_subdirectory(${NETKIT_DEP_THREADKIT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/threadkit-build)
+        set(threadkit_SOURCE_DIR ${NETKIT_DEP_THREADKIT_SOURCE_DIR})
+    else()
+        netkit_import_git_dep(threadkit "https://github.com/ouonline/threadkit.git" master)
+    endif()
 endif()
 
 target_link_libraries(netkit_static PUBLIC threadkit_static logger_static)
 
 if(NETKIT_ENABLE_IOURING)
     if(NOT LIBURING_LIBS)
-        netkit_import_git_dep(liburing "https://github.com/axboe/liburing.git" master)
+        if(NETKIT_DEP_LIBURING_SOURCE_DIR)
+            set(liburing_SOURCE_DIR ${NETKIT_DEP_LIBURING_SOURCE_DIR})
+        else()
+            netkit_import_git_dep(liburing "https://github.com/axboe/liburing.git" master)
+        endif()
 
         include(ProcessorCount)
         ProcessorCount(__NPROC__)
