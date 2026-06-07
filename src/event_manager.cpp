@@ -7,7 +7,7 @@
 #include <assert.h>
 using namespace std;
 
-#include "threadkit/event_count.h"
+#include "threadkit/cond_var.h"
 using namespace threadkit;
 
 #define REQ_BUF_EXPAND_SIZE 1024
@@ -162,7 +162,7 @@ errout:
 static void WorkerThread(NotificationQueueImpl** worker_nq_pptr,
                          NotificationQueueImpl* new_rd_nq,
                          atomic<uint32_t>* counter, uint32_t max_count,
-                         EventCount* cond, int* retcode, Logger* logger) {
+                         CondVar* cond, int* retcode, Logger* logger) {
     *retcode = utils::InitThreadLocalNq(logger);
     if ((*retcode)) {
         logger_error(logger, "InitThreadLocalNq failed: [%s].",
@@ -207,7 +207,7 @@ static void WorkerThread(NotificationQueueImpl** worker_nq_pptr,
 }
 
 static void WritingThread(NotificationQueueImpl** wr_nq_pptr,
-                          atomic<uint32_t>* counter, EventCount* cond,
+                          atomic<uint32_t>* counter, CondVar* cond,
                           int* retcode, Logger* logger) {
     *retcode = utils::InitThreadLocalNq(logger);
     if (*retcode) {
@@ -248,7 +248,7 @@ int EventManager::Init(const Options& options) {
     }
 
     int retcode;
-    EventCount cond;
+    CondVar cond;
 
     atomic<uint32_t> finished_count = {0};
     m_writing_thread = thread(WritingThread, &m_wr_nq, &finished_count, &cond,
