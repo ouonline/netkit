@@ -9,7 +9,7 @@ namespace netkit { namespace iouring {
 
 struct NotificationQueueOptions final {
     /** @brief creates a kernel thread to poll the SQ ring */
-    bool enable_kernel_polling = true;
+    bool enable_kernel_polling = false;
     /** @brief max number of notifications in queue */
     uint32_t queue_size = 1024;
 };
@@ -32,13 +32,15 @@ public:
     int WriteAsync(int64_t fd, const void* buf, uint64_t sz,
                    void* tag) override;
     int CloseAsync(int64_t fd, void* tag) override;
-    int NotifyAsync(NotificationQueueImpl*, int res, void* tag);
+    int NotifyAsync(NotificationQueue*, int res, void* tag) override;
 
     int Next(int64_t* res, void** tag, const TimeVal* timeout) override;
 
 private:
     struct io_uring m_ring;
     Logger* m_logger;
+    bool m_supports_ring_msg = false;
+    bool m_supports_multishot_accept = false;
 
 private:
     NotificationQueueImpl(const NotificationQueueImpl&) = delete;

@@ -4,8 +4,11 @@
 #include "netkit/notification_queue.h"
 #include "logger/logger.h"
 #include <sys/epoll.h>
+#include <unordered_map>
 
 namespace netkit { namespace epoll {
+
+struct EventHandler;
 
 class NotificationQueueImpl final : public NotificationQueue {
 public:
@@ -26,7 +29,7 @@ public:
     int WriteAsync(int64_t fd, const void* buf, uint64_t sz,
                    void* tag) override;
     int CloseAsync(int64_t fd, void* tag) override;
-    int NotifyAsync(NotificationQueueImpl*, int res, void* tag);
+    int NotifyAsync(NotificationQueue*, int res, void* tag) override;
 
     int Next(int64_t* res, void** tag, const TimeVal* timeout) override;
 
@@ -39,6 +42,7 @@ private:
     int m_nr_valid_event;
     struct epoll_event m_event_list[MAX_EVENTS];
     Logger* m_logger;
+    std::unordered_map<int, EventHandler*> m_handlers;
 
 private:
     NotificationQueueImpl(const NotificationQueueImpl&) = delete;

@@ -23,18 +23,9 @@ int NotificationQueueImpl::Init(Logger* l) {
     return 0;
 }
 
-void NotificationQueueImpl::Destroy() {
-    if (m_epfd > 0) {
-        close(m_epfd);
-        m_epfd = -1;
-        m_event_idx = 0;
-        m_nr_valid_event = 0;
-    }
-}
-
 struct EventHandler {
     EventHandler(int f, void* t, bool ka) : fd(f), tag(t), keep_alive(ka) {}
-    virtual ~EventHandler() {}
+    virtual ~EventHandler() = default;
     virtual int64_t In() {
         return -1;
     }
@@ -45,13 +36,29 @@ struct EventHandler {
     int fd;
     void* tag;
     bool keep_alive;
+    uint32_t flags = 0;
 };
+
+void NotificationQueueImpl::Destroy() {
+    if (m_epfd > 0) {
+        close(m_epfd);
+        m_epfd = -1;
+        m_event_idx = 0;
+        m_nr_valid_event = 0;
+        m_logger = nullptr;
+    }
+    for (auto& p : m_handlers) {
+        delete p.second;
+    }
+    m_handlers.clear();
+}
 
 static int DoEpollUpdate(int epfd, uint32_t flags, EventHandler* handler,
                          int fd, Logger* logger) {
     struct epoll_event ev;
     ev.events = flags;
     ev.data.ptr = handler;
+    handler->flags = flags;
 
     auto ret = epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev);
     if (ret != 0) {
@@ -87,14 +94,16 @@ public:
 
 int NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
     auto handler = new AcceptHandler(fd, tag, true);
+    m_handlers[handler->fd] = handler;
     struct epoll_event ev;
-    ev.events = EPOLLIN;
+    ev.events = EPOLLIN | EPOLLEXCLUSIVE;
     ev.data.ptr = static_cast<EventHandler*>(handler);
 
     auto ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, fd, &ev);
     if (ret != 0) {
         logger_error(m_logger, "epoll add server fd [%d] failed: [%s].", fd,
                      strerror(errno));
+        m_handlers.erase(handler->fd);
         delete handler;
         return -errno;
     }
@@ -104,10 +113,12 @@ int NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
 
 int NotificationQueueImpl::AcceptAsync(int64_t fd, void* tag) {
     auto handler = new AcceptHandler(fd, tag, false);
+    m_handlers[handler->fd] = handler;
     auto ret =
         DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in AcceptAsync() failed.");
+        m_handlers.erase(handler->fd);
         delete handler;
     }
     return ret;
@@ -133,10 +144,12 @@ private:
 int NotificationQueueImpl::RecvAsync(int64_t fd, void* buf, uint64_t sz,
                                      void* tag) {
     auto handler = new RecvHandler(fd, buf, sz, tag);
+    m_handlers[handler->fd] = handler;
     auto ret =
         DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in RecvAsync() failed.");
+        m_handlers.erase(handler->fd);
         delete handler;
     }
     return ret;
@@ -162,10 +175,12 @@ private:
 int NotificationQueueImpl::SendAsync(int64_t fd, const void* buf, uint64_t sz,
                                      void* tag) {
     auto handler = new SendHandler(fd, buf, sz, tag);
+    m_handlers[handler->fd] = handler;
     auto ret =
         DoEpollUpdate(m_epfd, EPOLLOUT | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in SendAsync() failed.");
+        m_handlers.erase(handler->fd);
         delete handler;
     }
     return ret;
@@ -173,11 +188,12 @@ int NotificationQueueImpl::SendAsync(int64_t fd, const void* buf, uint64_t sz,
 
 struct EventfdHandler final : public EventHandler {
 public:
-    EventfdHandler(int fd, void* t) : EventHandler(fd, t, false) {}
+    EventfdHandler(int fd, void* t) : EventHandler(fd, t, false), res(-1) {}
     ~EventfdHandler() {
         close(fd);
     }
     int64_t In() override {
+        // no need to read eventfd: EPOLLONESHOT keeps it disarmed
         return res;
     }
 
@@ -204,10 +220,12 @@ private:
 int NotificationQueueImpl::ReadAsync(int64_t fd, void* buf, uint64_t sz,
                                      void* tag) {
     auto handler = new ReadHandler(fd, buf, sz, tag);
+    m_handlers[handler->fd] = handler;
     auto ret =
         DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in ReadAsync() failed.");
+        m_handlers.erase(handler->fd);
         delete handler;
     }
     return ret;
@@ -233,16 +251,24 @@ private:
 int NotificationQueueImpl::WriteAsync(int64_t fd, const void* buf, uint64_t sz,
                                       void* tag) {
     auto handler = new WriteHandler(fd, buf, sz, tag);
+    m_handlers[handler->fd] = handler;
     auto ret =
         DoEpollUpdate(m_epfd, EPOLLOUT | EPOLLONESHOT, handler, fd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in WriteAsync() failed.");
+        m_handlers.erase(handler->fd);
         delete handler;
     }
     return ret;
 }
 
 int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
+    auto it = m_handlers.find(fd);
+    if (it != m_handlers.end()) {
+        delete it->second;
+        m_handlers.erase(it);
+    }
+
     int efd = eventfd(0, EFD_CLOEXEC);
     if (efd < 0) {
         logger_error(m_logger, "create eventfd failed: [%s].", strerror(errno));
@@ -250,10 +276,12 @@ int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
     }
 
     auto handler = new EventfdHandler(efd, tag);
+    m_handlers[handler->fd] = handler;
     auto ret =
         DoEpollUpdate(m_epfd, EPOLLIN | EPOLLONESHOT, handler, efd, m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in CloseAsync() failed.");
+        m_handlers.erase(handler->fd);
         delete handler;
         return ret;
     }
@@ -265,7 +293,7 @@ int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
     return 0;
 }
 
-int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res,
+int NotificationQueueImpl::NotifyAsync(NotificationQueue* nq, int res,
                                        void* tag) {
     int efd = eventfd(0, EFD_CLOEXEC);
     if (efd < 0) {
@@ -274,10 +302,14 @@ int NotificationQueueImpl::NotifyAsync(NotificationQueueImpl* nq, int res,
     }
 
     auto handler = new EventfdHandler(efd, tag);
-    auto ret = DoEpollUpdate(nq->m_epfd, EPOLLIN | EPOLLONESHOT, handler, efd,
+    auto* target = static_cast<NotificationQueueImpl*>(nq);
+    target->m_handlers[handler->fd] = handler;
+    auto ret = DoEpollUpdate(target->m_epfd,
+                             EPOLLIN | EPOLLONESHOT, handler, efd,
                              m_logger);
     if (ret != 0) {
         logger_error(m_logger, "DoEpollUpdate in NotifyAsync() failed.");
+        target->m_handlers.erase(handler->fd);
         delete handler;
         return ret;
     }
@@ -310,6 +342,9 @@ int NotificationQueueImpl::Next(int64_t* res, void** tag,
             }
             return -errno;
         }
+        if (m_nr_valid_event == 0) {
+            return -EAGAIN;
+        }
 
         m_event_idx = 0;
     }
@@ -321,17 +356,40 @@ int NotificationQueueImpl::Next(int64_t* res, void** tag,
 
     *tag = handler->tag;
 
-    if ((events & EPOLLHUP) || (events & EPOLLRDHUP) || (events & EPOLLERR)) {
-        *res = 0;
-        epoll_ctl(m_epfd, EPOLL_CTL_DEL, handler->fd, nullptr);
-        delete handler;
-    } else if (events & EPOLLIN) {
+    if (events & EPOLLIN) {
         *res = handler->In();
+        if (*res == -EAGAIN) {
+            if (!handler->keep_alive) {
+                DoEpollUpdate(m_epfd, handler->flags, handler, handler->fd,
+                              m_logger);
+            }
+            return -EAGAIN;
+        }
         if (!handler->keep_alive) {
+            m_handlers.erase(handler->fd);
             delete handler;
+            handler = nullptr;
         }
     } else if (events & EPOLLOUT) {
         *res = handler->Out();
+        if (*res == -EAGAIN) {
+            if (!handler->keep_alive) {
+                DoEpollUpdate(m_epfd, handler->flags, handler, handler->fd,
+                              m_logger);
+            }
+            return -EAGAIN;
+        }
+        if (!handler->keep_alive) {
+            m_handlers.erase(handler->fd);
+            delete handler;
+            handler = nullptr;
+        }
+    }
+
+    if (handler && ((events & EPOLLHUP) || (events & EPOLLRDHUP) || (events & EPOLLERR))) {
+        *res = 0;
+        epoll_ctl(m_epfd, EPOLL_CTL_DEL, handler->fd, nullptr);
+        m_handlers.erase(handler->fd);
         delete handler;
     }
 

@@ -8,7 +8,7 @@ namespace netkit {
 
 class NotificationQueue {
 public:
-    virtual ~NotificationQueue() {}
+    virtual ~NotificationQueue() = default;
 
     /**
        @brief accepts multiple connections. returns 0 or -errno.
@@ -49,6 +49,12 @@ public:
        @brief closes `fd`. returns 0 or -errno.
     */
     virtual int CloseAsync(int64_t fd, void* tag) = 0;
+
+    /**
+       @brief notifies another notification queue about an event. returns 0 or
+       -errno.
+    */
+    virtual int NotifyAsync(NotificationQueue* nq, int res, void* tag) = 0;
 
     /**
        @brief gets next event. returns 0 or -errno.
