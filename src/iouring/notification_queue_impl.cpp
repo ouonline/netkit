@@ -67,7 +67,7 @@ int NotificationQueueImpl::Next(int64_t* res, void** tag,
             };
             int ret = io_uring_wait_cqe_timeout(&m_ring, &cqe, &kts);
             if (ret < 0) {
-                if (ret != -EAGAIN) {
+                if (ret != -EAGAIN && ret != -EINTR) {
                     logger_error(m_logger, "wait cqe with timeout failed: [%s].",
                                  strerror(-ret));
                 }

@@ -336,7 +336,7 @@ int NotificationQueueImpl::Next(int64_t* res, void** tag,
         }
         m_nr_valid_event = epoll_wait(m_epfd, m_event_list, MAX_EVENTS, ts);
         if (m_nr_valid_event < 0) {
-            if (errno != EAGAIN) {
+            if (errno != EAGAIN && errno != EINTR) {
                 logger_error(m_logger, "epoll_wait failed: %s",
                              strerror(errno));
             }
