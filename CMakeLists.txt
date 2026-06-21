@@ -13,7 +13,7 @@ string(REGEX MATCH "[0-9]+.[0-9]+" LINUX_KERNEL_VERSION ${__UNAME_RESULT__})
 unset(__UNAME_RESULT__)
 
 # io_uring accept support since 5.5, and multi accept support since 5.19.
-set(__IOURING_MIN_KERNEL_VERSION__ 5.5)
+set(__IOURING_MIN_KERNEL_VERSION__ 5.19)
 
 # ----- options ----- #
 
@@ -22,18 +22,8 @@ option(NETKIT_INSTALL "install headers and libs" ON)
 option(NETKIT_HOLD_DEPS "do not update existing deps" OFF)
 
 if(LINUX_KERNEL_VERSION VERSION_LESS ${__IOURING_MIN_KERNEL_VERSION__})
-    set(__PREFER_EPOLL__ ON)
-    set(__PREFER_IOURING__ OFF)
-else()
-    set(__PREFER_EPOLL__ OFF)
-    set(__PREFER_IOURING__ ON)
+    message(FATAL_ERROR "kernel version >= [${__IOURING_MIN_KERNEL_VERSION__}] is required.")
 endif()
-
-option(NETKIT_ENABLE_EPOLL "enable epoll support" ${__PREFER_EPOLL__})
-option(NETKIT_ENABLE_IOURING "enable iouring support. kernel version >= ${__IOURING_MIN_KERNEL_VERSION__} required." ${__PREFER_IOURING__})
-
-unset(__PREFER_EPOLL__)
-unset(__PREFER_IOURING__)
 
 if(NOT CMAKE_CXX_STANDARD)
     set(CMAKE_CXX_STANDARD 17)
@@ -41,39 +31,17 @@ elseif(CMAKE_CXX_STANDARD LESS 17)
     message(FATAL_ERROR "the `new` operator for `alignas` requires C++17 at least.")
 endif()
 
-if(NOT NETKIT_ENABLE_EPOLL AND NOT NETKIT_ENABLE_IOURING)
-    message(FATAL_ERROR "Neither `NETKIT_ENABLE_IOURING` nor `NETKIT_ENABLE_EPOLL` is enabled.")
-endif()
-
-if(NETKIT_ENABLE_IOURING)
-    if(LINUX_KERNEL_VERSION VERSION_LESS ${__IOURING_MIN_KERNEL_VERSION__})
-        message(FATAL_ERROR "kernel version >= ${__IOURING_MIN_KERNEL_VERSION__} is required for io_uring.")
-    endif()
-endif()
-
 # ----- targets ----- #
 
 file(GLOB __NETKIT_SRC__ ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
-if(NETKIT_ENABLE_IOURING)
-    file(GLOB __IOURING_SRC__ ${CMAKE_CURRENT_SOURCE_DIR}/src/iouring/*.cpp)
-    list(APPEND __NETKIT_SRC__ ${__IOURING_SRC__})
-    unset(__IOURING_SRC__)
-endif()
-if(NETKIT_ENABLE_EPOLL)
-    file(GLOB __EPOLL_SRC__ ${CMAKE_CURRENT_SOURCE_DIR}/src/epoll/*.cpp)
-    list(APPEND __NETKIT_SRC__ ${__EPOLL_SRC__})
-    unset(__EPOLL_SRC__)
-endif()
+file(GLOB __IOURING_SRC__ ${CMAKE_CURRENT_SOURCE_DIR}/src/iouring/*.cpp)
+list(APPEND __NETKIT_SRC__ ${__IOURING_SRC__})
+unset(__IOURING_SRC__)
 add_library(netkit_static STATIC ${__NETKIT_SRC__})
 unset(__NETKIT_SRC__)
 
 target_include_directories(netkit_static PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-
-if(MSVC)
-    target_compile_options(netkit_static PRIVATE /W4)
-else()
-    target_compile_options(netkit_static PRIVATE -Wall -Wextra -Werror)
-endif()
+target_compile_options(netkit_static PRIVATE -Wall -Wextra -Werror)
 
 # ----- dependencies ----- #
 
@@ -140,39 +108,30 @@ endif()
 
 target_link_libraries(netkit_static PUBLIC threadkit_static logger_static cutils_static)
 
-if(NETKIT_ENABLE_IOURING)
-    if(NOT LIBURING_LIBS)
-        if(NETKIT_DEP_LIBURING_SOURCE_DIR)
-            set(liburing_SOURCE_DIR ${NETKIT_DEP_LIBURING_SOURCE_DIR})
-        else()
-            netkit_import_git_dep(liburing "https://github.com/axboe/liburing.git" master)
-        endif()
-
-        include(ProcessorCount)
-        ProcessorCount(__NPROC__)
-        execute_process(COMMAND make -j${__NPROC__} -C ${liburing_SOURCE_DIR})
-        unset(__NPROC__)
-        set(LIBURING_INCS ${liburing_SOURCE_DIR}/src/include)
-        set(LIBURING_LIBS ${liburing_SOURCE_DIR}/src/liburing.a)
+if(NOT LIBURING_LIBS)
+    if(NETKIT_DEP_LIBURING_SOURCE_DIR)
+        set(liburing_SOURCE_DIR ${NETKIT_DEP_LIBURING_SOURCE_DIR})
+    else()
+        netkit_import_git_dep(liburing "https://github.com/axboe/liburing.git" master)
     endif()
-    target_include_directories(netkit_static PUBLIC ${LIBURING_INCS})
-    target_link_libraries(netkit_static PUBLIC ${LIBURING_LIBS})
-    target_compile_definitions(netkit_static PUBLIC NETKIT_ENABLE_IOURING)
-endif()
 
-if(NETKIT_ENABLE_EPOLL)
-    target_compile_definitions(netkit_static PUBLIC NETKIT_ENABLE_EPOLL)
+    include(ProcessorCount)
+    ProcessorCount(__NPROC__)
+    execute_process(COMMAND make -j${__NPROC__} -C ${liburing_SOURCE_DIR})
+    unset(__NPROC__)
+    set(LIBURING_INCS ${liburing_SOURCE_DIR}/src/include)
+    set(LIBURING_LIBS ${liburing_SOURCE_DIR}/src/liburing.a)
 endif()
+target_include_directories(netkit_static PUBLIC ${LIBURING_INCS})
+target_link_libraries(netkit_static PUBLIC ${LIBURING_LIBS})
 
 # ----- installations ----- #
 
 if(NETKIT_INSTALL)
     install(DIRECTORY include DESTINATION .)
     install(TARGETS netkit_static DESTINATION lib)
-    if(NETKIT_ENABLE_IOURING)
-        install(DIRECTORY ${LIBURING_INCS} DESTINATION .)
-        install(FILES ${LIBURING_LIBS} DESTINATION lib)
-    endif()
+    install(DIRECTORY ${LIBURING_INCS} DESTINATION .)
+    install(FILES ${LIBURING_LIBS} DESTINATION lib)
 endif()
 
 # ----- tests ----- #
