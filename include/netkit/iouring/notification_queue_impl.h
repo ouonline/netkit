@@ -40,7 +40,11 @@ private:
     struct io_uring m_ring;
     Logger* m_logger;
     bool m_supports_ring_msg = false;
-    bool m_supports_multishot_accept = false;
+#ifdef IORING_ACCEPT_MULTISHOT
+    static constexpr bool m_supports_multishot_accept = true;
+#else
+    static constexpr bool m_supports_multishot_accept = false;
+#endif
 
 private:
     NotificationQueueImpl(const NotificationQueueImpl&) = delete;

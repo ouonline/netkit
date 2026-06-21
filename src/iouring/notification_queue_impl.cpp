@@ -1,7 +1,5 @@
 #include "netkit/iouring/notification_queue_impl.h"
-#include <sys/utsname.h>
 #include <cstring> // strerror()
-#include <cstdio> // sscanf()
 #include <functional>
 using namespace std;
 
@@ -31,13 +29,6 @@ int NotificationQueueImpl::Init(const NotificationQueueOptions& options,
         m_supports_ring_msg =
             io_uring_opcode_supported(probe, IORING_OP_MSG_RING);
         io_uring_free_probe(probe);
-    }
-
-    struct utsname uts;
-    if (uname(&uts) == 0) {
-        int major = 0, minor = 0;
-        sscanf(uts.release, "%d.%d", &major, &minor);
-        m_supports_multishot_accept = (major > 5 || (major == 5 && minor >= 19));
     }
 
     return 0;
@@ -122,10 +113,9 @@ static int GenericAsync(struct io_uring* ring, Logger* logger,
 
 int NotificationQueueImpl::MultiAcceptAsync(int64_t fd, void* tag) {
     if (!m_supports_multishot_accept) {
-        (void)fd;
-        (void)tag;
         return -ENOSYS;
     }
+
     return GenericAsync(
         &m_ring, m_logger, [fd, tag](struct io_uring_sqe* sqe) -> void {
             io_uring_prep_multishot_accept(sqe, fd, nullptr, nullptr, 0);
@@ -188,11 +178,9 @@ int NotificationQueueImpl::CloseAsync(int64_t fd, void* tag) {
 int NotificationQueueImpl::NotifyAsync(NotificationQueue* nq, int res,
                                        void* tag) {
     if (!m_supports_ring_msg) {
-        (void)nq;
-        (void)res;
-        (void)tag;
         return -ENOSYS;
     }
+
     auto impl = static_cast<NotificationQueueImpl*>(nq);
     return GenericAsync(&m_ring, m_logger,
                         [impl, res, tag](struct io_uring_sqe* sqe) -> void {
