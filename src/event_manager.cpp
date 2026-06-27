@@ -62,6 +62,10 @@ static void ProcessWriting(NotificationQueueImpl* wr_nq, int64_t res, void* tag,
     }
 
     if (res < 0) {
+        if (res == -EAGAIN || res == -EWOULDBLOCK || res == -EINTR) {
+            goto send_data;
+        }
+
         const ConnectionInfo& info = client->conn.info();
         logger_error(logger, "send data to client [%s:%u] failed: [%s].",
                      info.remote_addr.c_str(), info.remote_port,
@@ -132,6 +136,10 @@ static void WorkerProcessTimer(InternalTimer* timer, int64_t res,
     auto client = timer->client;
 
     if (res < 0) {
+        if (res == -EAGAIN || res == -EINTR) {
+            goto next;
+        }
+
         logger_error(logger, "get timer failed: [%s].", strerror(-res));
         goto errout;
     }
@@ -143,10 +151,11 @@ static void WorkerProcessTimer(InternalTimer* timer, int64_t res,
         goto errout;
     }
 
+next:
     timer->nr_expiration = 0;
     timer->value = State::TIMER_NEXT;
     res = nq->NotifyAsync(new_rd_nq, 0, timer);
-    if (!res) {
+    if (res == 0) {
         return;
     }
 
@@ -508,6 +517,11 @@ void EventManager::HandleClientReading(int64_t res, void* client_ptr) {
     auto client = static_cast<InternalClient*>(client_ptr);
 
     if (res < 0) {
+        if (res == -EAGAIN || res == -EWOULDBLOCK || res == -EINTR) {
+            res = 0;
+            goto read_again;
+        }
+
         const ConnectionInfo& info = client->conn.info();
         logger_error(m_logger, "recv data from client [%s:%u] failed: [%s].",
                      info.remote_addr.c_str(), info.remote_port,
@@ -525,6 +539,7 @@ void EventManager::HandleClientReading(int64_t res, void* client_ptr) {
     // the real size is less than we reserved before recving.
     client->req.Resize(client->req.size() + res);
 
+read_again:
     // we already have a HandleClientRequest() before
     if (client->bytes_left > 0) {
         assert(client->bytes_left >= (uint64_t)res);
@@ -568,8 +583,10 @@ void EventManager::HandleTimerExpired(int64_t res, void* state_ptr) {
     auto timer = static_cast<InternalTimer*>(state);
 
     if (res < 0) {
-        logger_error(m_logger, "get timer event failed: [%s].", strerror(-res));
-        goto errout;
+        if (res != -EAGAIN && res != -EWOULDBLOCK && res != -EINTR) {
+            logger_error(m_logger, "get timer event failed: [%s].", strerror(-res));
+            goto errout;
+        }
     }
 
     res = m_new_rd_nq.NotifyAsync(m_worker_nq_list[m_current_worker_idx], res,
