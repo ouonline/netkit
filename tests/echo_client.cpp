@@ -1,10 +1,9 @@
+#include "netkit/iouring/notification_queue_impl.h"
 #include "netkit/utils.h"
-#include "netkit/nq_utils.h"
-using namespace netkit;
-
 #include "logger/stdout_logger.h"
 #include <string.h> // strerror()
-#include <unistd.h> // sleep()/close()
+using namespace netkit;
+using namespace netkit::iouring;
 using namespace std;
 
 #define ECHO_BUFFER_SIZE 1024
@@ -20,18 +19,18 @@ enum State {
 struct EchoClient final {
     int fd;
     State state;
-    ConnectionInfo info;
+    EndpointInfo endpoint_info;
     char buf[ECHO_BUFFER_SIZE];
 };
 
-static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
+static State Process(int64_t res, EchoClient* client, NotificationQueue* nq,
                      Logger* logger) {
     int rc;
 
     switch (client->state) {
         case State::CLIENT_SEND_REQ: {
             if (res == 0) {
-                const ConnectionInfo& info = client->info;
+                const EndpointInfo& info = client->endpoint_info;
                 logger_info(logger, "[client] server [%s:%u] down.",
                             info.remote_addr.c_str(), info.remote_port);
                 client->state = State::CLIENT_DISCONNECTED;
@@ -43,15 +42,15 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
             }
 
             client->state = State::CLIENT_GET_RES;
-            rc = nq->RecvAsync(client->fd, client->buf, ECHO_BUFFER_SIZE,
+            rc = nq->ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE,
                                client);
             if (rc != 0) {
-                logger_error(logger, "RecvAsync() failed.");
+                logger_error(logger, "ReadAsync() failed.");
             }
             break;
         }
         case State::CLIENT_GET_RES: {
-            const ConnectionInfo& info = client->info;
+            const EndpointInfo& info = client->endpoint_info;
             if (res == 0) {
                 logger_info(logger, "[client] server [%s:%u] down.",
                             info.remote_addr.c_str(), info.remote_port);
@@ -88,16 +87,16 @@ static State Process(int64_t res, EchoClient* client, NotificationQueueImpl* nq,
 
             auto len = sprintf(client->buf, "%lu", num + 1);
             client->state = State::CLIENT_SEND_REQ;
-            rc = nq->SendAsync(client->fd, client->buf, len, client);
+            rc = nq->WriteAsync(client->fd, client->buf, len, client);
             if (rc != 0) {
-                logger_error(logger, "SendAsync() failed.");
+                logger_error(logger, "WriteAsync() failed.");
             }
             break;
         }
         case State::CLIENT_DISCONNECTED: {
             logger_info(logger, "[client] client [%s:%u] closed.",
-                        client->info.local_addr.c_str(),
-                        client->info.local_port);
+                        client->endpoint_info.local_addr.c_str(),
+                        client->endpoint_info.local_port);
             client->state = State::CLIENT_END_LOOP;
             break;
         }
@@ -125,7 +124,7 @@ int main(int argc, char* argv[]) {
     stdout_logger_init(&logger);
 
     NotificationQueueImpl nq;
-    auto rc = InitNq(&nq, &logger.l);
+    auto rc = nq.Init(NotificationQueueImpl::Options(), &logger.l);
     if (rc < 0) {
         logger_error(&logger.l, "init notification queue failed: [%s].",
                      strerror(-rc));
@@ -139,14 +138,14 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    utils::GenConnectionInfo(client.fd, &client.info);
-    const ConnectionInfo& info = client.info;
+    utils::GenEndpointInfo(client.fd, &client.endpoint_info);
+    const EndpointInfo& info = client.endpoint_info;
     logger_info(&logger.l, "[client] client [%s:%u] connect to server [%s:%u].",
                 info.local_addr.c_str(), info.local_port,
                 info.remote_addr.c_str(), info.remote_port);
 
     client.state = State::CLIENT_SEND_REQ;
-    rc = nq.SendAsync(client.fd, "0", 1, &client);
+    rc = nq.WriteAsync(client.fd, "0", 1, &client);
     if (rc != 0) {
         logger_error(&logger.l, "send initial request failed.");
         return -1;

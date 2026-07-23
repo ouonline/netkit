@@ -1,27 +1,34 @@
-#include "internal_utils.h"
 #include "internal_timer.h"
+#include "netkit/tcp_client.h"
 #include <unistd.h> // close()
-#include <string.h> // strerror()
+#include <string.h>
 #include <sys/timerfd.h>
 using namespace std;
 
 namespace netkit { namespace utils {
 
-int AddTimer(const TimeVal& delay, const TimeVal& interval,
-             const function<int(int32_t)>& cb, NotificationQueueImpl* nq,
-             InternalClient* client, Logger* logger) {
+int DoAddClient(int fd, TcpClient* client, NotificationQueue* nq,
+                Scheduler* sched, Logger* logger) {
+    client->Init(fd, sched, logger);
+
+    int err = client->Start(nq);
+    if (err) {
+        logger_error(logger, "TcpClient launch failed: [%s].", strerror(-err));
+        client->DeleteSelf();
+        return err;
+    }
+
+    return 0;
+}
+
+int DoAddTimer(const TimeVal& delay, const TimeVal& interval,
+               const function<void(int32_t val)>& cb, NotificationQueue* nq,
+               Logger* logger) {
     if (delay.tv_sec == 0 && delay.tv_usec == 0) {
         logger_error(logger,
                      "delay == 0 means disarming this timer and is not allowed "
                      "currently.");
         return -EINVAL;
-    }
-
-    int err = utils::InitThreadLocalNq(logger);
-    if (err) {
-        logger_error(logger, "init thread local logger failed: [%s].",
-                     strerror(-err));
-        return err;
     }
 
     int fd = timerfd_create(CLOCK_BOOTTIME, TFD_NONBLOCK | TFD_CLOEXEC);
@@ -30,7 +37,7 @@ int AddTimer(const TimeVal& delay, const TimeVal& interval,
         return -errno;
     }
 
-    auto timer = CreateInternalTimer(fd, client, cb);
+    auto timer = new InternalTimer(fd, cb, logger);
     if (!timer) {
         logger_error(logger, "allocate InternalTimer failed: [%s].",
                      strerror(ENOMEM));
@@ -51,48 +58,21 @@ int AddTimer(const TimeVal& delay, const TimeVal& interval,
             },
     };
 
-    err = timerfd_settime(fd, 0, &ts, nullptr);
+    int err = timerfd_settime(fd, 0, &ts, nullptr);
     if (err) {
         logger_error(logger, "timerfd_settime failed: [%s].", strerror(errno));
-        DestroyInternalTimer(timer);
+        timer->DeleteSelf();
         return -errno;
     }
 
-    timer->value = State::TIMER_NEXT;
-    GetClient(client);
-    err = utils::GetThreadLocalNq()->NotifyAsync(nq, 0,
-                                                 static_cast<State*>(timer));
+    err = timer->Start(nq);
     if (err) {
-        logger_error(logger, "about to read from timerfd failed: [%s].",
-                     strerror(-err));
-        timer->callback(err);
-        DestroyInternalTimer(timer);
-        PutClient(client);
+        logger_error(logger, "start timer failed: [%s].", strerror(-err));
+        timer->DeleteSelf();
         return err;
     }
 
     return 0;
-}
-
-thread_local bool g_nq_inited = false;
-thread_local NotificationQueueImpl g_nq;
-
-int InitThreadLocalNq(Logger* l) {
-    if (!g_nq_inited) {
-        int err = InitNq(&g_nq, l);
-        if (err) {
-            return err;
-        }
-        g_nq_inited = true;
-    }
-    return 0;
-}
-
-NotificationQueueImpl* GetThreadLocalNq() {
-    if (!g_nq_inited) {
-        return nullptr;
-    }
-    return &g_nq;
 }
 
 }}

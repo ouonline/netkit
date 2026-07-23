@@ -1,51 +1,37 @@
 #ifndef __NETKIT_CONNECTION_H__
 #define __NETKIT_CONNECTION_H__
 
-#include "netkit/nq_utils.h"
-#include "netkit/buffer.h"
-#include "connection_info.h"
 #include "utils.h"
-#include <functional>
+#include "send_item.h"
+#include "endpoint_info.h"
+#include "logger/logger.h"
+#include <mutex>
+#include <queue>
 
 namespace netkit {
 
-class InternalClient;
-
 class Connection final {
 private:
-    static void DummySentCallback(int) {}
+    EndpointInfo info;
 
 public:
-    Connection(int fd, NotificationQueueImpl* new_rd_nq,
-               NotificationQueueImpl* wr_nq, InternalClient* client, Logger* l)
-        : m_new_rd_nq(new_rd_nq)
-        , m_wr_nq(wr_nq)
-        , m_client(client)
-        , m_logger(l) {
-        utils::GenConnectionInfo(fd, &m_info);
+    Connection(int _fd, Logger* l) : fd(_fd), logger(l) {}
+
+    const EndpointInfo& GetEndpointInfo() {
+        if (info.remote_port == 0) {
+            std::lock_guard<std::mutex> _l(lock);
+            if (info.remote_port == 0) {
+                utils::GenEndpointInfo(fd, &info);
+            }
+        }
+        return info;
     }
 
-    const ConnectionInfo& info() const {
-        return m_info;
-    }
-
-    /** returns -errno or fd of the timer */
-    int AddTimer(const TimeVal& delay, const TimeVal& interval,
-                 /*
-                   `val` < 0: error occurs and `val` == -errno
-                   `val` > 0: the number of expirations
-                 */
-                 const std::function<int(int32_t val)>&);
-
-    int SendAsync(Buffer&&,
-                  const std::function<void(int err)>& = DummySentCallback);
-
-private:
-    ConnectionInfo m_info;
-    NotificationQueueImpl* m_new_rd_nq;
-    NotificationQueueImpl* m_wr_nq;
-    InternalClient* m_client;
-    Logger* m_logger;
+    int fd;
+    Logger* logger;
+    std::mutex lock;
+    uint32_t sending_offset = 0;
+    std::queue<SendItem> send_queue;
 };
 
 }

@@ -1,35 +1,29 @@
 #ifndef __NETKIT_INTERNAL_TIMER_H__
 #define __NETKIT_INTERNAL_TIMER_H__
 
-#include "state.h"
+#include "netkit/event_handler.h"
+#include "logger/logger.h"
 #include <functional>
 
 namespace netkit {
 
-struct InternalTimer final : public State {
-    InternalTimer(int _fd, InternalClient* c,
-                  const std::function<int(int32_t)>& cb)
-        : fd(_fd), client(c), callback(cb) {}
-    ~InternalTimer() {
-        if (fd > 0) {
-            close(fd);
-        }
-    }
+class InternalTimer final : public EventHandler {
+public:
+    InternalTimer(int fd, const std::function<void(int val)>& cb, Logger* l)
+        : m_fd(fd), m_cb(cb), m_logger(l) {}
 
-    int fd;
-    uint64_t nr_expiration = 0;
-    InternalClient* client;
-    std::function<int(int32_t val)> callback;
+    int Start(NotificationQueue*);
+    bool Process(int64_t, NotificationQueue*) override;
+
+protected:
+    ~InternalTimer();
+
+private:
+    int m_fd;
+    uint64_t m_nr_expiration;
+    std::function<void(int val)> m_cb;
+    Logger* m_logger;
 };
-
-inline InternalTimer* CreateInternalTimer(
-    int fd, InternalClient* c, const std::function<int(int32_t)>& cb) {
-    return new InternalTimer(fd, c, cb);
-}
-
-inline void DestroyInternalTimer(InternalTimer* t) {
-    delete t;
-}
 
 }
 

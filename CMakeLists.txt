@@ -12,7 +12,7 @@ message(-- " Kernel version: " ${__UNAME_RESULT__})
 string(REGEX MATCH "[0-9]+.[0-9]+" LINUX_KERNEL_VERSION ${__UNAME_RESULT__})
 unset(__UNAME_RESULT__)
 
-# io_uring accept support since 5.5, and multi accept support since 5.19.
+# io_uring accept support since 5.5, msg ring since 5.18, and multi accept support since 5.19.
 set(__IOURING_MIN_KERNEL_VERSION__ 5.19)
 
 # ----- options ----- #
@@ -26,9 +26,7 @@ if(LINUX_KERNEL_VERSION VERSION_LESS ${__IOURING_MIN_KERNEL_VERSION__})
 endif()
 
 if(NOT CMAKE_CXX_STANDARD)
-    set(CMAKE_CXX_STANDARD 17)
-elseif(CMAKE_CXX_STANDARD LESS 17)
-    message(FATAL_ERROR "the `new` operator for `alignas` requires C++17 at least.")
+    set(CMAKE_CXX_STANDARD 14)
 endif()
 
 # ----- targets ----- #
@@ -93,20 +91,7 @@ if(NOT TARGET logger_static)
     endif()
 endif()
 
-if(NOT TARGET threadkit_static)
-    set(THREADKIT_DEPS_DIR ${NETKIT_DEPS_DIR})
-    set(THREADKIT_BUILD_TESTS OFF)
-    set(THREADKIT_INSTALL ${NETKIT_INSTALL})
-    set(THREADKIT_HOLD_DEPS ${NETKIT_HOLD_DEPS})
-    if(NETKIT_DEP_THREADKIT_SOURCE_DIR)
-        add_subdirectory(${NETKIT_DEP_THREADKIT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/threadkit-build)
-        set(threadkit_SOURCE_DIR ${NETKIT_DEP_THREADKIT_SOURCE_DIR})
-    else()
-        netkit_import_git_dep(threadkit "https://github.com/ouonline/threadkit.git" master)
-    endif()
-endif()
-
-target_link_libraries(netkit_static PUBLIC threadkit_static logger_static cutils_static)
+target_link_libraries(netkit_static PUBLIC logger_static cutils_static)
 
 if(NOT LIBURING_LIBS)
     if(NETKIT_DEP_LIBURING_SOURCE_DIR)

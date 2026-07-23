@@ -5,62 +5,59 @@ using namespace netkit;
 #include <cstring> // strerror()
 using namespace std;
 
-class EchoServerHandler final : public Handler {
+class EchoTask final : public Task {
 public:
-    EchoServerHandler(Logger* logger) : m_logger(logger), m_conn(nullptr) {}
+    void Run(SendContext* ctx) override {
+        auto& info = ctx->GetEndpointInfo();
+        logger_info(
+            logger(), "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
+            info.local_addr.c_str(), info.local_port, info.remote_addr.c_str(),
+            info.remote_port, m_buffer.size(), m_buffer.data());
+        int err = ctx->Emit(move(m_buffer));
+        if (err) {
+            logger_error(logger(), "send data failed: [%s].", strerror(-err));
+        }
+    }
+};
 
-    ~EchoServerHandler() {
-        logger_info(m_logger, "[server] session [%p] destroyed.", this);
+class EchoClient final : public TcpClient {
+public:
+    ~EchoClient() {
+        logger_info(logger(), "[server] client [%p] destroyed.", this);
     }
 
-    int OnConnected(Connection* conn) override {
-        m_conn = conn;
-        const ConnectionInfo& info = conn->info();
-        logger_info(m_logger, "[server] client [%s:%u] connected.",
-                    info.remote_addr.c_str(), info.remote_port);
+    int OnConnected(SendContext* ctx) override {
+        m_endpoint_info = ctx->GetEndpointInfo();
+        logger_info(logger(), "[server] client [%s:%u] connected.",
+                    m_endpoint_info.remote_addr.c_str(),
+                    m_endpoint_info.remote_port);
         return 0;
     }
 
     void OnDisconnected() override {
-        const ConnectionInfo& info = m_conn->info();
-        logger_info(m_logger, "[server] client [%s:%u] disconnected.",
-                    info.remote_addr.c_str(), info.remote_port);
+        logger_info(logger(), "[server] client [%s:%u] disconnected.",
+                    m_endpoint_info.remote_addr.c_str(),
+                    m_endpoint_info.remote_port);
     }
 
-    ReqStat Check(const Buffer& req, uint64_t* size) override {
+    ReqStat Check(const Buffer& req, uint32_t* size) override {
         *size = req.size();
         return ReqStat::VALID;
     }
 
-    void Process(Buffer&& req) override {
-        const ConnectionInfo& info = m_conn->info();
-        logger_info(
-            m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
-            info.local_addr.c_str(), info.local_port, info.remote_addr.c_str(),
-            info.remote_port, req.size(), req.data());
-        int err = m_conn->SendAsync(std::move(req));
-        if (err) {
-            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
-        }
+    Task* CreateTask() override {
+        return new EchoTask();
     }
 
 private:
-    Logger* m_logger;
-    Connection* m_conn;
+    EndpointInfo m_endpoint_info;
 };
 
-class EchoServerFactory final : public HandlerFactory {
+class EchoServer final : public TcpServer {
 public:
-    EchoServerFactory(Logger* logger) : m_logger(logger) {}
-    Handler* Create() override {
-        return new EchoServerHandler(m_logger);
+    TcpClient* CreateClient() override {
+        return new EchoClient();
     }
-    void Destroy(Handler* p) override {
-        delete p;
-    }
-
-private:
-    Logger* m_logger;
 };
 
 int main(int argc, char* argv[]) {
@@ -82,7 +79,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    err = mgr.AddServer(host, port, make_shared<EchoServerFactory>(&logger.l));
+    err = mgr.AddTcpServer(host, port, new EchoServer());
     if (err < 0) {
         logger_error(&logger.l, "add server failed: [%s].", strerror(-err));
         return -1;

@@ -1,7 +1,7 @@
 #ifndef __NETKIT_UTILS_H__
 #define __NETKIT_UTILS_H__
 
-#include "connection_info.h"
+#include "endpoint_info.h"
 #include "logger/logger.h"
 #include <stdint.h>
 
@@ -13,7 +13,7 @@ int CreateTcpServerFd(const char* host, uint16_t port, Logger*);
 /** @return fd or -errno  */
 int CreateTcpClientFd(const char* host, uint16_t port, Logger*);
 
-void GenConnectionInfo(int fd, ConnectionInfo*);
+void GenEndpointInfo(int fd, EndpointInfo*);
 
 }}
 

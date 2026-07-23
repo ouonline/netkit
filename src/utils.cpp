@@ -22,19 +22,22 @@ static int GetHostInfo(const char* host, uint16_t port, struct addrinfo** info,
     int err = getaddrinfo(host, buf, &hints, info);
     if (err) {
         logger_error(logger, "getaddrinfo() failed: %s.", gai_strerror(err));
-        return -err;
+        return err;
     }
 
     return 0;
 }
 
-static int SetReuseAddr(int fd, Logger* logger) {
+static int SetReuse(int fd, Logger* logger) {
     int opt = 1;
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int)) != 0) {
         logger_error(logger, "setsockopt failed: %s.", strerror(errno));
         return -errno;
     }
-
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(int)) != 0) {
+        logger_error(logger, "setsockopt failed: %s.", strerror(errno));
+        return -errno;
+    }
     return 0;
 }
 
@@ -55,7 +58,7 @@ int CreateTcpServerFd(const char* host, uint16_t port, Logger* logger) {
         goto err;
     }
 
-    if (SetReuseAddr(fd, logger) != 0) {
+    if (SetReuse(fd, logger) != 0) {
         goto err1;
     }
 
@@ -64,7 +67,7 @@ int CreateTcpServerFd(const char* host, uint16_t port, Logger* logger) {
         goto err1;
     }
 
-    if (listen(fd, 0) == -1) {
+    if (listen(fd, 128) == -1) {
         logger_error(logger, "listen failed: %s.", strerror(errno));
         goto err1;
     }
@@ -110,7 +113,7 @@ err:
     return ret;
 }
 
-void GenConnectionInfo(int fd, ConnectionInfo* info) {
+void GenEndpointInfo(int fd, EndpointInfo* info) {
     struct sockaddr_in addr;
     socklen_t len = sizeof(addr);
     int ret = getpeername(fd, (struct sockaddr*)&addr, &len);

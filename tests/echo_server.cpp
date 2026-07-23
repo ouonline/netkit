@@ -1,10 +1,9 @@
+#include "netkit/iouring/notification_queue_impl.h"
 #include "netkit/utils.h"
-#include "netkit/nq_utils.h"
-using namespace netkit;
-
 #include "logger/stdout_logger.h"
-#include <unistd.h> // close()
-#include <cstring> // strerror()
+#include <string.h> // strerror()
+using namespace netkit;
+using namespace netkit::iouring;
 using namespace std;
 
 #define ECHO_BUFFER_SIZE 1024
@@ -35,12 +34,12 @@ struct EchoSession final : public State {
     }
 
     int64_t fd;
-    ConnectionInfo info;
+    EndpointInfo endpoint_info;
     char buf[ECHO_BUFFER_SIZE];
 };
 
 static State::Value Process(EchoServer* svr, int64_t res, void* tag,
-                            NotificationQueueImpl* nq, Logger* logger) {
+                            NotificationQueue* nq, Logger* logger) {
     int rc;
 
     auto state = static_cast<State*>(tag);
@@ -55,22 +54,22 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
 
             auto session = new EchoSession();
             session->fd = res;
-            utils::GenConnectionInfo(res, &session->info);
+            utils::GenEndpointInfo(res, &session->endpoint_info);
             logger_info(logger, "[server] accepts client [%s:%u].",
-                        session->info.remote_addr.c_str(),
-                        session->info.remote_port);
+                        session->endpoint_info.remote_addr.c_str(),
+                        session->endpoint_info.remote_port);
 
             session->value = State::RECV_REQ;
-            rc = nq->RecvAsync(res, session->buf, ECHO_BUFFER_SIZE,
+            rc = nq->ReadAsync(res, session->buf, ECHO_BUFFER_SIZE,
                                static_cast<State*>(session));
             if (rc != 0) {
-                logger_error(logger, "RecvAsync() failed.");
+                logger_error(logger, "ReadAsync() failed.");
             }
             break;
         }
         case State::RECV_REQ: {
             auto session = static_cast<EchoSession*>(state);
-            const ConnectionInfo& info = session->info;
+            const EndpointInfo& info = session->endpoint_info;
             if (res < 0) {
                 logger_error(logger, "recv session request failed: [%s].",
                              strerror(-res));
@@ -92,9 +91,9 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
                     info.local_addr.c_str(), info.local_port, res,
                     session->buf);
                 session->value = State::SEND_RES;
-                rc = nq->SendAsync(session->fd, session->buf, res, tag);
+                rc = nq->WriteAsync(session->fd, session->buf, res, tag);
                 if (rc != 0) {
-                    logger_error(logger, "SendAsync() failed.");
+                    logger_error(logger, "WriteAsync() failed.");
                 }
             }
             break;
@@ -106,16 +105,16 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
                              strerror(-res));
                 delete session;
             } else if (res == 0) {
-                const ConnectionInfo& info = session->info;
+                const EndpointInfo& info = session->endpoint_info;
                 logger_info(logger, "[server] client [%s:%u] disconnected.",
                             info.remote_addr.c_str(), info.remote_port);
                 delete session;
             } else {
                 session->value = State::RECV_REQ;
-                rc = nq->RecvAsync(session->fd, session->buf, ECHO_BUFFER_SIZE,
+                rc = nq->ReadAsync(session->fd, session->buf, ECHO_BUFFER_SIZE,
                                    tag);
                 if (rc != 0) {
-                    logger_error(logger, "RecvAsync() failed.");
+                    logger_error(logger, "ReadAsync() failed.");
                 }
             }
             break;
@@ -149,7 +148,7 @@ int main(int argc, char* argv[]) {
     stdout_logger_init(&logger);
 
     NotificationQueueImpl nq;
-    auto rc = InitNq(&nq, &logger.l);
+    auto rc = nq.Init(NotificationQueueImpl::Options(), &logger.l);
     if (rc < 0) {
         logger_error(&logger.l, "init notification queue failed: [%s].",
                      strerror(-rc));
@@ -164,7 +163,7 @@ int main(int argc, char* argv[]) {
     }
 
     svr.value = State::CLIENT_CONNECTED;
-    rc = nq.MultiAcceptAsync(svr.fd, static_cast<State*>(&svr));
+    rc = nq.AcceptAsync(svr.fd, static_cast<State*>(&svr), true);
     if (rc != 0) {
         logger_error(&logger.l,
                      "register server to notification queue failed: [%s].",

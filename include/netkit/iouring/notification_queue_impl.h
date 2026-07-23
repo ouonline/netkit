@@ -7,31 +7,27 @@
 
 namespace netkit { namespace iouring {
 
-struct NotificationQueueOptions final {
-    /** @brief creates a kernel thread to poll the SQ ring */
-    bool enable_kernel_polling = false;
-    /** @brief max number of notifications in queue */
-    uint32_t queue_size = 1024;
-};
-
 class NotificationQueueImpl final : public NotificationQueue {
+public:
+    struct Options final {
+        /** @brief max number of notifications in queue */
+        uint32_t queue_size = 1024;
+    };
+
 public:
     NotificationQueueImpl() : m_logger(nullptr) {}
     ~NotificationQueueImpl() {
         Destroy();
     }
 
-    int Init(const NotificationQueueOptions&, Logger* l);
+    int Init(const Options&, Logger* l);
     void Destroy(); // destroy this instance if necessary
 
-    int MultiAcceptAsync(int64_t svr_fd, void* tag) override;
-    int AcceptAsync(int64_t svr_fd, void* tag) override;
-    int RecvAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
-    int SendAsync(int64_t fd, const void* buf, uint64_t sz, void* tag) override;
-    int ReadAsync(int64_t fd, void* buf, uint64_t sz, void* tag) override;
-    int WriteAsync(int64_t fd, const void* buf, uint64_t sz,
+    int AcceptAsync(uint32_t svr_fd, void* tag, bool multishot) override;
+    int ReadAsync(uint32_t fd, void* buf, uint32_t sz, void* tag) override;
+    int WriteAsync(uint32_t fd, const void* buf, uint32_t sz,
                    void* tag) override;
-    int CloseAsync(int64_t fd, void* tag) override;
+    int CloseAsync(uint32_t fd, void* tag) override;
     int NotifyAsync(NotificationQueue*, int res, void* tag) override;
 
     int Next(int64_t* res, void** tag, const TimeVal* timeout) override;
@@ -39,12 +35,6 @@ public:
 private:
     struct io_uring m_ring;
     Logger* m_logger;
-    bool m_supports_ring_msg = false;
-#ifdef IORING_ACCEPT_MULTISHOT
-    static constexpr bool m_supports_multishot_accept = true;
-#else
-    static constexpr bool m_supports_multishot_accept = false;
-#endif
 
 private:
     NotificationQueueImpl(const NotificationQueueImpl&) = delete;

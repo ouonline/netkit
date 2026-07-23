@@ -1,11 +1,10 @@
 #ifndef __NETKIT_EVENT_MANAGER_H__
 #define __NETKIT_EVENT_MANAGER_H__
 
-#include "nq_utils.h"
-#include "handler_factory.h"
-#include "threadkit/common.h"
-#include <thread>
+#include "tcp_server.h"
+#include "logger/logger.h"
 #include <memory>
+#include <thread>
 
 namespace netkit {
 
@@ -16,56 +15,30 @@ public:
     };
 
 public:
-    EventManager(Logger* logger) : m_logger(logger) {}
+    EventManager(Logger* logger)
+        : m_logger(logger), m_sched(&m_worker_nq_list) {}
     ~EventManager() {
         Destroy();
     }
 
     /** returns 0 or -errno */
     int Init(const Options&);
-
     void Destroy();
 
-    /** returns -errno or index of the server */
-    int AddServer(const char* addr, uint16_t port,
-                  const std::shared_ptr<HandlerFactory>&);
+    /** returns -errno or fd of the server */
+    int AddTcpServer(const char* addr, uint16_t port, TcpServer*);
 
-    /** returns -errno or index of the client */
-    int AddClient(const char* addr, uint16_t port,
-                  const std::shared_ptr<Handler>&);
+    /** returns -errno or fd of the client */
+    int AddTcpClient(const char* addr, uint16_t port, TcpClient*);
 
     void Loop();
 
 private:
-    int DoAddClient(int64_t new_fd, const std::shared_ptr<Handler>&);
-    void ProcessNewAndReading(int64_t, void* tag);
-    /* |-- */ void HandleTimerExpired(int64_t res, void* state_ptr);
-    /* |-- */ void HandleTimerNext(void* timer_ptr);
-    /* |-- */ void HandleAccept(int64_t new_fd, void* svr_ptr);
-    /* |-+ */ void HandleClientReading(int64_t, void* client_ptr);
-    /*   |-- */ void HandleInvalidRequest(void* client_ptr);
-    /*   |-- */ void HandleMoreDataRequest(void* client_ptr,
-                                           uint64_t expand_size);
-    /*   |__ */ bool HandleValidRequest(void* client_ptr, uint64_t req_bytes);
-
-private:
-    alignas(threadkit::CACHELINE_SIZE) Logger* m_logger;
+    Logger* m_logger;
+    std::unique_ptr<NotificationQueue> m_new_rd_nq;
+    std::vector<std::unique_ptr<NotificationQueue>> m_worker_nq_list;
+    Scheduler m_sched;
     std::vector<std::thread> m_worker_thread_list;
-
-    // for writing events
-    alignas(threadkit::CACHELINE_SIZE) NotificationQueueImpl* m_wr_nq = nullptr;
-
-    std::thread m_writing_thread;
-
-    // for new connection and reading events
-    alignas(threadkit::CACHELINE_SIZE) NotificationQueueImpl m_new_rd_nq;
-
-    // is read by new_rd_nq for dispatching tasks
-    std::vector<NotificationQueueImpl*> m_worker_nq_list;
-
-    // used by new_rd_nq
-    uint32_t m_worker_num = 0;
-    uint32_t m_current_worker_idx = 0;
 
 private:
     EventManager(EventManager&&) = delete;

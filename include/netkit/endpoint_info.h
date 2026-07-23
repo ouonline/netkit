@@ -1,25 +1,25 @@
-#ifndef __NETKIT_CONNECTION_INFO_H__
-#define __NETKIT_CONNECTION_INFO_H__
+#ifndef __NETKIT_ENDPOINT_INFO_H__
+#define __NETKIT_ENDPOINT_INFO_H__
 
 #include <stdint.h>
 #include <string>
 
 namespace netkit {
 
-struct ConnectionInfo final {
-    ConnectionInfo() {}
-    ConnectionInfo(const ConnectionInfo&) = default;
-    ConnectionInfo& operator=(const ConnectionInfo&) = default;
+struct EndpointInfo final {
+    EndpointInfo() {}
+    EndpointInfo(const EndpointInfo&) = default;
+    EndpointInfo& operator=(const EndpointInfo&) = default;
 
-    ConnectionInfo(ConnectionInfo&& info) {
+    EndpointInfo(EndpointInfo&& info) {
         DoMove(std::move(info));
     }
-    ConnectionInfo& operator=(ConnectionInfo&& info) {
+    EndpointInfo& operator=(EndpointInfo&& info) {
         DoMove(std::move(info));
         return *this;
     }
 
-    void DoMove(ConnectionInfo&& info) {
+    void DoMove(EndpointInfo&& info) {
         local_port = info.local_port;
         remote_port = info.remote_port;
         local_addr = std::move(info.local_addr);
