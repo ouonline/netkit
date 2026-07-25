@@ -1,19 +1,12 @@
 #include "misc.h"
 #include "netkit/tcp_client.h"
-#include <unistd.h> // close()
 #include <string.h> // strerror()
+#include <sys/socket.h> // shutdown()
 using namespace std;
 
 #define REQ_BUF_EXPAND_SIZE 1024
 
 namespace netkit {
-
-TcpClient::~TcpClient() {
-    if (m_conn->fd > 0) { // may be closed by other workers
-        close(m_conn->fd);
-        m_conn->fd = -1;
-    }
-}
 
 void TcpClient::DeleteSelf() {
     OnDisconnected();
@@ -137,8 +130,7 @@ bool TcpClient::Process(int64_t res, NotificationQueue* nq) {
         }
 
         logger_error(m_conn->logger, "read data failed: [%s].", strerror(-res));
-        close(m_conn->fd);
-        m_conn->fd = -1;
+        shutdown(m_conn->fd, SHUT_RDWR);
         return false;
     }
     if (res == 0) {

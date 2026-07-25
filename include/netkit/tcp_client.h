@@ -40,7 +40,7 @@ public:
     void DeleteSelf() final;
 
 protected:
-    virtual ~TcpClient();
+    virtual ~TcpClient() = default;
 
     virtual int OnConnected(SendContext*) = 0;
     virtual void OnDisconnected() = 0;

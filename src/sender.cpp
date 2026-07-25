@@ -1,7 +1,7 @@
 #include "misc.h"
 #include "sender.h"
-#include <unistd.h> // close()
 #include <string.h> // strerror()
+#include <sys/socket.h> // shutdown()
 using namespace std;
 
 namespace netkit {
@@ -37,8 +37,7 @@ bool Sender::Process(int64_t res, NotificationQueue* nq) {
     if (res < 0) {
         logger_error(m_conn->logger, "send data failed: [%s].", strerror(-res));
         item->on_complete(res);
-        close(m_conn->fd);
-        m_conn->fd = -1;
+        shutdown(m_conn->fd, SHUT_RDWR);
         return false;
     }
     if (res == 0) {

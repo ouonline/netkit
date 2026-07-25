@@ -1,7 +1,6 @@
 #ifndef __NETKIT_CONNECTION_H__
 #define __NETKIT_CONNECTION_H__
 
-#include "utils.h"
 #include "send_item.h"
 #include "endpoint_info.h"
 #include "logger/logger.h"
@@ -12,20 +11,13 @@ namespace netkit {
 
 class Connection final {
 private:
-    EndpointInfo info;
+    EndpointInfo m_info;
 
 public:
     Connection(int _fd, Logger* l) : fd(_fd), logger(l) {}
+    ~Connection();
 
-    const EndpointInfo& GetEndpointInfo() {
-        if (info.remote_port == 0) {
-            std::lock_guard<std::mutex> _l(lock);
-            if (info.remote_port == 0) {
-                utils::GenEndpointInfo(fd, &info);
-            }
-        }
-        return info;
-    }
+    const EndpointInfo& GetEndpointInfo();
 
     int fd;
     Logger* logger;

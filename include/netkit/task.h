@@ -14,10 +14,8 @@ public:
     }
 
     bool Process(int64_t, NotificationQueue* nq) final {
-        if (m_conn->fd >= 0) {
-            SendContext ctx(m_conn, nq);
-            Run(&ctx);
-        }
+        SendContext ctx(m_conn, nq);
+        Run(&ctx);
         return false;
     }
 
