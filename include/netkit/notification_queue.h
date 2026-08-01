@@ -2,7 +2,7 @@
 #define __NETKIT_NOTIFICATION_QUEUE_H__
 
 #include "timeval.h"
-#include <stdint.h>
+#include "event_result.h"
 
 namespace netkit {
 
@@ -13,24 +13,24 @@ public:
     /**
        @brief accepts one connection. returns 0 or -errno.
     */
-    virtual int AcceptAsync(uint32_t svr_fd, void* tag, bool multishot) = 0;
+    virtual int AcceptAsync(uintptr_t svr_fd, void* tag, bool multishot) = 0;
 
     /**
        @brief reads at most `sz` bytes into `buf` from `fd`. returns 0 or
        -errno.
     */
-    virtual int ReadAsync(uint32_t fd, void* buf, uint32_t sz, void* tag) = 0;
+    virtual int ReadAsync(uintptr_t fd, void* buf, uint64_t sz, void* tag) = 0;
 
     /**
        @brief writes at most `sz` bytes from `buf` to `fd`. returns 0 or -errno.
     */
-    virtual int WriteAsync(uint32_t fd, const void* buf, uint32_t sz,
+    virtual int WriteAsync(uintptr_t fd, const void* buf, uint64_t sz,
                            void* tag) = 0;
 
     /**
        @brief closes `fd`. returns 0 or -errno.
     */
-    virtual int CloseAsync(uint32_t fd, void* tag) = 0;
+    virtual int CloseAsync(uintptr_t fd, void* tag) = 0;
 
     /**
        @brief notifies another notification queue about an event. returns 0 or
@@ -57,7 +57,7 @@ public:
        @return -EAGAIN if there is no events, 0 for success, and -errno for
        other errors.
     */
-    virtual int Next(int64_t* res, void** tag, const TimeVal* timeout) = 0;
+    virtual int Next(EventResult* res, void** tag, const TimeVal* timeout) = 0;
 };
 
 }

@@ -74,13 +74,13 @@ int main(int argc, char* argv[]) {
 
     EventManager mgr(&logger.l);
     auto err = mgr.Init(EventManager::Options());
-    if (err < 0) {
+    if (err) {
         logger_error(&logger.l, "init manager failed: [%s].", strerror(-err));
         return -1;
     }
 
     err = mgr.AddTcpServer(host, port, new EchoServer());
-    if (err < 0) {
+    if (err) {
         logger_error(&logger.l, "add server failed: [%s].", strerror(-err));
         return -1;
     }

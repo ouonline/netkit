@@ -17,7 +17,7 @@ public:
     }
 
     int Start(NotificationQueue*);
-    bool Process(int64_t, NotificationQueue*) final;
+    bool Process(EventResult, NotificationQueue*) final;
 
 protected:
     virtual ~TcpServer();

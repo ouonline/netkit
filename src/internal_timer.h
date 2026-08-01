@@ -13,7 +13,7 @@ public:
         : m_fd(fd), m_cb(cb), m_logger(l) {}
 
     int Start(NotificationQueue*);
-    bool Process(int64_t, NotificationQueue*) override;
+    bool Process(EventResult, NotificationQueue*) override;
 
 protected:
     ~InternalTimer();

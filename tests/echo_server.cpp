@@ -22,7 +22,7 @@ struct State {
 };
 
 struct EchoServer final : public State {
-    int64_t fd;
+    uintptr_t fd;
 };
 
 struct EchoSession final : public State {
@@ -33,12 +33,12 @@ struct EchoSession final : public State {
         }
     }
 
-    int64_t fd;
+    uintptr_t fd;
     EndpointInfo endpoint_info;
     char buf[ECHO_BUFFER_SIZE];
 };
 
-static State::Value Process(EchoServer* svr, int64_t res, void* tag,
+static State::Value Process(EchoServer* svr, EventResult res, void* tag,
                             NotificationQueue* nq, Logger* logger) {
     int rc;
 
@@ -46,21 +46,21 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
     auto ret_state = state->value;
     switch (ret_state) {
         case State::CLIENT_CONNECTED: {
-            if (res <= 0) {
+            if (res.err || res.val == 0) {
                 logger_info(logger, "[server] closes server: [%s].",
-                            strerror(-res));
+                            strerror(res.err));
                 break;
             }
 
             auto session = new EchoSession();
-            session->fd = res;
-            utils::GenEndpointInfo(res, &session->endpoint_info);
+            session->fd = res.val;
+            utils::GenEndpointInfo(res.val, &session->endpoint_info);
             logger_info(logger, "[server] accepts client [%s:%u].",
                         session->endpoint_info.remote_addr.c_str(),
                         session->endpoint_info.remote_port);
 
             session->value = State::RECV_REQ;
-            rc = nq->ReadAsync(res, session->buf, ECHO_BUFFER_SIZE,
+            rc = nq->ReadAsync(res.val, session->buf, ECHO_BUFFER_SIZE,
                                static_cast<State*>(session));
             if (rc != 0) {
                 logger_error(logger, "ReadAsync() failed.");
@@ -70,11 +70,11 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
         case State::RECV_REQ: {
             auto session = static_cast<EchoSession*>(state);
             const EndpointInfo& info = session->endpoint_info;
-            if (res < 0) {
+            if (res.err) {
                 logger_error(logger, "recv session request failed: [%s].",
-                             strerror(-res));
+                             strerror(res.err));
                 delete session;
-            } else if (res == 0) {
+            } else if (res.val == 0) {
                 logger_info(logger, "[server] client [%s:%u] disconnected.",
                             info.remote_addr.c_str(), info.remote_port);
                 delete session;
@@ -88,10 +88,10 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
                     logger,
                     "[server] client [%s:%u] ==> server [%s:%u] data [%.*s]",
                     info.remote_addr.c_str(), info.remote_port,
-                    info.local_addr.c_str(), info.local_port, res,
+                    info.local_addr.c_str(), info.local_port, res.val,
                     session->buf);
                 session->value = State::SEND_RES;
-                rc = nq->WriteAsync(session->fd, session->buf, res, tag);
+                rc = nq->WriteAsync(session->fd, session->buf, res.val, tag);
                 if (rc != 0) {
                     logger_error(logger, "WriteAsync() failed.");
                 }
@@ -100,11 +100,11 @@ static State::Value Process(EchoServer* svr, int64_t res, void* tag,
         }
         case State::SEND_RES: {
             auto session = static_cast<EchoSession*>(state);
-            if (res < 0) {
+            if (res.err) {
                 logger_error(logger, "send response to session failed: [%s].",
-                             strerror(-res));
+                             strerror(res.err));
                 delete session;
-            } else if (res == 0) {
+            } else if (res.val == 0) {
                 const EndpointInfo& info = session->endpoint_info;
                 logger_info(logger, "[server] client [%s:%u] disconnected.",
                             info.remote_addr.c_str(), info.remote_port);
@@ -172,7 +172,7 @@ int main(int argc, char* argv[]) {
     }
 
     while (true) {
-        int64_t res = 0;
+        EventResult res;
         void* tag = nullptr;
 
         auto rc = nq.Next(&res, &tag, nullptr);

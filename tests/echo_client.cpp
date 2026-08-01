@@ -23,13 +23,13 @@ struct EchoClient final {
     char buf[ECHO_BUFFER_SIZE];
 };
 
-static State Process(int64_t res, EchoClient* client, NotificationQueue* nq,
+static State Process(EventResult res, EchoClient* client, NotificationQueue* nq,
                      Logger* logger) {
     int rc;
 
     switch (client->state) {
         case State::CLIENT_SEND_REQ: {
-            if (res == 0) {
+            if (res.val == 0) {
                 const EndpointInfo& info = client->endpoint_info;
                 logger_info(logger, "[client] server [%s:%u] down.",
                             info.remote_addr.c_str(), info.remote_port);
@@ -51,7 +51,7 @@ static State Process(int64_t res, EchoClient* client, NotificationQueue* nq,
         }
         case State::CLIENT_GET_RES: {
             const EndpointInfo& info = client->endpoint_info;
-            if (res == 0) {
+            if (res.val == 0) {
                 logger_info(logger, "[client] server [%s:%u] down.",
                             info.remote_addr.c_str(), info.remote_port);
                 client->state = State::CLIENT_DISCONNECTED;
@@ -66,13 +66,13 @@ static State Process(int64_t res, EchoClient* client, NotificationQueue* nq,
                 logger,
                 "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
                 info.remote_addr.c_str(), info.remote_port,
-                info.local_addr.c_str(), info.local_port, res, client->buf);
+                info.local_addr.c_str(), info.local_port, res.val, client->buf);
             sleep(1);
 
-            if (res < ECHO_BUFFER_SIZE) {
-                client->buf[res] = '\0';
+            if (res.val < ECHO_BUFFER_SIZE) {
+                client->buf[res.val] = '\0';
             } else {
-                client->buf[res - 1] = '\0';
+                client->buf[res.val - 1] = '\0';
             }
 
             auto num = atol(client->buf);
@@ -152,7 +152,7 @@ int main(int argc, char* argv[]) {
     }
 
     while (true) {
-        int64_t res = 0;
+        EventResult res;
         void* tag = nullptr;
 
         rc = nq.Next(&res, &tag, nullptr);

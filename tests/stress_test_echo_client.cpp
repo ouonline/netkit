@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
         }
 
         while (true) {
-            int64_t res;
+            EventResult res;
             void* tag;
             auto err = recv_nq.Next(&res, &tag, nullptr);
             if (err) {
@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
     }
 
     while (true) {
-        int64_t res = 0;
+        EventResult res;
         void* tag = nullptr;
         rc = send_nq.Next(&res, &tag, nullptr);
         if (rc != 0) {

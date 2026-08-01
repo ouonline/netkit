@@ -1,7 +1,7 @@
 #ifndef __NETKIT_SEND_ITEM_H__
 #define __NETKIT_SEND_ITEM_H__
 
-#include "netkit/buffer.h"
+#include "buffer.h"
 #include <functional>
 
 namespace netkit {

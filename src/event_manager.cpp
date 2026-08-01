@@ -11,10 +11,10 @@ using namespace iouring;
 
 static void WorkLoop(NotificationQueue* nq, Logger* logger) {
     while (true) {
-        int64_t res = 0;
+        EventResult res;
         void* tag = nullptr;
         int err = nq->Next(&res, &tag, nullptr);
-        if (err < 0) {
+        if (err) {
             logger_error(logger, "get event failed: [%s].", strerror(-err));
             break;
         }

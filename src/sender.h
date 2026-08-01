@@ -11,7 +11,7 @@ class Sender final : public EventHandler {
 public:
     Sender(const std::shared_ptr<Connection>& c) : m_conn(c) {}
     int Start(NotificationQueue*);
-    bool Process(int64_t, NotificationQueue*) override;
+    bool Process(EventResult, NotificationQueue*) override;
 
 protected:
     ~Sender() = default;

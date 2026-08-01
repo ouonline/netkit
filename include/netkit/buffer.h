@@ -36,7 +36,7 @@ public:
         return (const char*)qbuf_data(&m_data);
     }
 
-    uint32_t size() const {
+    uint64_t size() const {
         return qbuf_size(&m_data);
     }
 
@@ -44,19 +44,19 @@ public:
         return qbuf_empty(&m_data);
     }
 
-    int Reserve(uint32_t new_size) {
+    int Reserve(uint64_t new_size) {
         return qbuf_reserve(&m_data, new_size);
     }
 
-    int Resize(uint32_t new_size) {
+    int Resize(uint64_t new_size) {
         return qbuf_resize(&m_data, new_size);
     }
 
-    int Assign(const char* data, uint32_t len) {
+    int Assign(const char* data, uint64_t len) {
         return qbuf_assign(&m_data, data, len);
     }
 
-    int Append(const char* data, uint32_t len) {
+    int Append(const char* data, uint64_t len) {
         return qbuf_append(&m_data, data, len);
     }
 

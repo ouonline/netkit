@@ -24,12 +24,13 @@ int TcpServer::Start(NotificationQueue* nq) {
     return err;
 }
 
-bool TcpServer::Process(int64_t fd, NotificationQueue* nq) {
-    if (fd < 0) {
-        logger_error(m_logger, "server down: [%s].", strerror(-fd));
+bool TcpServer::Process(EventResult res, NotificationQueue* nq) {
+    if (res.err) {
+        logger_error(m_logger, "server down: [%s].", strerror(res.err));
         return false;
     }
 
+    int fd = res.val;
     auto client = CreateClient();
     if (!client) {
         close(fd);

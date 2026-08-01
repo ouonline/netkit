@@ -25,27 +25,28 @@ int InternalTimer::Start(NotificationQueue* nq) {
     return 0;
 }
 
-bool InternalTimer::Process(int64_t res, NotificationQueue* nq) {
-    if (res < 0) {
+bool InternalTimer::Process(EventResult res, NotificationQueue* nq) {
+    if (res.err) {
         logger_error(m_logger, "read timer expirations failed: [%s].",
-                     strerror(-res));
-        m_cb(res);
+                     strerror(res.err));
+        m_cb(-res.err);
         return false;
     }
-    if (res == 0) {
+    if (res.val == 0) {
         return false;
     }
 
     m_cb(m_nr_expiration);
 
+    int rc;
     do {
-        res = nq->ReadAsync(m_fd, &m_nr_expiration, sizeof(m_nr_expiration),
-                            static_cast<EventHandler*>(this));
-    } while (ShouldRetry(res));
-    if (res) {
+        rc = nq->ReadAsync(m_fd, &m_nr_expiration, sizeof(m_nr_expiration),
+                           static_cast<EventHandler*>(this));
+    } while (ShouldRetry(rc));
+    if (rc) {
         logger_error(m_logger, "launch read operation failed: [%s].",
-                     strerror(-res));
-        m_cb(res);
+                     strerror(-rc));
+        m_cb(rc);
         return false;
     }
 

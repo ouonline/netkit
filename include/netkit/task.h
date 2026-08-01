@@ -13,7 +13,7 @@ public:
         m_conn = c;
     }
 
-    bool Process(int64_t, NotificationQueue* nq) final {
+    bool Process(EventResult, NotificationQueue* nq) final {
         SendContext ctx(m_conn, nq);
         Run(&ctx);
         return false;

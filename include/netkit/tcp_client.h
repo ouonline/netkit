@@ -36,7 +36,7 @@ public:
     }
 
     int Start(NotificationQueue*);
-    bool Process(int64_t, NotificationQueue*) final;
+    bool Process(EventResult, NotificationQueue*) final;
     void DeleteSelf() final;
 
 protected:
@@ -61,7 +61,7 @@ private:
     int HandleValidRequest(uint32_t req_bytes, NotificationQueue*);
 
 private:
-    uint32_t m_bytes_needed = 0;
+    uint64_t m_bytes_needed = 0;
     Buffer m_buf;
     Scheduler* m_sched = nullptr;
     std::shared_ptr<Connection> m_conn;

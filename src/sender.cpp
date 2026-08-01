@@ -27,25 +27,26 @@ int Sender::Start(NotificationQueue* nq) {
     return err;
 }
 
-bool Sender::Process(int64_t res, NotificationQueue* nq) {
+bool Sender::Process(EventResult res, NotificationQueue* nq) {
     SendItem* item;
     {
         lock_guard<mutex> _l(m_conn->lock);
         item = &m_conn->send_queue.front();
     }
 
-    if (res < 0) {
-        logger_error(m_conn->logger, "send data failed: [%s].", strerror(-res));
-        item->on_complete(res);
+    if (res.err) {
+        logger_error(m_conn->logger, "send data failed: [%s].",
+                     strerror(res.err));
+        item->on_complete(-res.err);
         shutdown(m_conn->fd, SHUT_RDWR);
         return false;
     }
-    if (res == 0) {
+    if (res.val == 0) {
         logger_info(m_conn->logger, "peer disconnected.");
         return false;
     }
 
-    m_conn->sending_offset += res;
+    m_conn->sending_offset += res.val;
     if (m_conn->sending_offset == item->data.size()) {
         item->on_complete(0);
         m_conn->sending_offset = 0;
@@ -61,15 +62,16 @@ bool Sender::Process(int64_t res, NotificationQueue* nq) {
         return false;
     }
 
+    int rc;
     do {
-        res = nq->WriteAsync(m_conn->fd,
-                             item->data.data() + m_conn->sending_offset,
-                             item->data.size() - m_conn->sending_offset,
-                             static_cast<EventHandler*>(this));
-    } while (ShouldRetry(res));
-    if (res) {
+        rc = nq->WriteAsync(m_conn->fd,
+                            item->data.data() + m_conn->sending_offset,
+                            item->data.size() - m_conn->sending_offset,
+                            static_cast<EventHandler*>(this));
+    } while (ShouldRetry(rc));
+    if (rc) {
         logger_error(m_conn->logger, "sending data failed: [%s].",
-                     strerror(-res));
+                     strerror(-rc));
         return false;
     }
 
