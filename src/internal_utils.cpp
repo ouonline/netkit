@@ -7,20 +7,6 @@ using namespace std;
 
 namespace netkit { namespace utils {
 
-int DoAddClient(int fd, TcpClient* client, NotificationQueue* nq,
-                Scheduler* sched, Logger* logger) {
-    client->Init(fd, sched, logger);
-
-    int err = client->Start(nq);
-    if (err) {
-        logger_error(logger, "TcpClient launch failed: [%s].", strerror(-err));
-        client->DeleteSelf();
-        return err;
-    }
-
-    return 0;
-}
-
 int DoAddTimer(const TimeVal& delay, const TimeVal& interval,
                const function<void(int32_t val)>& cb, NotificationQueue* nq,
                Logger* logger) {

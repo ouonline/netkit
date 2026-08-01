@@ -29,16 +29,6 @@ enum ReqStat {
 };
 
 class TcpClient : public EventHandler {
-public:
-    void Init(int fd, Scheduler* sched, Logger* l) {
-        m_conn = std::make_shared<Connection>(fd, l);
-        m_sched = sched;
-    }
-
-    int Start(NotificationQueue*);
-    bool Process(EventResult, NotificationQueue*) final;
-    void DeleteSelf() final;
-
 protected:
     virtual ~TcpClient() = default;
 
@@ -50,6 +40,19 @@ protected:
     Logger* logger() const {
         return m_conn->logger;
     }
+
+private:
+    friend class TcpServer;
+    friend class EventManager;
+
+    void Init(int fd, Scheduler* sched, Logger* l) {
+        m_conn = std::make_shared<Connection>(fd, l);
+        m_sched = sched;
+    }
+
+    int Start(NotificationQueue*);
+    bool Process(EventResult, NotificationQueue*) final;
+    void DeleteSelf() final;
 
 private:
     bool HandleInvalidRequest();

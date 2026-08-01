@@ -9,16 +9,6 @@
 namespace netkit {
 
 class TcpServer : public EventHandler {
-public:
-    void Init(int fd, Scheduler* sched, Logger* l) {
-        m_fd = fd;
-        m_sched = sched;
-        m_logger = l;
-    }
-
-    int Start(NotificationQueue*);
-    bool Process(EventResult, NotificationQueue*) final;
-
 protected:
     virtual ~TcpServer();
 
@@ -28,6 +18,18 @@ protected:
     Logger* logger() const {
         return m_logger;
     }
+
+private:
+    friend class EventManager;
+
+    void Init(int fd, Scheduler* sched, Logger* l) {
+        m_fd = fd;
+        m_sched = sched;
+        m_logger = l;
+    }
+
+    int Start(NotificationQueue*);
+    bool Process(EventResult, NotificationQueue*) final;
 
 private:
     int m_fd = -1;

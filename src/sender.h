@@ -8,13 +8,15 @@
 namespace netkit {
 
 class Sender final : public EventHandler {
-public:
+protected:
+    ~Sender() = default;
+
+private:
+    friend class SendContext;
+
     Sender(const std::shared_ptr<Connection>& c) : m_conn(c) {}
     int Start(NotificationQueue*);
     bool Process(EventResult, NotificationQueue*) override;
-
-protected:
-    ~Sender() = default;
 
 private:
     std::shared_ptr<Connection> m_conn;
