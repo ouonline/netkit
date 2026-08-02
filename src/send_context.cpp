@@ -1,4 +1,6 @@
 #include "netkit/send_context.h"
+#include "netkit/timer.h"
+#include "netkit/utils.h"
 #include "sender.h"
 #include <string.h> // strerror()
 using namespace std;
@@ -10,7 +12,7 @@ static void DummyCallback(int) {}
 int SendContext::Emit(Buffer&& b, const function<void(int err)>& on_complete) {
     bool is_empty_before_adding;
     {
-        lock_guard<mutex> _l(m_conn->lock);
+        lock_guard<mutex> _l(m_conn->send_lock);
         is_empty_before_adding = m_conn->send_queue.empty();
         m_conn->send_queue.emplace(move(b), (on_complete) ?: DummyCallback);
     }
@@ -33,6 +35,39 @@ int SendContext::Emit(Buffer&& b, const function<void(int err)>& on_complete) {
     }
 
     return 0;
+}
+
+int SendContext::AddTimer(const TimeVal& delay, const TimeVal& interval,
+                          Timer* timer) {
+    if (!timer) {
+        return -EINVAL;
+    }
+
+    int fd = utils::CreateTimerFd(delay, interval, m_conn->logger);
+    if (fd < 0) {
+        logger_error(m_conn->logger, "CreateTimerFd failed: [%s].",
+                     strerror(-fd));
+        timer->DeleteSelf();
+        return fd;
+    }
+
+    int err = timer->Init(fd, m_conn);
+    if (err) {
+        logger_error(m_conn->logger, "init timer failed: [%s].",
+                     strerror(-err));
+        timer->DeleteSelf();
+        return err;
+    }
+
+    err = timer->Start(m_nq);
+    if (err) {
+        logger_error(m_conn->logger, "start timer failed: [%s].",
+                     strerror(-err));
+        timer->DeleteSelf();
+        return err;
+    }
+
+    return fd;
 }
 
 }

@@ -105,15 +105,15 @@ int main(int argc, char* argv[]) {
     const uint16_t port = atol(argv[2]);
 
     EventManager mgr(&logger.l);
-    auto err = mgr.Init(EventManager::Options());
-    if (err) {
+    int err = mgr.Init(EventManager::Options());
+    if (err < 0) {
         logger_error(&logger.l, "init manager failed: [%s].", strerror(-err));
         return -1;
     }
 
-    err = mgr.AddTcpClient(host, port, new EchoClient());
-    if (err) {
-        logger_error(&logger.l, "add client failed: [%s].", strerror(-err));
+    int fd = mgr.AddTcpClient(host, port, new EchoClient());
+    if (fd < 0) {
+        logger_error(&logger.l, "add client failed: [%s].", strerror(-fd));
         return -1;
     }
 

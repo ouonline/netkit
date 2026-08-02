@@ -163,12 +163,13 @@ int NotificationQueueImpl::CloseAsync(uintptr_t fd, void* tag) {
 int NotificationQueueImpl::NotifyAsync(NotificationQueue* nq, int res,
                                        void* tag) {
     auto impl = static_cast<NotificationQueueImpl*>(nq);
-    return GenericAsync(
-        &m_ring, m_logger, [impl, res, tag](struct io_uring_sqe* sqe) -> void {
-            io_uring_prep_msg_ring(sqe, impl->m_ring.ring_fd, res, (uint64_t)tag, 0);
-            // skips the successful notification for this ring
-            io_uring_sqe_set_flags(sqe, IOSQE_CQE_SKIP_SUCCESS);
-        });
+    return GenericAsync(&m_ring, m_logger,
+                        [impl, res, tag](struct io_uring_sqe* sqe) -> void {
+                            io_uring_prep_msg_ring(sqe, impl->m_ring.ring_fd,
+                                                   res, (uint64_t)tag, 0);
+                            // skips the successful notification for this ring
+                            io_uring_sqe_set_flags(sqe, IOSQE_CQE_SKIP_SUCCESS);
+                        });
 }
 
 }}

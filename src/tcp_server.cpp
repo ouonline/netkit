@@ -1,6 +1,5 @@
 #include "netkit/tcp_server.h"
 #include "misc.h"
-#include "internal_utils.h"
 #include <unistd.h> // close()
 #include <string.h> // strerror()
 using namespace std;
@@ -8,7 +7,9 @@ using namespace std;
 namespace netkit {
 
 TcpServer::~TcpServer() {
-    close(m_fd);
+    if (m_fd >= 0) {
+        close(m_fd);
+    }
 }
 
 int TcpServer::Start(NotificationQueue* nq) {
@@ -38,7 +39,8 @@ bool TcpServer::Process(EventResult res, NotificationQueue* nq) {
         return true;
     }
 
-    client->Init(fd, m_sched, m_logger);
+    client->Init(m_logger);
+    client->SetVar(fd, m_sched);
 
     int err = client->Start(nq);
     if (err) {

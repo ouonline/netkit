@@ -1,13 +1,14 @@
 #ifndef __NETKIT_SEND_CONTEXT_H__
 #define __NETKIT_SEND_CONTEXT_H__
 
-#include "utils.h"
 #include "connection.h"
 #include "notification_queue.h"
 #include <memory>
 #include <functional>
 
 namespace netkit {
+
+class Timer;
 
 class SendContext final {
 public:
@@ -18,7 +19,11 @@ public:
         return m_conn->GetEndpointInfo();
     }
 
+    // returns 0 or -errno
     int Emit(Buffer&&, const std::function<void(int err)>& on_complete = {});
+
+    // returns -errno or timer fd
+    int AddTimer(const TimeVal& delay, const TimeVal& interval, Timer*);
 
 private:
     const std::shared_ptr<Connection>& m_conn;

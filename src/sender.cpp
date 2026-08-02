@@ -1,7 +1,6 @@
 #include "misc.h"
 #include "sender.h"
 #include <string.h> // strerror()
-#include <sys/socket.h> // shutdown()
 using namespace std;
 
 namespace netkit {
@@ -9,7 +8,7 @@ namespace netkit {
 int Sender::Start(NotificationQueue* nq) {
     SendItem* item;
     {
-        lock_guard<mutex> _l(m_conn->lock);
+        lock_guard<mutex> _l(m_conn->send_lock);
         item = &m_conn->send_queue.front();
     }
 
@@ -30,7 +29,7 @@ int Sender::Start(NotificationQueue* nq) {
 bool Sender::Process(EventResult res, NotificationQueue* nq) {
     SendItem* item;
     {
-        lock_guard<mutex> _l(m_conn->lock);
+        lock_guard<mutex> _l(m_conn->send_lock);
         item = &m_conn->send_queue.front();
     }
 
@@ -38,7 +37,7 @@ bool Sender::Process(EventResult res, NotificationQueue* nq) {
         logger_error(m_conn->logger, "send data failed: [%s].",
                      strerror(res.err));
         item->on_complete(-res.err);
-        shutdown(m_conn->fd, SHUT_RDWR);
+        m_conn->ShutDown();
         return false;
     }
     if (res.val == 0) {
@@ -46,11 +45,11 @@ bool Sender::Process(EventResult res, NotificationQueue* nq) {
         return false;
     }
 
-    m_conn->sending_offset += res.val;
-    if (m_conn->sending_offset == item->data.size()) {
+    m_conn->send_offset += res.val;
+    if (m_conn->send_offset == item->data.size()) {
         item->on_complete(0);
-        m_conn->sending_offset = 0;
-        lock_guard<mutex> _l(m_conn->lock);
+        m_conn->send_offset = 0;
+        lock_guard<mutex> _l(m_conn->send_lock);
         m_conn->send_queue.pop();
         if (m_conn->send_queue.empty()) {
             return false;
@@ -58,15 +57,10 @@ bool Sender::Process(EventResult res, NotificationQueue* nq) {
         item = &m_conn->send_queue.front();
     }
 
-    if (m_conn->fd < 0) {
-        return false;
-    }
-
     int rc;
     do {
-        rc = nq->WriteAsync(m_conn->fd,
-                            item->data.data() + m_conn->sending_offset,
-                            item->data.size() - m_conn->sending_offset,
+        rc = nq->WriteAsync(m_conn->fd, item->data.data() + m_conn->send_offset,
+                            item->data.size() - m_conn->send_offset,
                             static_cast<EventHandler*>(this));
     } while (ShouldRetry(rc));
     if (rc) {

@@ -4,6 +4,8 @@
 #include "send_item.h"
 #include "endpoint_info.h"
 #include "logger/logger.h"
+#include <set>
+#include <atomic>
 #include <mutex>
 #include <queue>
 
@@ -11,18 +13,26 @@ namespace netkit {
 
 class Connection final {
 private:
+    std::atomic<uint32_t> m_is_valid = {1};
     EndpointInfo m_info;
 
 public:
-    Connection(int _fd, Logger* l) : fd(_fd), logger(l) {}
+    Connection(Logger* l) : logger(l) {}
     ~Connection();
 
     const EndpointInfo& GetEndpointInfo();
+    void ShutDown();
 
-    int fd;
+    bool IsValid() const {
+        return m_is_valid.load(std::memory_order_relaxed);
+    }
+
+    int fd = -1;
     Logger* logger;
-    std::mutex lock;
-    uint32_t sending_offset = 0;
+    std::mutex timer_lock;
+    std::set<int> timer_fds;
+    std::mutex send_lock;
+    uint32_t send_offset = 0;
     std::queue<SendItem> send_queue;
 };
 

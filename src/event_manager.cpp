@@ -1,5 +1,5 @@
 #include "misc.h"
-#include "internal_utils.h"
+#include "netkit/utils.h"
 #include "netkit/event_manager.h"
 #include "netkit/iouring/notification_queue_impl.h"
 #include <string.h>
@@ -112,6 +112,7 @@ int EventManager::AddTcpServer(const char* addr, uint16_t port,
     if (fd < 0) {
         logger_error(m_logger, "create server for [%s:%u] failed: [%s].", addr,
                      port, strerror(-fd));
+        svr->DeleteSelf();
         return fd;
     }
 
@@ -129,14 +130,17 @@ int EventManager::AddTcpServer(const char* addr, uint16_t port,
 
 int EventManager::AddTcpClient(const char* addr, uint16_t port,
                                TcpClient* client) {
+    client->Init(m_logger);
+
     int fd = utils::CreateTcpClientFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "connect to [%s:%u] failed: [%s].", addr, port,
                      strerror(-fd));
+        client->DeleteSelf();
         return fd;
     }
 
-    client->Init(fd, &m_sched, m_logger);
+    client->SetVar(fd, &m_sched);
 
     int err = client->Start(m_new_rd_nq.get());
     if (err) {

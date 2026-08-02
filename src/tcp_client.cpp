@@ -1,7 +1,6 @@
 #include "misc.h"
 #include "netkit/tcp_client.h"
 #include <string.h> // strerror()
-#include <sys/socket.h> // shutdown()
 using namespace std;
 
 #define REQ_BUF_EXPAND_SIZE 1024
@@ -9,7 +8,13 @@ using namespace std;
 namespace netkit {
 
 void TcpClient::DeleteSelf() {
-    OnDisconnected();
+    if (m_conn) {
+        bool connected = (m_conn->fd >= 0);
+        m_conn->ShutDown();
+        if (connected) {
+            OnDisconnected();
+        }
+    }
     delete this;
 }
 
@@ -130,7 +135,7 @@ bool TcpClient::Process(EventResult res, NotificationQueue* nq) {
 
         logger_error(m_conn->logger, "read data failed: [%s].",
                      strerror(res.err));
-        shutdown(m_conn->fd, SHUT_RDWR);
+        m_conn->ShutDown();
         return false;
     }
     if (res.val == 0) {

@@ -4,6 +4,7 @@
 #include <netdb.h>
 #include <unistd.h> // close()
 #include <arpa/inet.h>
+#include <sys/timerfd.h>
 using namespace std;
 
 namespace netkit { namespace utils {
@@ -113,20 +114,58 @@ err:
     return ret;
 }
 
+int CreateTimerFd(const TimeVal& delay, const TimeVal& interval,
+                  Logger* logger) {
+    if (delay.tv_sec == 0 && delay.tv_usec == 0) {
+        logger_error(logger,
+                     "delay == 0 means disarming this timer and is not allowed "
+                     "currently.");
+        return -EINVAL;
+    }
+
+    int fd = timerfd_create(CLOCK_BOOTTIME, TFD_NONBLOCK | TFD_CLOEXEC);
+    if (fd < 0) {
+        logger_error(logger, "create timerfd failed: [%s].", strerror(errno));
+        return -errno;
+    }
+
+    const struct itimerspec ts = {
+        .it_interval =
+            {
+                .tv_sec = interval.tv_sec,
+                .tv_nsec = interval.tv_usec * 1000,
+            },
+        .it_value =
+            {
+                .tv_sec = delay.tv_sec,
+                .tv_nsec = delay.tv_usec * 1000,
+            },
+    };
+
+    int err = timerfd_settime(fd, 0, &ts, nullptr);
+    if (err) {
+        logger_error(logger, "timerfd_settime failed: [%s].", strerror(errno));
+        close(fd);
+        return -errno;
+    }
+
+    return fd;
+}
+
 void GenEndpointInfo(int fd, EndpointInfo* info) {
     struct sockaddr_in addr;
     socklen_t len = sizeof(addr);
     int ret = getpeername(fd, (struct sockaddr*)&addr, &len);
     if (ret == 0) {
         info->remote_addr = inet_ntoa(addr.sin_addr);
-        info->remote_port = addr.sin_port;
+        info->remote_port = ntohs(addr.sin_port);
     }
 
     len = sizeof(addr);
     ret = getsockname(fd, (struct sockaddr*)&addr, &len);
     if (ret == 0) {
         info->local_addr = inet_ntoa(addr.sin_addr);
-        info->local_port = addr.sin_port;
+        info->local_port = ntohs(addr.sin_port);
     }
 }
 

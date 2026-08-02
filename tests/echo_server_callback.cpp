@@ -73,15 +73,15 @@ int main(int argc, char* argv[]) {
     const uint16_t port = atol(argv[2]);
 
     EventManager mgr(&logger.l);
-    auto err = mgr.Init(EventManager::Options());
+    int err = mgr.Init(EventManager::Options());
     if (err) {
         logger_error(&logger.l, "init manager failed: [%s].", strerror(-err));
         return -1;
     }
 
-    err = mgr.AddTcpServer(host, port, new EchoServer());
-    if (err) {
-        logger_error(&logger.l, "add server failed: [%s].", strerror(-err));
+    int fd = mgr.AddTcpServer(host, port, new EchoServer());
+    if (fd < 0) {
+        logger_error(&logger.l, "add server failed: [%s].", strerror(-fd));
         return -1;
     }
 

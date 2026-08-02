@@ -45,8 +45,14 @@ private:
     friend class TcpServer;
     friend class EventManager;
 
-    void Init(int fd, Scheduler* sched, Logger* l) {
-        m_conn = std::make_shared<Connection>(fd, l);
+    // logger MUST be set first, in case derived classes use logger in their
+    // destructors.
+    void Init(Logger* l) {
+        m_conn = std::make_shared<Connection>(l);
+    }
+
+    void SetVar(int fd, Scheduler* sched) {
+        m_conn->fd = fd;
         m_sched = sched;
     }
 
