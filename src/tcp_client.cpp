@@ -18,6 +18,23 @@ void TcpClient::DeleteSelf() {
     delete this;
 }
 
+int TcpClient::DoRead(void* buf, uint64_t sz, NotificationQueue* nq) {
+loop:
+    int err =
+        nq->ReadAsync(m_conn->fd, buf, sz, static_cast<EventHandler*>(this));
+    if (ShouldRetry(err)) {
+        goto loop;
+    }
+
+    if (err) {
+        logger_error(m_conn->logger, "reading data failed: [%s].",
+                     strerror(-err));
+        // fall through
+    }
+
+    return err;
+}
+
 int TcpClient::Start(NotificationQueue* nq) {
     int err = m_buf.Reserve(REQ_BUF_EXPAND_SIZE);
     if (err) {
@@ -35,28 +52,17 @@ int TcpClient::Start(NotificationQueue* nq) {
         return err;
     }
 
-    do {
-        err = nq->ReadAsync(m_conn->fd, m_buf.data(), REQ_BUF_EXPAND_SIZE,
-                            static_cast<EventHandler*>(this));
-    } while (ShouldRetry(err));
-    if (err) {
-        logger_error(m_conn->logger, "about to recv data failed: [%s].",
-                     strerror(-err));
-        return err;
-    }
-
-    return 0;
+    return DoRead(m_buf.data(), REQ_BUF_EXPAND_SIZE, nq);
 }
 
-bool TcpClient::HandleInvalidRequest() {
+void TcpClient::HandleInvalidRequest() {
     const EndpointInfo& info = m_conn->GetEndpointInfo();
     logger_error(m_conn->logger, "invalid request from [%s:%u].",
                  info.remote_addr.c_str(), info.remote_port);
-    return false;
 }
 
-bool TcpClient::HandleMoreDataRequest(uint32_t req_bytes,
-                                      NotificationQueue* nq) {
+int TcpClient::HandleMoreDataRequest(uint32_t req_bytes,
+                                     NotificationQueue* nq) {
     if (req_bytes == 0) {
         req_bytes = REQ_BUF_EXPAND_SIZE;
     } else {
@@ -67,20 +73,10 @@ bool TcpClient::HandleMoreDataRequest(uint32_t req_bytes,
     if (err) {
         logger_error(m_conn->logger, "reserve [%lu] bytes failed: [%s].",
                      strerror(ENOMEM));
-        return false;
+        return -ENOMEM;
     }
 
-    do {
-        err = nq->ReadAsync(m_conn->fd, m_buf.data() + m_buf.size(), req_bytes,
-                            static_cast<EventHandler*>(this));
-    } while (ShouldRetry(err));
-    if (err) {
-        logger_error(m_conn->logger, "launch read request failed: [%s].",
-                     strerror(-err));
-        return false;
-    }
-
-    return true;
+    return DoRead(m_buf.data() + m_buf.size(), req_bytes, nq);
 }
 
 int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
@@ -118,8 +114,8 @@ int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
     }
 
     if (m_buf.IsEmpty()) {
-        bool ok = HandleMoreDataRequest(0, nq);
-        if (!ok) {
+        err = HandleMoreDataRequest(0, nq);
+        if (err) {
             return -1;
         }
         return 0;
@@ -167,11 +163,12 @@ read_again:
         auto req_stat = Check(m_buf, &req_bytes);
 
         if (req_stat == ReqStat::INVALID) {
-            return HandleInvalidRequest();
+            HandleInvalidRequest();
+            return false;
         }
 
         if (req_stat == ReqStat::MORE_DATA) {
-            return HandleMoreDataRequest(req_bytes, nq);
+            return (HandleMoreDataRequest(req_bytes, nq) == 0);
         }
 
         int rc = HandleValidRequest(req_bytes, nq);

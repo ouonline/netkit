@@ -37,13 +37,12 @@ int SendContext::Emit(Buffer&& b, const function<void(int err)>& on_complete) {
     return 0;
 }
 
-int SendContext::AddTimer(const TimeVal& delay, const TimeVal& interval,
-                          TimerPtr ptr) {
+int SendContext::AddTimer(const TimeVal& interval, TimerPtr ptr) {
     if (!ptr) {
         return -EINVAL;
     }
 
-    int fd = utils::CreateTimerFd(delay, interval, m_conn->logger);
+    int fd = utils::CreateTimerFd(interval, m_conn->logger);
     if (fd < 0) {
         logger_error(m_conn->logger, "CreateTimerFd failed: [%s].",
                      strerror(-fd));

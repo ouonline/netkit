@@ -114,12 +114,9 @@ err:
     return ret;
 }
 
-int CreateTimerFd(const TimeVal& delay, const TimeVal& interval,
-                  Logger* logger) {
-    if (delay.tv_sec == 0 && delay.tv_usec == 0) {
-        logger_error(logger,
-                     "delay == 0 means disarming this timer and is not allowed "
-                     "currently.");
+int CreateTimerFd(const TimeVal& interval, Logger* logger) {
+    if (interval.tv_sec == 0 && interval.tv_usec == 0) {
+        logger_error(logger, "interval == 0 is not allowed.");
         return -EINVAL;
     }
 
@@ -137,8 +134,8 @@ int CreateTimerFd(const TimeVal& delay, const TimeVal& interval,
             },
         .it_value =
             {
-                .tv_sec = delay.tv_sec,
-                .tv_nsec = delay.tv_usec * 1000,
+                .tv_sec = interval.tv_sec,
+                .tv_nsec = interval.tv_usec * 1000,
             },
     };
 

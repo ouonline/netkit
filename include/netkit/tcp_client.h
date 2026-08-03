@@ -58,8 +58,9 @@ private:
     void DeleteSelf() final;
 
 private:
-    bool HandleInvalidRequest();
-    bool HandleMoreDataRequest(uint32_t req_bytes, NotificationQueue*);
+    int DoRead(void* buf, uint64_t sz, NotificationQueue*);
+    void HandleInvalidRequest();
+    int HandleMoreDataRequest(uint32_t req_bytes, NotificationQueue*);
 
     // -1: error
     // 0: ok and return

@@ -13,15 +13,18 @@ TcpServer::~TcpServer() {
 }
 
 int TcpServer::Start(NotificationQueue* nq) {
-    int err;
-    do {
-        err = nq->AcceptAsync(m_fd, static_cast<EventHandler*>(this), true);
-    } while (ShouldRetry(err));
+loop:
+    int err = nq->AcceptAsync(m_fd, static_cast<EventHandler*>(this), true);
+    if (ShouldRetry(err)) {
+        goto loop;
+    }
+
     if (err) {
         logger_error(m_logger, "add server to notification queue failed: [%s].",
                      strerror(-err));
         // fall through
     }
+
     return err;
 }
 

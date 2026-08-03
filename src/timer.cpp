@@ -31,18 +31,20 @@ int Timer::Init(int fd, const shared_ptr<Connection>& conn) {
 }
 
 int Timer::Start(NotificationQueue* nq) {
-    int err;
-    do {
-        err = nq->ReadAsync(m_fd, &m_nr_expiration, sizeof(m_nr_expiration),
+loop:
+    int err = nq->ReadAsync(m_fd, &m_nr_expiration, sizeof(m_nr_expiration),
                             static_cast<EventHandler*>(this));
-    } while (ShouldRetry(err));
-    if (err) {
-        logger_error(m_conn->logger, "launch read operation failed: [%s].",
-                     strerror(-err));
-        return err;
+    if (ShouldRetry(err)) {
+        goto loop;
     }
 
-    return 0;
+    if (err) {
+        logger_error(m_conn->logger, "start timer failed: [%s].",
+                     strerror(-err));
+        // fall through
+    }
+
+    return err;
 }
 
 bool Timer::Process(EventResult res, NotificationQueue* nq) {
@@ -63,15 +65,9 @@ bool Timer::Process(EventResult res, NotificationQueue* nq) {
         return false;
     }
 
-    int rc;
-    do {
-        rc = nq->ReadAsync(m_fd, &m_nr_expiration, sizeof(m_nr_expiration),
-                           static_cast<EventHandler*>(this));
-    } while (ShouldRetry(rc));
-    if (rc) {
-        logger_error(m_conn->logger, "launch read operation failed: [%s].",
-                     strerror(-rc));
-        OnExpiration(rc, &ctx);
+    int err = Start(nq);
+    if (err) {
+        OnExpiration(err, &ctx);
         return false;
     }
 

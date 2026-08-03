@@ -19,7 +19,7 @@ public:
     int Emit(Buffer&&, const std::function<void(int err)>& on_complete = {});
 
     // returns -errno or timer fd
-    int AddTimer(const TimeVal& delay, const TimeVal& interval, TimerPtr);
+    int AddTimer(const TimeVal& interval, TimerPtr);
 
 private:
     const std::shared_ptr<Connection>& m_conn;

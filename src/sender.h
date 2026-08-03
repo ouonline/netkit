@@ -18,6 +18,8 @@ private:
     int Start(NotificationQueue*);
     bool Process(EventResult, NotificationQueue*) override;
 
+    int DoWrite(const void* buf, uint64_t sz, NotificationQueue*);
+
 private:
     std::shared_ptr<Connection> m_conn;
 };

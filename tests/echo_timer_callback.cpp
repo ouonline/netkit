@@ -76,9 +76,8 @@ public:
             return -ENOMEM;
         }
 
-        const TimeVal delay = {1, 0};
         const TimeVal interval = {1, 0};
-        const int timer_fd = ctx->AddTimer(delay, interval, move(timer));
+        const int timer_fd = ctx->AddTimer(interval, move(timer));
         if (timer_fd < 0) {
             logger_error(logger(), "add timer failed: [%s].",
                          strerror(-timer_fd));

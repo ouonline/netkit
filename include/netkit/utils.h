@@ -15,7 +15,7 @@ int CreateTcpServerFd(const char* host, uint16_t port, Logger*);
 int CreateTcpClientFd(const char* host, uint16_t port, Logger*);
 
 /** @return fd or -errno  */
-int CreateTimerFd(const TimeVal& delay, const TimeVal& interval, Logger*);
+int CreateTimerFd(const TimeVal& interval, Logger*);
 
 void GenEndpointInfo(int fd, EndpointInfo*);
 

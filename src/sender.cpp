@@ -5,6 +5,23 @@ using namespace std;
 
 namespace netkit {
 
+int Sender::DoWrite(const void* buf, uint64_t sz, NotificationQueue* nq) {
+loop:
+    int err =
+        nq->WriteAsync(m_conn->fd, buf, sz, static_cast<EventHandler*>(this));
+    if (ShouldRetry(err)) {
+        goto loop;
+    }
+
+    if (err) {
+        logger_error(m_conn->logger, "writing data failed: [%s].",
+                     strerror(-err));
+        // fall through
+    }
+
+    return err;
+}
+
 int Sender::Start(NotificationQueue* nq) {
     SendItem* item;
     {
@@ -12,18 +29,7 @@ int Sender::Start(NotificationQueue* nq) {
         item = &m_conn->send_queue.front();
     }
 
-    int err;
-    do {
-        err = nq->WriteAsync(m_conn->fd, item->data.data(), item->data.size(),
-                             static_cast<EventHandler*>(this));
-    } while (ShouldRetry(err));
-    if (err) {
-        logger_error(m_conn->logger, "sending data failed: [%s].",
-                     strerror(-err));
-        // fall through
-    }
-
-    return err;
+    return DoWrite(item->data.data(), item->data.size(), nq);
 }
 
 bool Sender::Process(EventResult res, NotificationQueue* nq) {
@@ -57,19 +63,9 @@ bool Sender::Process(EventResult res, NotificationQueue* nq) {
         item = &m_conn->send_queue.front();
     }
 
-    int rc;
-    do {
-        rc = nq->WriteAsync(m_conn->fd, item->data.data() + m_conn->send_offset,
-                            item->data.size() - m_conn->send_offset,
-                            static_cast<EventHandler*>(this));
-    } while (ShouldRetry(rc));
-    if (rc) {
-        logger_error(m_conn->logger, "sending data failed: [%s].",
-                     strerror(-rc));
-        return false;
-    }
-
-    return true;
+    int err = DoWrite(item->data.data() + m_conn->send_offset,
+                      item->data.size() - m_conn->send_offset, nq);
+    return (err == 0);
 }
 
 }
