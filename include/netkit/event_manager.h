@@ -35,7 +35,7 @@ public:
 
 private:
     Logger* m_logger;
-    std::unique_ptr<NotificationQueue> m_new_rd_nq;
+    std::unique_ptr<NotificationQueue> m_nq;
     std::vector<std::unique_ptr<NotificationQueue>> m_worker_nq_list;
     Scheduler m_sched;
     std::vector<std::thread> m_worker_thread_list;

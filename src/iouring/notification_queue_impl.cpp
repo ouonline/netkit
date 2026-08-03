@@ -69,6 +69,7 @@ int NotificationQueueImpl::Next(EventResult* res, void** tag,
     }
 
     if (cqe->res < 0) {
+        res->val = 0;
         res->err = -cqe->res;
     } else {
         res->val = cqe->res;

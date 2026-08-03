@@ -36,7 +36,7 @@ void EventManager::Destroy() {
     }
 
     for (uint32_t i = 0; i < m_worker_nq_list.size(); ++i) {
-        m_new_rd_nq->NotifyAsync(m_worker_nq_list[i].get(), 0, nullptr);
+        m_nq->NotifyAsync(m_worker_nq_list[i].get(), 0, nullptr);
     }
 
     for (uint32_t i = 0; i < m_worker_thread_list.size(); ++i) {
@@ -47,7 +47,7 @@ void EventManager::Destroy() {
 
     m_worker_thread_list.clear();
     m_worker_nq_list.clear();
-    m_new_rd_nq.reset();
+    m_nq.reset();
     m_logger = nullptr;
 }
 
@@ -87,7 +87,7 @@ int EventManager::Init(const Options& options) {
                      strerror(ENOMEM));
         return -ENOMEM;
     }
-    m_new_rd_nq.reset(impl);
+    m_nq.reset(impl);
 
     int err = impl->Init(NotificationQueueImpl::Options(), m_logger);
     if (err) {
@@ -122,7 +122,7 @@ int EventManager::AddTcpServer(const char* addr, uint16_t port,
     TcpServer* svr = ptr.release();
     svr->Init(fd, &m_sched, m_logger);
 
-    int err = svr->Start(m_new_rd_nq.get());
+    int err = svr->Start(m_nq.get());
     if (err) {
         logger_error(m_logger, "start server failed: [%s].", strerror(-err));
         svr->DeleteSelf();
@@ -150,7 +150,7 @@ int EventManager::AddTcpClient(const char* addr, uint16_t port,
     TcpClient* client = ptr.release();
     client->SetVar(fd, &m_sched);
 
-    int err = client->Start(m_new_rd_nq.get());
+    int err = client->Start(m_nq.get());
     if (err) {
         logger_error(m_logger, "TcpClient start failed: [%s].", strerror(-err));
         client->DeleteSelf();
@@ -161,7 +161,7 @@ int EventManager::AddTcpClient(const char* addr, uint16_t port,
 }
 
 void EventManager::Loop() {
-    WorkLoop(m_new_rd_nq.get(), m_logger);
+    WorkLoop(m_nq.get(), m_logger);
 }
 
 }

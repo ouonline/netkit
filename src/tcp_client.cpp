@@ -104,7 +104,7 @@ int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
     Task* task = ptr.release();
     task->Init(move(req), m_conn);
 
-    err = m_sched->Process(0, static_cast<EventHandler*>(task), nq);
+    err = m_sched->Schedule(0, static_cast<EventHandler*>(task), nq);
     if (err) {
         logger_error(m_conn->logger,
                      "assign task to worker thread failed: [%s].",

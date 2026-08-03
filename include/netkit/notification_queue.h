@@ -42,14 +42,13 @@ public:
        @brief gets next event. returns 0 or -errno.
 
        @param `res` has different meanings according to events:
-       - ACCEPT: `res` is the client fd or -errno, `tag` is the value passed to
-                 `AcceptAsync()`.
-       - READ: `res` is the number of bytes received or -errno, `tag` is the
-               value passed to `ReadAsync()`.
-       - WRITE: `res` is the number of bytes sent or -errno, `tag` is the
-                value passed to `WriteAsync()`.
-       - CLOSE: `res` is the return value of `close()` or -errno, `tag` is the
-                value passed to `CloseAsync()`.
+       - ACCEPT: client fd or -errno.
+       - READ: number of bytes read or -errno.
+       - WRITE: number of bytes written or -errno.
+       - CLOSE: return value of `close()` or -errno.
+       - NOTIFY: value passed to `NotifyAsync()`.
+
+       @param `tag` is the value passed to `*Async()`.
 
        @param `timtout` waits until at least one event arrives, timeout reaches,
        or some error occurs. `nullptr` for blocking without timeout.
