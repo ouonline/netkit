@@ -10,7 +10,7 @@ namespace netkit {
 void TcpClient::DeleteSelf() {
     if (m_conn) {
         bool connected = (m_conn->fd >= 0);
-        m_conn->ShutDown();
+        m_conn->ShutDown(m_logger);
         if (connected) {
             OnDisconnected();
         }
@@ -27,8 +27,7 @@ loop:
     }
 
     if (err) {
-        logger_error(m_conn->logger, "reading data failed: [%s].",
-                     strerror(-err));
+        logger_error(m_logger, "reading data failed: [%s].", strerror(-err));
         // fall through
     }
 
@@ -38,16 +37,15 @@ loop:
 int TcpClient::Start(NotificationQueue* nq) {
     int err = m_buf.Reserve(REQ_BUF_EXPAND_SIZE);
     if (err) {
-        logger_error(m_conn->logger,
-                     "reserve [%lu] bytes for request failed: [%s].",
+        logger_error(m_logger, "reserve [%lu] bytes for request failed: [%s].",
                      REQ_BUF_EXPAND_SIZE, strerror(-err));
         return err;
     }
 
-    SendContext ctx(m_conn, nq);
+    SendContext ctx(m_conn, nq, m_logger);
     err = OnConnected(&ctx);
     if (err) {
-        logger_error(m_conn->logger, "client OnConnected failed: [%s].",
+        logger_error(m_logger, "client OnConnected failed: [%s].",
                      strerror(-err));
         return err;
     }
@@ -57,7 +55,7 @@ int TcpClient::Start(NotificationQueue* nq) {
 
 void TcpClient::HandleInvalidRequest() {
     const EndpointInfo& info = m_conn->GetEndpointInfo();
-    logger_error(m_conn->logger, "invalid request from [%s:%u].",
+    logger_error(m_logger, "invalid request from [%s:%u].",
                  info.remote_addr.c_str(), info.remote_port);
 }
 
@@ -71,7 +69,7 @@ int TcpClient::HandleMoreDataRequest(uint32_t req_bytes,
 
     int err = m_buf.Reserve(m_buf.size() + req_bytes);
     if (err) {
-        logger_error(m_conn->logger, "reserve [%lu] bytes failed: [%s].",
+        logger_error(m_logger, "reserve [%lu] bytes failed: [%s].",
                      strerror(ENOMEM));
         return -ENOMEM;
     }
@@ -86,7 +84,7 @@ int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
     if (req_bytes < m_buf.size()) {
         err = req.Assign(m_buf.data() + req_bytes, m_buf.size() - req_bytes);
         if (err) {
-            logger_error(m_conn->logger, "move request data failed: [%s].",
+            logger_error(m_logger, "move request data failed: [%s].",
                          strerror(ENOMEM));
             return -1;
         }
@@ -96,8 +94,7 @@ int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
 
     TaskPtr ptr = CreateTask();
     if (!ptr) {
-        logger_error(m_conn->logger, "allocate Task failed: [%s].",
-                     strerror(ENOMEM));
+        logger_error(m_logger, "allocate Task failed: [%s].", strerror(ENOMEM));
         return -1;
     }
 
@@ -106,8 +103,7 @@ int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
 
     err = m_sched->Schedule(0, static_cast<EventHandler*>(task), nq);
     if (err) {
-        logger_error(m_conn->logger,
-                     "assign task to worker thread failed: [%s].",
+        logger_error(m_logger, "assign task to worker thread failed: [%s].",
                      strerror(-err));
         task->DeleteSelf();
         return -1;
@@ -130,9 +126,8 @@ bool TcpClient::Process(EventResult res, NotificationQueue* nq) {
             goto read_again;
         }
 
-        logger_error(m_conn->logger, "read data failed: [%s].",
-                     strerror(res.err));
-        m_conn->ShutDown();
+        logger_error(m_logger, "read data failed: [%s].", strerror(res.err));
+        m_conn->ShutDown(m_logger);
         return false;
     }
     if (res.val == 0) {
@@ -149,8 +144,7 @@ read_again:
                 nq->ReadAsync(m_conn->fd, m_buf.data() + m_buf.size(),
                               m_bytes_needed, static_cast<EventHandler*>(this));
             if (err) {
-                logger_error(m_conn->logger,
-                             "launch read request failed: [%s].",
+                logger_error(m_logger, "launch read request failed: [%s].",
                              strerror(-err));
                 return false;
             }

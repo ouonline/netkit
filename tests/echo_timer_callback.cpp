@@ -11,9 +11,10 @@ using namespace std;
 
 class EchoTask final : public Task {
 public:
+    EchoTask(Logger* l) : Task(l) {}
     void Run(SendContext* ctx) override {
         const auto& info = ctx->GetEndpointInfo();
-        logger_info(logger(),
+        logger_info(m_logger,
                     "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
                     info.remote_addr.c_str(), info.remote_port,
                     info.local_addr.c_str(), info.local_port,
@@ -22,10 +23,13 @@ public:
 };
 
 class EchoTimer final : public Timer {
+public:
+    EchoTimer(Logger* l) : Timer(l) {}
+
 private:
     bool OnExpiration(int val, SendContext* ctx) override {
         if (val < 0) {
-            logger_error(logger(), "timer failed: [%s].", strerror(-val));
+            logger_error(m_logger, "timer failed: [%s].", strerror(-val));
             return false;
         }
 
@@ -33,20 +37,20 @@ private:
         const auto message = to_string(m_counter++);
         int err = buf.Append(message.data(), message.size());
         if (err) {
-            logger_error(logger(), "prepare data failed: [%s].",
+            logger_error(m_logger, "prepare data failed: [%s].",
                          strerror(-err));
             return false;
         }
 
         const auto& info = ctx->GetEndpointInfo();
         logger_info(
-            logger(), "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
+            m_logger, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
             info.local_addr.c_str(), info.local_port, info.remote_addr.c_str(),
             info.remote_port, static_cast<int>(buf.size()), buf.data());
 
         err = ctx->Emit(move(buf));
         if (err) {
-            logger_error(logger(), "send data failed: [%s].", strerror(-err));
+            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
             return false;
         }
 
@@ -59,19 +63,20 @@ private:
 
 class EchoClient final : public TcpClient {
 public:
+    EchoClient(Logger* l) : TcpClient(l) {}
     ~EchoClient() {
-        logger_info(logger(), "[client] client destroyed.");
+        logger_info(m_logger, "[client] client destroyed.");
     }
 
     int OnConnected(SendContext* ctx) override {
         m_endpoint_info = ctx->GetEndpointInfo();
-        logger_info(logger(), "[client] connect to server [%s:%u].",
+        logger_info(m_logger, "[client] connect to server [%s:%u].",
                     m_endpoint_info.remote_addr.c_str(),
                     m_endpoint_info.remote_port);
 
-        TimerPtr timer(new EchoTimer());
+        TimerPtr timer(new EchoTimer(m_logger));
         if (!timer) {
-            logger_error(logger(), "allocate timer failed: [%s].",
+            logger_error(m_logger, "allocate timer failed: [%s].",
                          strerror(ENOMEM));
             return -ENOMEM;
         }
@@ -79,7 +84,7 @@ public:
         const TimeVal interval = {1, 0};
         const int timer_fd = ctx->AddTimer(interval, move(timer));
         if (timer_fd < 0) {
-            logger_error(logger(), "add timer failed: [%s].",
+            logger_error(m_logger, "add timer failed: [%s].",
                          strerror(-timer_fd));
             return timer_fd;
         }
@@ -88,7 +93,7 @@ public:
     }
 
     void OnDisconnected() override {
-        logger_info(logger(), "[client] client [%s:%u] disconnected.",
+        logger_info(m_logger, "[client] client [%s:%u] disconnected.",
                     m_endpoint_info.local_addr.c_str(),
                     m_endpoint_info.local_port);
     }
@@ -99,7 +104,7 @@ public:
     }
 
     TaskPtr CreateTask() override {
-        return TaskPtr(new EchoTask());
+        return TaskPtr(new EchoTask(m_logger));
     }
 
 private:
@@ -125,7 +130,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    err = mgr.AddTcpClient(host, port, TcpClientPtr(new EchoClient()));
+    err = mgr.AddTcpClient(host, port, TcpClientPtr(new EchoClient(&logger.l)));
     if (err < 0) {
         logger_error(&logger.l, "add client failed: [%s].", strerror(-err));
         return -1;

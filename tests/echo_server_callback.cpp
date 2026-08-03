@@ -7,35 +7,37 @@ using namespace std;
 
 class EchoTask final : public Task {
 public:
+    EchoTask(Logger* l) : Task(l) {}
     void Run(SendContext* ctx) override {
         auto& info = ctx->GetEndpointInfo();
         logger_info(
-            logger(), "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
+            m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
             info.local_addr.c_str(), info.local_port, info.remote_addr.c_str(),
             info.remote_port, m_buffer.size(), m_buffer.data());
         int err = ctx->Emit(move(m_buffer));
         if (err) {
-            logger_error(logger(), "send data failed: [%s].", strerror(-err));
+            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
         }
     }
 };
 
 class EchoClient final : public TcpClient {
 public:
+    EchoClient(Logger* l) : TcpClient(l) {}
     ~EchoClient() {
-        logger_info(logger(), "[server] client [%p] destroyed.", this);
+        logger_info(m_logger, "[server] client [%p] destroyed.", this);
     }
 
     int OnConnected(SendContext* ctx) override {
         m_endpoint_info = ctx->GetEndpointInfo();
-        logger_info(logger(), "[server] client [%s:%u] connected.",
+        logger_info(m_logger, "[server] client [%s:%u] connected.",
                     m_endpoint_info.remote_addr.c_str(),
                     m_endpoint_info.remote_port);
         return 0;
     }
 
     void OnDisconnected() override {
-        logger_info(logger(), "[server] client [%s:%u] disconnected.",
+        logger_info(m_logger, "[server] client [%s:%u] disconnected.",
                     m_endpoint_info.remote_addr.c_str(),
                     m_endpoint_info.remote_port);
     }
@@ -46,7 +48,7 @@ public:
     }
 
     TaskPtr CreateTask() override {
-        return TaskPtr(new EchoTask());
+        return TaskPtr(new EchoTask(m_logger));
     }
 
 private:
@@ -55,8 +57,9 @@ private:
 
 class EchoServer final : public TcpServer {
 public:
+    EchoServer(Logger* l) : TcpServer(l) {}
     TcpClientPtr CreateClient() override {
-        return TcpClientPtr(new EchoClient());
+        return TcpClientPtr(new EchoClient(m_logger));
     }
 };
 
@@ -79,7 +82,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    err = mgr.AddTcpServer(host, port, TcpServerPtr(new EchoServer()));
+    err = mgr.AddTcpServer(host, port, TcpServerPtr(new EchoServer(&logger.l)));
     if (err < 0) {
         logger_error(&logger.l, "add server failed: [%s].", strerror(-err));
         return -1;

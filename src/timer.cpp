@@ -39,8 +39,7 @@ loop:
     }
 
     if (err) {
-        logger_error(m_conn->logger, "start timer failed: [%s].",
-                     strerror(-err));
+        logger_error(m_logger, "start timer failed: [%s].", strerror(-err));
         // fall through
     }
 
@@ -52,9 +51,9 @@ bool Timer::Process(EventResult res, NotificationQueue* nq) {
         return false;
     }
 
-    SendContext ctx(m_conn, nq);
+    SendContext ctx(m_conn, nq, m_logger);
     if (res.err) {
-        logger_error(m_conn->logger, "read timer expirations failed: [%s].",
+        logger_error(m_logger, "read timer expirations failed: [%s].",
                      strerror(res.err));
         OnExpiration(-res.err, &ctx);
         return false;

@@ -12,6 +12,7 @@ class SendContext;
 
 class Timer : public EventHandler {
 protected:
+    Timer(Logger* l) : m_logger(l) {}
     virtual ~Timer();
 
     /*
@@ -21,9 +22,8 @@ protected:
     */
     virtual bool OnExpiration(int val, SendContext*) = 0;
 
-    Logger* logger() const {
-        return m_conn->logger;
-    }
+protected:
+    Logger* m_logger;
 
 private:
     friend class SendContext;

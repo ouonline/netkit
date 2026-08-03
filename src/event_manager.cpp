@@ -120,7 +120,7 @@ int EventManager::AddTcpServer(const char* addr, uint16_t port,
     }
 
     TcpServer* svr = ptr.release();
-    svr->Init(fd, &m_sched, m_logger);
+    svr->Init(fd, &m_sched);
 
     int err = svr->Start(m_nq.get());
     if (err) {
@@ -138,8 +138,6 @@ int EventManager::AddTcpClient(const char* addr, uint16_t port,
         return -EINVAL;
     }
 
-    ptr->Init(m_logger); // set logger at the beginning
-
     int fd = utils::CreateTcpClientFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "connect to [%s:%u] failed: [%s].", addr, port,
@@ -148,7 +146,7 @@ int EventManager::AddTcpClient(const char* addr, uint16_t port,
     }
 
     TcpClient* client = ptr.release();
-    client->SetVar(fd, &m_sched);
+    client->Init(fd, &m_sched);
 
     int err = client->Start(m_nq.get());
     if (err) {

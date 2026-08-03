@@ -8,16 +8,14 @@ namespace netkit {
 
 class Task : public EventHandler {
 protected:
+    Task(Logger* l) : m_logger(l) {}
     virtual ~Task() = default;
 
     virtual void Run(SendContext*) = 0;
 
-    Logger* logger() const {
-        return m_conn->logger;
-    }
-
 protected:
     Buffer m_buffer;
+    Logger* m_logger;
 
 private:
     friend class TcpClient;
@@ -28,7 +26,7 @@ private:
     }
 
     bool Process(EventResult, NotificationQueue* nq) final {
-        SendContext ctx(m_conn, nq);
+        SendContext ctx(m_conn, nq, m_logger);
         Run(&ctx);
         return false;
     }

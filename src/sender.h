@@ -14,7 +14,8 @@ protected:
 private:
     friend class SendContext;
 
-    Sender(const std::shared_ptr<Connection>& c) : m_conn(c) {}
+    Sender(const std::shared_ptr<Connection>& c, Logger* l)
+        : m_conn(c), m_logger(l) {}
     int Start(NotificationQueue*);
     bool Process(EventResult, NotificationQueue*) override;
 
@@ -22,6 +23,7 @@ private:
 
 private:
     std::shared_ptr<Connection> m_conn;
+    Logger* m_logger;
 };
 
 }

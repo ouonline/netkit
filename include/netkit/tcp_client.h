@@ -27,6 +27,7 @@ enum ReqStat {
 
 class TcpClient : public EventHandler {
 protected:
+    TcpClient(Logger* l) : m_logger(l) {}
     virtual ~TcpClient() = default;
 
     virtual int OnConnected(SendContext*) = 0;
@@ -34,22 +35,15 @@ protected:
     virtual ReqStat Check(const Buffer&, uint32_t* req_bytes) = 0;
     virtual TaskPtr CreateTask() = 0;
 
-    Logger* logger() const {
-        return m_conn->logger;
-    }
+protected:
+    Logger* m_logger;
 
 private:
     friend class TcpServer;
     friend class EventManager;
 
-    // logger MUST be set first, in case derived classes use logger in their
-    // destructors.
-    void Init(Logger* l) {
-        m_conn = std::make_shared<Connection>(l);
-    }
-
-    void SetVar(int fd, Scheduler* sched) {
-        m_conn->fd = fd;
+    void Init(int fd, Scheduler* sched) {
+        m_conn = std::make_shared<Connection>(fd);
         m_sched = sched;
     }
 

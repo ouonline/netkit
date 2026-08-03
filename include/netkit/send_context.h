@@ -8,8 +8,9 @@ namespace netkit {
 
 class SendContext final {
 public:
-    SendContext(const std::shared_ptr<Connection>& c, NotificationQueue* nq)
-        : m_conn(c), m_nq(nq) {}
+    SendContext(const std::shared_ptr<Connection>& c, NotificationQueue* nq,
+                Logger* l)
+        : m_conn(c), m_nq(nq), m_logger(l) {}
 
     const EndpointInfo& GetEndpointInfo() {
         return m_conn->GetEndpointInfo();
@@ -24,6 +25,7 @@ public:
 private:
     const std::shared_ptr<Connection>& m_conn;
     NotificationQueue* m_nq;
+    Logger* m_logger;
 };
 
 }

@@ -18,16 +18,16 @@ int SendContext::Emit(Buffer&& b, const function<void(int err)>& on_complete) {
     }
 
     if (is_empty_before_adding) {
-        auto sender = new Sender(m_conn);
+        auto sender = new Sender(m_conn, m_logger);
         if (!sender) {
-            logger_error(m_conn->logger, "allocate sender failed: [%s].",
+            logger_error(m_logger, "allocate sender failed: [%s].",
                          strerror(ENOMEM));
             return -ENOMEM;
         }
 
         int err = sender->Start(m_nq);
         if (err) {
-            logger_error(m_conn->logger, "about to send data failed: [%s].",
+            logger_error(m_logger, "about to send data failed: [%s].",
                          strerror(-err));
             sender->DeleteSelf();
             return err;
@@ -42,26 +42,23 @@ int SendContext::AddTimer(const TimeVal& interval, TimerPtr ptr) {
         return -EINVAL;
     }
 
-    int fd = utils::CreateTimerFd(interval, m_conn->logger);
+    int fd = utils::CreateTimerFd(interval, m_logger);
     if (fd < 0) {
-        logger_error(m_conn->logger, "CreateTimerFd failed: [%s].",
-                     strerror(-fd));
+        logger_error(m_logger, "CreateTimerFd failed: [%s].", strerror(-fd));
         return fd;
     }
 
     Timer* timer = ptr.release();
     int err = timer->Init(fd, m_conn);
     if (err) {
-        logger_error(m_conn->logger, "init timer failed: [%s].",
-                     strerror(-err));
+        logger_error(m_logger, "init timer failed: [%s].", strerror(-err));
         timer->DeleteSelf();
         return err;
     }
 
     err = timer->Start(m_nq);
     if (err) {
-        logger_error(m_conn->logger, "start timer failed: [%s].",
-                     strerror(-err));
+        logger_error(m_logger, "start timer failed: [%s].", strerror(-err));
         timer->DeleteSelf();
         return err;
     }

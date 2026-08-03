@@ -17,18 +17,17 @@ private:
     EndpointInfo m_info;
 
 public:
-    Connection(Logger* l) : logger(l) {}
+    Connection(int _fd) : fd(_fd) {}
     ~Connection();
 
     const EndpointInfo& GetEndpointInfo();
-    void ShutDown();
+    void ShutDown(Logger*);
 
     bool IsValid() const {
         return m_is_valid.load(std::memory_order_relaxed);
     }
 
-    int fd = -1;
-    Logger* logger;
+    const int fd;
     std::mutex timer_lock;
     std::set<int> timer_fds;
     std::mutex send_lock;

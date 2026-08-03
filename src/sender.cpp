@@ -14,8 +14,7 @@ loop:
     }
 
     if (err) {
-        logger_error(m_conn->logger, "writing data failed: [%s].",
-                     strerror(-err));
+        logger_error(m_logger, "writing data failed: [%s].", strerror(-err));
         // fall through
     }
 
@@ -40,14 +39,13 @@ bool Sender::Process(EventResult res, NotificationQueue* nq) {
     }
 
     if (res.err) {
-        logger_error(m_conn->logger, "send data failed: [%s].",
-                     strerror(res.err));
+        logger_error(m_logger, "send data failed: [%s].", strerror(res.err));
         item->on_complete(-res.err);
-        m_conn->ShutDown();
+        m_conn->ShutDown(m_logger);
         return false;
     }
     if (res.val == 0) {
-        logger_info(m_conn->logger, "peer disconnected.");
+        logger_info(m_logger, "peer disconnected.");
         return false;
     }
 

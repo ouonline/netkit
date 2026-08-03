@@ -43,8 +43,7 @@ bool TcpServer::Process(EventResult res, NotificationQueue* nq) {
     }
 
     TcpClient* client = ptr.release();
-    client->Init(m_logger);
-    client->SetVar(fd, m_sched);
+    client->Init(fd, m_sched);
 
     int err = client->Start(nq);
     if (err) {

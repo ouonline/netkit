@@ -7,22 +7,20 @@ namespace netkit {
 
 class TcpServer : public EventHandler {
 protected:
+    TcpServer(Logger* l) : m_logger(l) {}
     virtual ~TcpServer();
 
     virtual TcpClientPtr CreateClient() = 0;
 
-    // same API as other EventHandler derived classes
-    Logger* logger() const {
-        return m_logger;
-    }
+protected:
+    Logger* m_logger;
 
 private:
     friend class EventManager;
 
-    void Init(int fd, Scheduler* sched, Logger* l) {
+    void Init(int fd, Scheduler* sched) {
         m_fd = fd;
         m_sched = sched;
-        m_logger = l;
     }
 
     int Start(NotificationQueue*);
@@ -31,7 +29,6 @@ private:
 private:
     int m_fd = -1;
     Scheduler* m_sched = nullptr;
-    Logger* m_logger = nullptr;
 };
 
 using TcpServerPtr = EventHandlerPtr<TcpServer>;

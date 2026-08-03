@@ -9,16 +9,17 @@ using namespace std;
 
 class EchoTask final : public Task {
 public:
+    EchoTask(Logger* l) : Task(l) {}
     void Run(SendContext* ctx) override {
         auto& info = ctx->GetEndpointInfo();
         logger_info(
-            logger(), "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
+            m_logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
             info.remote_addr.c_str(), info.remote_port, info.local_addr.c_str(),
             info.local_port, m_buffer.size(), m_buffer.data());
 
         int err = m_buffer.Reserve(10);
         if (err) {
-            logger_error(logger(), "Reserve buffer failed: [%s].",
+            logger_error(m_logger, "Reserve buffer failed: [%s].",
                          strerror(-err));
             return;
         }
@@ -30,7 +31,7 @@ public:
 
         err = ctx->Emit(move(m_buffer));
         if (err) {
-            logger_error(logger(), "send data failed: [%s].", strerror(-err));
+            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
         }
 
         sleep(1);
@@ -39,33 +40,34 @@ public:
 
 class EchoClient final : public TcpClient {
 public:
+    EchoClient(Logger* l) : TcpClient(l) {}
     ~EchoClient() {
-        logger_info(logger(), "[client] cient destroyed.");
+        logger_info(m_logger, "[client] cient destroyed.");
     }
 
     int OnConnected(SendContext* ctx) override {
         m_endpoint_info = ctx->GetEndpointInfo();
-        logger_info(logger(), "[client] connect to server [%s:%u].",
+        logger_info(m_logger, "[client] connect to server [%s:%u].",
                     m_endpoint_info.remote_addr.c_str(),
                     m_endpoint_info.remote_port);
 
         Buffer buf;
         int err = buf.Append("0", 1);
         if (err) {
-            logger_error(logger(), "prepare init data failed: [%s].",
+            logger_error(m_logger, "prepare init data failed: [%s].",
                          strerror(-err));
             return err;
         }
 
         logger_info(
-            logger(), "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
+            m_logger, "[client] client [%s:%u] ==> server [%s:%u] data [%.*s]",
             m_endpoint_info.local_addr.c_str(), m_endpoint_info.local_port,
             m_endpoint_info.remote_addr.c_str(), m_endpoint_info.remote_port,
             buf.size(), buf.data());
 
         err = ctx->Emit(move(buf));
         if (err) {
-            logger_error(logger(), "send data failed: [%s].", strerror(-err));
+            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
             return err;
         }
 
@@ -74,7 +76,7 @@ public:
     }
 
     void OnDisconnected() override {
-        logger_info(logger(), "[client] client [%s:%u] disconnected.",
+        logger_info(m_logger, "[client] client [%s:%u] disconnected.",
                     m_endpoint_info.local_addr.c_str(),
                     m_endpoint_info.local_port);
     }
@@ -85,7 +87,7 @@ public:
     }
 
     TaskPtr CreateTask() override {
-        return TaskPtr(new EchoTask());
+        return TaskPtr(new EchoTask(m_logger));
     }
 
 private:
@@ -111,7 +113,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    err = mgr.AddTcpClient(host, port, TcpClientPtr(new EchoClient()));
+    err = mgr.AddTcpClient(host, port, TcpClientPtr(new EchoClient(&logger.l)));
     if (err < 0) {
         logger_error(&logger.l, "add client failed: [%s].", strerror(-err));
         return -1;
