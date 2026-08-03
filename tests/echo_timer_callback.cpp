@@ -69,7 +69,7 @@ public:
                     m_endpoint_info.remote_addr.c_str(),
                     m_endpoint_info.remote_port);
 
-        auto timer = new EchoTimer();
+        TimerPtr timer(new EchoTimer());
         if (!timer) {
             logger_error(logger(), "allocate timer failed: [%s].",
                          strerror(ENOMEM));
@@ -78,7 +78,7 @@ public:
 
         const TimeVal delay = {1, 0};
         const TimeVal interval = {1, 0};
-        const int timer_fd = ctx->AddTimer(delay, interval, timer);
+        const int timer_fd = ctx->AddTimer(delay, interval, move(timer));
         if (timer_fd < 0) {
             logger_error(logger(), "add timer failed: [%s].",
                          strerror(-timer_fd));
@@ -99,8 +99,8 @@ public:
         return ReqStat::VALID;
     }
 
-    Task* CreateTask() override {
-        return new EchoTask();
+    TaskPtr CreateTask() override {
+        return TaskPtr(new EchoTask());
     }
 
 private:
@@ -126,7 +126,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    err = mgr.AddTcpClient(host, port, new EchoClient());
+    err = mgr.AddTcpClient(host, port, TcpClientPtr(new EchoClient()));
     if (err < 0) {
         logger_error(&logger.l, "add client failed: [%s].", strerror(-err));
         return -1;

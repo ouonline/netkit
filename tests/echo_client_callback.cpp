@@ -84,8 +84,8 @@ public:
         return ReqStat::VALID;
     }
 
-    Task* CreateTask() override {
-        return new EchoTask();
+    TaskPtr CreateTask() override {
+        return TaskPtr(new EchoTask());
     }
 
 private:
@@ -111,9 +111,9 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    int fd = mgr.AddTcpClient(host, port, new EchoClient());
-    if (fd < 0) {
-        logger_error(&logger.l, "add client failed: [%s].", strerror(-fd));
+    err = mgr.AddTcpClient(host, port, TcpClientPtr(new EchoClient()));
+    if (err < 0) {
+        logger_error(&logger.l, "add client failed: [%s].", strerror(-err));
         return -1;
     }
 

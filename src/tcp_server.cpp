@@ -32,13 +32,14 @@ bool TcpServer::Process(EventResult res, NotificationQueue* nq) {
     }
 
     int fd = res.val;
-    auto client = CreateClient();
-    if (!client) {
+    TcpClientPtr ptr = CreateClient();
+    if (!ptr) {
         close(fd);
         logger_error(m_logger, "create client failed.");
         return true;
     }
 
+    TcpClient* client = ptr.release();
     client->Init(m_logger);
     client->SetVar(fd, m_sched);
 

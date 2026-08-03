@@ -107,15 +107,19 @@ int EventManager::Init(const Options& options) {
 }
 
 int EventManager::AddTcpServer(const char* addr, uint16_t port,
-                               TcpServer* svr) {
+                               TcpServerPtr ptr) {
+    if (!ptr) {
+        return -EINVAL;
+    }
+
     int fd = utils::CreateTcpServerFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "create server for [%s:%u] failed: [%s].", addr,
                      port, strerror(-fd));
-        svr->DeleteSelf();
         return fd;
     }
 
+    TcpServer* svr = ptr.release();
     svr->Init(fd, &m_sched, m_logger);
 
     int err = svr->Start(m_new_rd_nq.get());
@@ -129,17 +133,21 @@ int EventManager::AddTcpServer(const char* addr, uint16_t port,
 }
 
 int EventManager::AddTcpClient(const char* addr, uint16_t port,
-                               TcpClient* client) {
-    client->Init(m_logger);
+                               TcpClientPtr ptr) {
+    if (!ptr) {
+        return -EINVAL;
+    }
+
+    ptr->Init(m_logger); // set logger at the beginning
 
     int fd = utils::CreateTcpClientFd(addr, port, m_logger);
     if (fd < 0) {
         logger_error(m_logger, "connect to [%s:%u] failed: [%s].", addr, port,
                      strerror(-fd));
-        client->DeleteSelf();
         return fd;
     }
 
+    TcpClient* client = ptr.release();
     client->SetVar(fd, &m_sched);
 
     int err = client->Start(m_new_rd_nq.get());

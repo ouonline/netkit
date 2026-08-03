@@ -2,9 +2,6 @@
 #define __NETKIT_TCP_SERVER_H__
 
 #include "tcp_client.h"
-#include "event_handler.h"
-#include "scheduler.h"
-#include "logger/logger.h"
 
 namespace netkit {
 
@@ -12,7 +9,7 @@ class TcpServer : public EventHandler {
 protected:
     virtual ~TcpServer();
 
-    virtual TcpClient* CreateClient() = 0;
+    virtual TcpClientPtr CreateClient() = 0;
 
     // same API as other EventHandler derived classes
     Logger* logger() const {
@@ -36,6 +33,8 @@ private:
     Scheduler* m_sched = nullptr;
     Logger* m_logger = nullptr;
 };
+
+using TcpServerPtr = EventHandlerPtr<TcpServer>;
 
 }
 

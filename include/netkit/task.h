@@ -1,8 +1,8 @@
 #ifndef __NETKIT_TASK_H__
 #define __NETKIT_TASK_H__
 
-#include "event_handler.h"
 #include "send_context.h"
+#include "event_handler_ptr.h"
 
 namespace netkit {
 
@@ -36,6 +36,8 @@ private:
 private:
     std::shared_ptr<Connection> m_conn;
 };
+
+using TaskPtr = EventHandlerPtr<Task>;
 
 }
 

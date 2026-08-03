@@ -1,11 +1,14 @@
 #ifndef __NETKIT_TIMER_H__
 #define __NETKIT_TIMER_H__
 
-#include "event_handler.h"
-#include "send_context.h"
+#include "event_handler_ptr.h"
+#include "connection.h"
+#include "logger/logger.h"
 #include <memory>
 
 namespace netkit {
+
+class SendContext;
 
 class Timer : public EventHandler {
 protected:
@@ -34,6 +37,8 @@ private:
     uint64_t m_nr_expiration;
     std::shared_ptr<Connection> m_conn;
 };
+
+using TimerPtr = EventHandlerPtr<Timer>;
 
 }
 

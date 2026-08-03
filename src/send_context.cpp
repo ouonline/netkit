@@ -38,8 +38,8 @@ int SendContext::Emit(Buffer&& b, const function<void(int err)>& on_complete) {
 }
 
 int SendContext::AddTimer(const TimeVal& delay, const TimeVal& interval,
-                          Timer* timer) {
-    if (!timer) {
+                          TimerPtr ptr) {
+    if (!ptr) {
         return -EINVAL;
     }
 
@@ -47,10 +47,10 @@ int SendContext::AddTimer(const TimeVal& delay, const TimeVal& interval,
     if (fd < 0) {
         logger_error(m_conn->logger, "CreateTimerFd failed: [%s].",
                      strerror(-fd));
-        timer->DeleteSelf();
         return fd;
     }
 
+    Timer* timer = ptr.release();
     int err = timer->Init(fd, m_conn);
     if (err) {
         logger_error(m_conn->logger, "init timer failed: [%s].",

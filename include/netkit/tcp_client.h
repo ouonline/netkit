@@ -2,9 +2,6 @@
 #define __NETKIT_TCP_CLIENT_H__
 
 #include "task.h"
-#include "send_context.h"
-#include "event_handler.h"
-#include "connection.h"
 #include "scheduler.h"
 
 namespace netkit {
@@ -35,7 +32,7 @@ protected:
     virtual int OnConnected(SendContext*) = 0;
     virtual void OnDisconnected() = 0;
     virtual ReqStat Check(const Buffer&, uint32_t* req_bytes) = 0;
-    virtual Task* CreateTask() = 0;
+    virtual TaskPtr CreateTask() = 0;
 
     Logger* logger() const {
         return m_conn->logger;
@@ -75,6 +72,8 @@ private:
     Scheduler* m_sched = nullptr;
     std::shared_ptr<Connection> m_conn;
 };
+
+using TcpClientPtr = EventHandlerPtr<TcpClient>;
 
 }
 

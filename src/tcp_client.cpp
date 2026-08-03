@@ -85,7 +85,6 @@ bool TcpClient::HandleMoreDataRequest(uint32_t req_bytes,
 
 int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
     int err;
-    Task* task;
 
     Buffer req;
     if (req_bytes < m_buf.size()) {
@@ -99,12 +98,14 @@ int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
     }
     std::swap(req, m_buf);
 
-    task = CreateTask();
-    if (!task) {
+    TaskPtr ptr = CreateTask();
+    if (!ptr) {
         logger_error(m_conn->logger, "allocate Task failed: [%s].",
                      strerror(ENOMEM));
         return -1;
     }
+
+    Task* task = ptr.release();
     task->Init(move(req), m_conn);
 
     err = m_sched->Process(0, static_cast<EventHandler*>(task), nq);

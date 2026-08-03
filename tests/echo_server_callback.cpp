@@ -45,8 +45,8 @@ public:
         return ReqStat::VALID;
     }
 
-    Task* CreateTask() override {
-        return new EchoTask();
+    TaskPtr CreateTask() override {
+        return TaskPtr(new EchoTask());
     }
 
 private:
@@ -55,8 +55,8 @@ private:
 
 class EchoServer final : public TcpServer {
 public:
-    TcpClient* CreateClient() override {
-        return new EchoClient();
+    TcpClientPtr CreateClient() override {
+        return TcpClientPtr(new EchoClient());
     }
 };
 
@@ -79,9 +79,9 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    int fd = mgr.AddTcpServer(host, port, new EchoServer());
-    if (fd < 0) {
-        logger_error(&logger.l, "add server failed: [%s].", strerror(-fd));
+    err = mgr.AddTcpServer(host, port, TcpServerPtr(new EchoServer()));
+    if (err < 0) {
+        logger_error(&logger.l, "add server failed: [%s].", strerror(-err));
         return -1;
     }
 

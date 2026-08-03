@@ -26,10 +26,10 @@ public:
     void Destroy();
 
     /** returns -errno or fd of the server */
-    int AddTcpServer(const char* addr, uint16_t port, TcpServer*);
+    int AddTcpServer(const char* addr, uint16_t port, TcpServerPtr);
 
     /** returns -errno or fd of the client */
-    int AddTcpClient(const char* addr, uint16_t port, TcpClient*);
+    int AddTcpClient(const char* addr, uint16_t port, TcpClientPtr);
 
     void Loop();
 

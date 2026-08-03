@@ -1,4 +1,5 @@
 #include "netkit/timer.h"
+#include "netkit/send_context.h"
 #include "misc.h"
 #include <string.h> // strerror()
 #include <unistd.h> // close()
@@ -25,6 +26,7 @@ int Timer::Init(int fd, const shared_ptr<Connection>& conn) {
     }
 
     conn->timer_fds.insert(fd);
+
     return 0;
 }
 
