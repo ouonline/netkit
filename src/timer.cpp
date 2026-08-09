@@ -52,10 +52,10 @@ bool Timer::Process(EventResult res, NotificationQueue* nq) {
     }
 
     SendContext ctx(m_conn, nq, m_logger);
-    if (res.err) {
+    if (res.val < 0) {
         logger_error(m_logger, "read timer expirations failed: [%s].",
-                     strerror(res.err));
-        OnExpiration(-res.err, &ctx);
+                     strerror(-res.val));
+        OnExpiration(res.val, &ctx);
         return false;
     }
 

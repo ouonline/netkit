@@ -23,11 +23,10 @@ public:
     int Init(const Options&, Logger* l);
     void Destroy(); // destroy this instance if necessary
 
-    int AcceptAsync(uintptr_t svr_fd, void* tag, bool multishot) override;
-    int ReadAsync(uintptr_t fd, void* buf, uint64_t sz, void* tag) override;
-    int WriteAsync(uintptr_t fd, const void* buf, uint64_t sz,
-                   void* tag) override;
-    int CloseAsync(uintptr_t fd, void* tag) override;
+    int AcceptAsync(int svr_fd, void* tag, bool multishot) override;
+    int ReadAsync(int fd, void* buf, uint64_t sz, void* tag) override;
+    int WriteAsync(int fd, const void* buf, uint64_t sz, void* tag) override;
+    int CloseAsync(int fd, void* tag) override;
     int NotifyAsync(NotificationQueue*, int res, void* tag) override;
 
     int Next(EventResult* res, void** tag, const TimeVal* timeout) override;

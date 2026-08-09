@@ -121,24 +121,25 @@ int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
 }
 
 bool TcpClient::Process(EventResult res, NotificationQueue* nq) {
-    if (res.err) {
-        if (ShouldRetry(-res.err)) {
-            goto read_again;
-        }
-
-        logger_error(m_logger, "read data failed: [%s].", strerror(res.err));
-        m_conn->ShutDown(m_logger);
-        return false;
-    }
     if (res.val == 0) {
         return false;
     }
 
-    m_buf.Resize(m_buf.size() + res.val);
+    uint32_t bytes_read = 0;
+    if (res.val < 0) {
+        if (!ShouldRetry(res.val)) {
+            logger_error(m_logger, "read data failed: [%s].",
+                         strerror(-res.val));
+            m_conn->ShutDown(m_logger);
+            return false;
+        }
+    } else {
+        bytes_read = static_cast<uint32_t>(res.val);
+        m_buf.Resize(m_buf.size() + bytes_read);
+    }
 
-read_again:
     if (m_bytes_needed > 0) {
-        m_bytes_needed -= res.val;
+        m_bytes_needed -= bytes_read;
         if (m_bytes_needed > 0) {
             int err =
                 nq->ReadAsync(m_conn->fd, m_buf.data() + m_buf.size(),

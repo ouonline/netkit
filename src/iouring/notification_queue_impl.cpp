@@ -1,6 +1,7 @@
 #include "netkit/iouring/notification_queue_impl.h"
 #include <string.h> // strerror()
 #include <functional>
+#include <limits>
 using namespace std;
 
 namespace netkit { namespace iouring {
@@ -68,13 +69,7 @@ int NotificationQueueImpl::Next(EventResult* res, void** tag,
         }
     }
 
-    if (cqe->res < 0) {
-        res->val = 0;
-        res->err = -cqe->res;
-    } else {
-        res->val = cqe->res;
-        res->err = 0;
-    }
+    res->val = cqe->res;
     *tag = io_uring_cqe_get_data(cqe);
 
     io_uring_cqe_seen(&m_ring, cqe);
@@ -118,8 +113,11 @@ static int GenericAsync(struct io_uring* ring, Logger* logger,
     return 0;
 }
 
-int NotificationQueueImpl::AcceptAsync(uintptr_t fd, void* tag,
-                                       bool multishot) {
+static unsigned ClampIOSize(uint64_t sz) {
+    return (numeric_limits<unsigned>::max() < sz) ?: static_cast<unsigned>(sz);
+}
+
+int NotificationQueueImpl::AcceptAsync(int fd, void* tag, bool multishot) {
     if (multishot) {
         return GenericAsync(
             &m_ring, m_logger, [fd, tag](struct io_uring_sqe* sqe) -> void {
@@ -135,25 +133,29 @@ int NotificationQueueImpl::AcceptAsync(uintptr_t fd, void* tag,
                         });
 }
 
-int NotificationQueueImpl::ReadAsync(uintptr_t fd, void* buf, uint64_t sz,
+int NotificationQueueImpl::ReadAsync(int fd, void* buf, uint64_t sz,
                                      void* tag) {
-    return GenericAsync(&m_ring, m_logger,
-                        [fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
-                            io_uring_prep_read(sqe, fd, buf, sz, -1);
-                            io_uring_sqe_set_data(sqe, tag);
-                        });
+    unsigned nbytes = ClampIOSize(sz);
+    return GenericAsync(
+        &m_ring, m_logger,
+        [fd, buf, nbytes, tag](struct io_uring_sqe* sqe) -> void {
+            io_uring_prep_read(sqe, fd, buf, nbytes, -1);
+            io_uring_sqe_set_data(sqe, tag);
+        });
 }
 
-int NotificationQueueImpl::WriteAsync(uintptr_t fd, const void* buf,
-                                      uint64_t sz, void* tag) {
-    return GenericAsync(&m_ring, m_logger,
-                        [fd, buf, sz, tag](struct io_uring_sqe* sqe) -> void {
-                            io_uring_prep_write(sqe, fd, buf, sz, -1);
-                            io_uring_sqe_set_data(sqe, tag);
-                        });
+int NotificationQueueImpl::WriteAsync(int fd, const void* buf, uint64_t sz,
+                                      void* tag) {
+    unsigned nbytes = ClampIOSize(sz);
+    return GenericAsync(
+        &m_ring, m_logger,
+        [fd, buf, nbytes, tag](struct io_uring_sqe* sqe) -> void {
+            io_uring_prep_write(sqe, fd, buf, nbytes, -1);
+            io_uring_sqe_set_data(sqe, tag);
+        });
 }
 
-int NotificationQueueImpl::CloseAsync(uintptr_t fd, void* tag) {
+int NotificationQueueImpl::CloseAsync(int fd, void* tag) {
     return GenericAsync(&m_ring, m_logger,
                         [fd, tag](struct io_uring_sqe* sqe) -> void {
                             io_uring_prep_close(sqe, fd);

@@ -22,7 +22,7 @@ struct State {
 };
 
 struct EchoServer final : public State {
-    uintptr_t fd;
+    int fd;
 };
 
 struct EchoSession final : public State {
@@ -33,7 +33,7 @@ struct EchoSession final : public State {
         }
     }
 
-    uintptr_t fd;
+    int fd;
     EndpointInfo endpoint_info;
     char buf[ECHO_BUFFER_SIZE];
 };
@@ -46,9 +46,9 @@ static State::Value Process(EchoServer* svr, EventResult res, void* tag,
     auto ret_state = state->value;
     switch (ret_state) {
         case State::CLIENT_CONNECTED: {
-            if (res.err || res.val == 0) {
+            if (res.val <= 0) {
                 logger_info(logger, "[server] closes server: [%s].",
-                            strerror(res.err));
+                            strerror(-res.val));
                 break;
             }
 
@@ -70,9 +70,9 @@ static State::Value Process(EchoServer* svr, EventResult res, void* tag,
         case State::RECV_REQ: {
             auto session = static_cast<EchoSession*>(state);
             const EndpointInfo& info = session->endpoint_info;
-            if (res.err) {
+            if (res.val < 0) {
                 logger_error(logger, "recv session request failed: [%s].",
-                             strerror(res.err));
+                             strerror(-res.val));
                 delete session;
             } else if (res.val == 0) {
                 logger_info(logger, "[server] client [%s:%u] disconnected.",
@@ -100,9 +100,9 @@ static State::Value Process(EchoServer* svr, EventResult res, void* tag,
         }
         case State::SEND_RES: {
             auto session = static_cast<EchoSession*>(state);
-            if (res.err) {
+            if (res.val < 0) {
                 logger_error(logger, "send response to session failed: [%s].",
-                             strerror(res.err));
+                             strerror(-res.val));
                 delete session;
             } else if (res.val == 0) {
                 const EndpointInfo& info = session->endpoint_info;

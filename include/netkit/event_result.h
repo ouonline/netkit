@@ -6,8 +6,7 @@
 namespace netkit {
 
 struct EventResult final {
-    uintptr_t val;
-    int32_t err;
+    int32_t val; // value or -errno
 };
 
 }

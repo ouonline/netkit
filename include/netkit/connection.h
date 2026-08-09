@@ -31,7 +31,7 @@ public:
     std::mutex timer_lock;
     std::set<int> timer_fds;
     std::mutex send_lock;
-    uint32_t send_offset = 0;
+    uint64_t send_offset = 0;
     std::queue<SendItem> send_queue;
 };
 

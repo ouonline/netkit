@@ -29,7 +29,7 @@ static State Process(EventResult res, EchoClient* client, NotificationQueue* nq,
 
     switch (client->state) {
         case State::CLIENT_SEND_REQ: {
-            if (res.val == 0) {
+            if (res.val <= 0) {
                 const EndpointInfo& info = client->endpoint_info;
                 logger_info(logger, "[client] server [%s:%u] down.",
                             info.remote_addr.c_str(), info.remote_port);
@@ -51,7 +51,7 @@ static State Process(EventResult res, EchoClient* client, NotificationQueue* nq,
         }
         case State::CLIENT_GET_RES: {
             const EndpointInfo& info = client->endpoint_info;
-            if (res.val == 0) {
+            if (res.val <= 0) {
                 logger_info(logger, "[client] server [%s:%u] down.",
                             info.remote_addr.c_str(), info.remote_port);
                 client->state = State::CLIENT_DISCONNECTED;

@@ -29,8 +29,8 @@ loop:
 }
 
 bool TcpServer::Process(EventResult res, NotificationQueue* nq) {
-    if (res.err) {
-        logger_error(m_logger, "server down: [%s].", strerror(res.err));
+    if (res.val < 0) {
+        logger_error(m_logger, "server down: [%s].", strerror(-res.val));
         return false;
     }
 

@@ -38,9 +38,9 @@ bool Sender::Process(EventResult res, NotificationQueue* nq) {
         item = &m_conn->send_queue.front();
     }
 
-    if (res.err) {
-        logger_error(m_logger, "send data failed: [%s].", strerror(res.err));
-        item->on_complete(-res.err);
+    if (res.val < 0) {
+        logger_error(m_logger, "send data failed: [%s].", strerror(-res.val));
+        item->on_complete(res.val);
         m_conn->ShutDown(m_logger);
         return false;
     }
@@ -49,7 +49,7 @@ bool Sender::Process(EventResult res, NotificationQueue* nq) {
         return false;
     }
 
-    m_conn->send_offset += res.val;
+    m_conn->send_offset += static_cast<uint32_t>(res.val);
     if (m_conn->send_offset == item->data.size()) {
         item->on_complete(0);
         m_conn->send_offset = 0;
