@@ -17,7 +17,8 @@ protected:
 
     /*
       `val` < 0: error occurs and `val` == -errno
-      `val` > 0: the number of expirations
+      `val` > 0: number of expirations
+      `val` == 0: exit normally
       returns true to keep this timer
     */
     virtual bool OnExpiration(int val, SendContext*) = 0;

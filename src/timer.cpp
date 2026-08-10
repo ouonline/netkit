@@ -47,11 +47,13 @@ loop:
 }
 
 bool Timer::Process(EventResult res, EventQueue* eq) {
+    SendContext ctx(m_conn, eq, m_logger);
+
     if (!m_conn->IsValid()) {
+        OnExpiration(0, &ctx);
         return false;
     }
 
-    SendContext ctx(m_conn, eq, m_logger);
     if (res.val < 0) {
         logger_error(m_logger, "read timer expirations failed: [%s].",
                      strerror(-res.val));

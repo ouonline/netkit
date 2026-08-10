@@ -32,6 +32,10 @@ private:
             logger_error(m_logger, "timer failed: [%s].", strerror(-val));
             return false;
         }
+        if (val == 0) {
+            logger_info(m_logger, "client disconnected.");
+            return false;
+        }
 
         Buffer buf;
         const auto message = to_string(m_counter++);
