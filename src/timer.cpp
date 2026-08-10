@@ -30,9 +30,9 @@ int Timer::Init(int fd, const shared_ptr<Connection>& conn) {
     return 0;
 }
 
-int Timer::Start(NotificationQueue* nq) {
+int Timer::Start(EventQueue* eq) {
 loop:
-    int err = nq->ReadAsync(m_fd, &m_nr_expiration, sizeof(m_nr_expiration),
+    int err = eq->ReadAsync(m_fd, &m_nr_expiration, sizeof(m_nr_expiration),
                             static_cast<EventHandler*>(this));
     if (ShouldRetry(err)) {
         goto loop;
@@ -46,12 +46,12 @@ loop:
     return err;
 }
 
-bool Timer::Process(EventResult res, NotificationQueue* nq) {
+bool Timer::Process(EventResult res, EventQueue* eq) {
     if (!m_conn->IsValid()) {
         return false;
     }
 
-    SendContext ctx(m_conn, nq, m_logger);
+    SendContext ctx(m_conn, eq, m_logger);
     if (res.val < 0) {
         logger_error(m_logger, "read timer expirations failed: [%s].",
                      strerror(-res.val));
@@ -64,7 +64,7 @@ bool Timer::Process(EventResult res, NotificationQueue* nq) {
         return false;
     }
 
-    int err = Start(nq);
+    int err = Start(eq);
     if (err) {
         OnExpiration(err, &ctx);
         return false;

@@ -1,4 +1,4 @@
-#include "netkit/iouring/notification_queue_impl.h"
+#include "netkit/iouring/event_queue_impl.h"
 #include "netkit/utils.h"
 #include "logger/stdout_logger.h"
 #include <string.h> // strerror()
@@ -23,7 +23,7 @@ struct EchoClient final {
     char buf[ECHO_BUFFER_SIZE];
 };
 
-static State Process(EventResult res, EchoClient* client, NotificationQueue* nq,
+static State Process(EventResult res, EchoClient* client, EventQueue* eq,
                      Logger* logger) {
     int rc;
 
@@ -34,7 +34,7 @@ static State Process(EventResult res, EchoClient* client, NotificationQueue* nq,
                 logger_info(logger, "[client] server [%s:%u] down.",
                             info.remote_addr.c_str(), info.remote_port);
                 client->state = State::CLIENT_DISCONNECTED;
-                rc = nq->CloseAsync(client->fd, client);
+                rc = eq->CloseAsync(client->fd, client);
                 if (rc != 0) {
                     logger_error(logger, "CloseAsync() failed.");
                 }
@@ -42,7 +42,7 @@ static State Process(EventResult res, EchoClient* client, NotificationQueue* nq,
             }
 
             client->state = State::CLIENT_GET_RES;
-            rc = nq->ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE,
+            rc = eq->ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE,
                                client);
             if (rc != 0) {
                 logger_error(logger, "ReadAsync() failed.");
@@ -55,7 +55,7 @@ static State Process(EventResult res, EchoClient* client, NotificationQueue* nq,
                 logger_info(logger, "[client] server [%s:%u] down.",
                             info.remote_addr.c_str(), info.remote_port);
                 client->state = State::CLIENT_DISCONNECTED;
-                rc = nq->CloseAsync(client->fd, client);
+                rc = eq->CloseAsync(client->fd, client);
                 if (rc != 0) {
                     logger_error(logger, "CloseAsync() failed.");
                 }
@@ -78,7 +78,7 @@ static State Process(EventResult res, EchoClient* client, NotificationQueue* nq,
             auto num = atol(client->buf);
             if (num == 5) {
                 client->state = State::CLIENT_DISCONNECTED;
-                rc = nq->CloseAsync(client->fd, client);
+                rc = eq->CloseAsync(client->fd, client);
                 if (rc != 0) {
                     logger_error(logger, "CloseAsync() failed.");
                 }
@@ -87,7 +87,7 @@ static State Process(EventResult res, EchoClient* client, NotificationQueue* nq,
 
             auto len = sprintf(client->buf, "%lu", num + 1);
             client->state = State::CLIENT_SEND_REQ;
-            rc = nq->WriteAsync(client->fd, client->buf, len, client);
+            rc = eq->WriteAsync(client->fd, client->buf, len, client);
             if (rc != 0) {
                 logger_error(logger, "WriteAsync() failed.");
             }
@@ -123,10 +123,10 @@ int main(int argc, char* argv[]) {
     StdoutLogger logger;
     stdout_logger_init(&logger);
 
-    NotificationQueueImpl nq;
-    auto rc = nq.Init(NotificationQueueImpl::Options(), &logger.l);
+    EventQueueImpl eq;
+    auto rc = eq.Init(EventQueueImpl::Options(), &logger.l);
     if (rc < 0) {
-        logger_error(&logger.l, "init notification queue failed: [%s].",
+        logger_error(&logger.l, "init event queue failed: [%s].",
                      strerror(-rc));
         return -1;
     }
@@ -145,7 +145,7 @@ int main(int argc, char* argv[]) {
                 info.remote_addr.c_str(), info.remote_port);
 
     client.state = State::CLIENT_SEND_REQ;
-    rc = nq.WriteAsync(client.fd, "0", 1, &client);
+    rc = eq.WriteAsync(client.fd, "0", 1, &client);
     if (rc != 0) {
         logger_error(&logger.l, "send initial request failed.");
         return -1;
@@ -155,14 +155,14 @@ int main(int argc, char* argv[]) {
         EventResult res;
         void* tag = nullptr;
 
-        rc = nq.Next(&res, &tag, nullptr);
+        rc = eq.Next(&res, &tag, nullptr);
         if (rc != 0) {
             logger_error(&logger.l, "get event failed.");
             break;
         }
 
         auto client = static_cast<EchoClient*>(tag);
-        auto st = Process(res, client, &nq, &logger.l);
+        auto st = Process(res, client, &eq, &logger.l);
         if (st == State::CLIENT_END_LOOP) {
             break;
         }

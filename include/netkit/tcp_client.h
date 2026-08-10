@@ -47,19 +47,19 @@ private:
         m_sched = sched;
     }
 
-    int Start(NotificationQueue*);
-    bool Process(EventResult, NotificationQueue*) final;
+    int Start(EventQueue*);
+    bool Process(EventResult, EventQueue*) final;
     void DeleteSelf() final;
 
 private:
-    int DoRead(void* buf, uint64_t sz, NotificationQueue*);
+    int DoRead(void* buf, uint64_t sz, EventQueue*);
     void HandleInvalidRequest();
-    int HandleMoreDataRequest(uint32_t req_bytes, NotificationQueue*);
+    int HandleMoreDataRequest(uint32_t req_bytes, EventQueue*);
 
     // -1: error
     // 0: ok and return
     // 1: ok, and continue next ->Check()
-    int HandleValidRequest(uint32_t req_bytes, NotificationQueue*);
+    int HandleValidRequest(uint32_t req_bytes, EventQueue*);
 
 private:
     uint64_t m_bytes_needed = 0;

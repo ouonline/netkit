@@ -29,8 +29,8 @@ private:
     friend class SendContext;
 
     int Init(int fd, const std::shared_ptr<Connection>&);
-    int Start(NotificationQueue*);
-    bool Process(EventResult, NotificationQueue*) final;
+    int Start(EventQueue*);
+    bool Process(EventResult, EventQueue*) final;
 
 private:
     int m_fd;

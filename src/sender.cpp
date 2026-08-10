@@ -5,10 +5,10 @@ using namespace std;
 
 namespace netkit {
 
-int Sender::DoWrite(const void* buf, uint64_t sz, NotificationQueue* nq) {
+int Sender::DoWrite(const void* buf, uint64_t sz, EventQueue* eq) {
 loop:
     int err =
-        nq->WriteAsync(m_conn->fd, buf, sz, static_cast<EventHandler*>(this));
+        eq->WriteAsync(m_conn->fd, buf, sz, static_cast<EventHandler*>(this));
     if (ShouldRetry(err)) {
         goto loop;
     }
@@ -21,17 +21,17 @@ loop:
     return err;
 }
 
-int Sender::Start(NotificationQueue* nq) {
+int Sender::Start(EventQueue* eq) {
     SendItem* item;
     {
         lock_guard<mutex> _l(m_conn->send_lock);
         item = &m_conn->send_queue.front();
     }
 
-    return DoWrite(item->data.data(), item->data.size(), nq);
+    return DoWrite(item->data.data(), item->data.size(), eq);
 }
 
-bool Sender::Process(EventResult res, NotificationQueue* nq) {
+bool Sender::Process(EventResult res, EventQueue* eq) {
     SendItem* item;
     {
         lock_guard<mutex> _l(m_conn->send_lock);
@@ -62,7 +62,7 @@ bool Sender::Process(EventResult res, NotificationQueue* nq) {
     }
 
     int err = DoWrite(item->data.data() + m_conn->send_offset,
-                      item->data.size() - m_conn->send_offset, nq);
+                      item->data.size() - m_conn->send_offset, eq);
     return (err == 0);
 }
 

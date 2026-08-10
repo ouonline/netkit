@@ -16,10 +16,10 @@ private:
 
     Sender(const std::shared_ptr<Connection>& c, Logger* l)
         : m_conn(c), m_logger(l) {}
-    int Start(NotificationQueue*);
-    bool Process(EventResult, NotificationQueue*) override;
+    int Start(EventQueue*);
+    bool Process(EventResult, EventQueue*) override;
 
-    int DoWrite(const void* buf, uint64_t sz, NotificationQueue*);
+    int DoWrite(const void* buf, uint64_t sz, EventQueue*);
 
 private:
     std::shared_ptr<Connection> m_conn;

@@ -25,8 +25,8 @@ private:
         m_conn = c;
     }
 
-    bool Process(EventResult, NotificationQueue* nq) final {
-        SendContext ctx(m_conn, nq, m_logger);
+    bool Process(EventResult, EventQueue* eq) final {
+        SendContext ctx(m_conn, eq, m_logger);
         Run(&ctx);
         return false;
     }

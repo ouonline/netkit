@@ -1,7 +1,7 @@
 #include "misc.h"
 #include "netkit/utils.h"
 #include "netkit/event_manager.h"
-#include "netkit/iouring/notification_queue_impl.h"
+#include "netkit/iouring/event_queue_impl.h"
 #include <string.h>
 using namespace std;
 
@@ -9,11 +9,11 @@ namespace netkit {
 
 using namespace iouring;
 
-static void WorkLoop(NotificationQueue* nq, Logger* logger) {
+static void WorkLoop(EventQueue* eq, Logger* logger) {
     while (true) {
         EventResult res;
         void* tag = nullptr;
-        int err = nq->Next(&res, &tag, nullptr);
+        int err = eq->Next(&res, &tag, nullptr);
         if (err) {
             logger_error(logger, "get event failed: [%s].", strerror(-err));
             break;
@@ -23,7 +23,7 @@ static void WorkLoop(NotificationQueue* nq, Logger* logger) {
         }
 
         auto handler = static_cast<EventHandler*>(tag);
-        bool keep = handler->Process(res, nq);
+        bool keep = handler->Process(res, eq);
         if (!keep) {
             handler->DeleteSelf();
         }
@@ -35,8 +35,8 @@ void EventManager::Destroy() {
         return;
     }
 
-    for (uint32_t i = 0; i < m_worker_nq_list.size(); ++i) {
-        m_nq->NotifyAsync(m_worker_nq_list[i].get(), 0, nullptr);
+    for (uint32_t i = 0; i < m_worker_eq_list.size(); ++i) {
+        m_eq->NotifyAsync(m_worker_eq_list[i].get(), 0, nullptr);
     }
 
     for (uint32_t i = 0; i < m_worker_thread_list.size(); ++i) {
@@ -46,8 +46,8 @@ void EventManager::Destroy() {
     }
 
     m_worker_thread_list.clear();
-    m_worker_nq_list.clear();
-    m_nq.reset();
+    m_worker_eq_list.clear();
+    m_eq.reset();
     m_logger = nullptr;
 }
 
@@ -63,42 +63,42 @@ int EventManager::Init(const Options& options) {
         worker_num = max(thread::hardware_concurrency(), 2u) - 1;
     }
 
-    m_worker_nq_list.resize(worker_num);
+    m_worker_eq_list.resize(worker_num);
     for (uint32_t i = 0; i < worker_num; ++i) {
-        auto impl = new NotificationQueueImpl();
+        auto impl = new EventQueueImpl();
         if (!impl) {
-            logger_error(m_logger, "allocate notification queue failed: [%s].",
+            logger_error(m_logger, "allocate event queue failed: [%s].",
                          strerror(ENOMEM));
             return -ENOMEM;
         }
-        m_worker_nq_list[i].reset(impl);
+        m_worker_eq_list[i].reset(impl);
 
-        int err = impl->Init(NotificationQueueImpl::Options(), m_logger);
+        int err = impl->Init(EventQueueImpl::Options(), m_logger);
         if (err) {
-            logger_error(m_logger, "init notification queue failed: [%s].",
+            logger_error(m_logger, "init event queue failed: [%s].",
                          strerror(-err));
             return err;
         }
     }
 
-    auto impl = new NotificationQueueImpl();
+    auto impl = new EventQueueImpl();
     if (!impl) {
-        logger_error(m_logger, "allocate notification queue failed: [%s].",
+        logger_error(m_logger, "allocate event queue failed: [%s].",
                      strerror(ENOMEM));
         return -ENOMEM;
     }
-    m_nq.reset(impl);
+    m_eq.reset(impl);
 
-    int err = impl->Init(NotificationQueueImpl::Options(), m_logger);
+    int err = impl->Init(EventQueueImpl::Options(), m_logger);
     if (err) {
-        logger_error(m_logger, "init notification queue failed: [%s].",
+        logger_error(m_logger, "init event queue failed: [%s].",
                      strerror(-err));
         return err;
     }
 
     m_worker_thread_list.reserve(worker_num);
     for (uint32_t i = 0; i < worker_num; ++i) {
-        m_worker_thread_list.emplace_back(WorkLoop, m_worker_nq_list[i].get(),
+        m_worker_thread_list.emplace_back(WorkLoop, m_worker_eq_list[i].get(),
                                           m_logger);
     }
 
@@ -122,7 +122,7 @@ int EventManager::AddTcpServer(const char* addr, uint16_t port,
     TcpServer* svr = ptr.release();
     svr->Init(fd, &m_sched);
 
-    int err = svr->Start(m_nq.get());
+    int err = svr->Start(m_eq.get());
     if (err) {
         logger_error(m_logger, "start server failed: [%s].", strerror(-err));
         svr->DeleteSelf();
@@ -148,7 +148,7 @@ int EventManager::AddTcpClient(const char* addr, uint16_t port,
     TcpClient* client = ptr.release();
     client->Init(fd, &m_sched);
 
-    int err = client->Start(m_nq.get());
+    int err = client->Start(m_eq.get());
     if (err) {
         logger_error(m_logger, "TcpClient start failed: [%s].", strerror(-err));
         client->DeleteSelf();
@@ -159,7 +159,7 @@ int EventManager::AddTcpClient(const char* addr, uint16_t port,
 }
 
 void EventManager::Loop() {
-    WorkLoop(m_nq.get(), m_logger);
+    WorkLoop(m_eq.get(), m_logger);
 }
 
 }

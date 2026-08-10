@@ -12,15 +12,15 @@ TcpServer::~TcpServer() {
     }
 }
 
-int TcpServer::Start(NotificationQueue* nq) {
+int TcpServer::Start(EventQueue* eq) {
 loop:
-    int err = nq->AcceptAsync(m_fd, static_cast<EventHandler*>(this), true);
+    int err = eq->AcceptAsync(m_fd, static_cast<EventHandler*>(this), true);
     if (ShouldRetry(err)) {
         goto loop;
     }
 
     if (err) {
-        logger_error(m_logger, "add server to notification queue failed: [%s].",
+        logger_error(m_logger, "add server to event queue failed: [%s].",
                      strerror(-err));
         // fall through
     }
@@ -28,7 +28,7 @@ loop:
     return err;
 }
 
-bool TcpServer::Process(EventResult res, NotificationQueue* nq) {
+bool TcpServer::Process(EventResult res, EventQueue* eq) {
     if (res.val < 0) {
         logger_error(m_logger, "server down: [%s].", strerror(-res.val));
         return false;
@@ -45,7 +45,7 @@ bool TcpServer::Process(EventResult res, NotificationQueue* nq) {
     TcpClient* client = ptr.release();
     client->Init(fd, m_sched);
 
-    int err = client->Start(nq);
+    int err = client->Start(eq);
     if (err) {
         logger_error(m_logger, "TcpClient start failed: [%s].", strerror(-err));
         client->DeleteSelf();

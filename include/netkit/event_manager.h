@@ -16,7 +16,7 @@ public:
 
 public:
     EventManager(Logger* logger)
-        : m_logger(logger), m_sched(&m_worker_nq_list) {}
+        : m_logger(logger), m_sched(&m_worker_eq_list) {}
     ~EventManager() {
         Destroy();
     }
@@ -35,8 +35,8 @@ public:
 
 private:
     Logger* m_logger;
-    std::unique_ptr<NotificationQueue> m_nq;
-    std::vector<std::unique_ptr<NotificationQueue>> m_worker_nq_list;
+    std::unique_ptr<EventQueue> m_eq;
+    std::vector<std::unique_ptr<EventQueue>> m_worker_eq_list;
     Scheduler m_sched;
     std::vector<std::thread> m_worker_thread_list;
 

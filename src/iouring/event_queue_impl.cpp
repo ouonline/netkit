@@ -1,4 +1,4 @@
-#include "netkit/iouring/notification_queue_impl.h"
+#include "netkit/iouring/event_queue_impl.h"
 #include <string.h> // strerror()
 #include <functional>
 #include <limits>
@@ -6,7 +6,7 @@ using namespace std;
 
 namespace netkit { namespace iouring {
 
-int NotificationQueueImpl::Init(const Options& options, Logger* l) {
+int EventQueueImpl::Init(const Options& options, Logger* l) {
     if (m_logger) {
         return 0;
     }
@@ -22,15 +22,14 @@ int NotificationQueueImpl::Init(const Options& options, Logger* l) {
     return 0;
 }
 
-void NotificationQueueImpl::Destroy() {
+void EventQueueImpl::Destroy() {
     if (m_logger) {
         io_uring_queue_exit(&m_ring);
         m_logger = nullptr;
     }
 }
 
-int NotificationQueueImpl::Next(EventResult* res, void** tag,
-                                const TimeVal* timeout) {
+int EventQueueImpl::Next(EventResult* res, void** tag, const TimeVal* timeout) {
     struct io_uring_cqe* cqe = nullptr;
 
     if (timeout) {
@@ -114,10 +113,14 @@ static int GenericAsync(struct io_uring* ring, Logger* logger,
 }
 
 static unsigned ClampIOSize(uint64_t sz) {
-    return (numeric_limits<unsigned>::max() < sz) ?: static_cast<unsigned>(sz);
+    auto max_val = numeric_limits<unsigned>::max();
+    if (max_val < sz) {
+        return max_val;
+    }
+    return static_cast<unsigned>(sz);
 }
 
-int NotificationQueueImpl::AcceptAsync(int fd, void* tag, bool multishot) {
+int EventQueueImpl::AcceptAsync(int fd, void* tag, bool multishot) {
     if (multishot) {
         return GenericAsync(
             &m_ring, m_logger, [fd, tag](struct io_uring_sqe* sqe) -> void {
@@ -133,8 +136,7 @@ int NotificationQueueImpl::AcceptAsync(int fd, void* tag, bool multishot) {
                         });
 }
 
-int NotificationQueueImpl::ReadAsync(int fd, void* buf, uint64_t sz,
-                                     void* tag) {
+int EventQueueImpl::ReadAsync(int fd, void* buf, uint64_t sz, void* tag) {
     unsigned nbytes = ClampIOSize(sz);
     return GenericAsync(
         &m_ring, m_logger,
@@ -144,8 +146,8 @@ int NotificationQueueImpl::ReadAsync(int fd, void* buf, uint64_t sz,
         });
 }
 
-int NotificationQueueImpl::WriteAsync(int fd, const void* buf, uint64_t sz,
-                                      void* tag) {
+int EventQueueImpl::WriteAsync(int fd, const void* buf, uint64_t sz,
+                               void* tag) {
     unsigned nbytes = ClampIOSize(sz);
     return GenericAsync(
         &m_ring, m_logger,
@@ -155,7 +157,7 @@ int NotificationQueueImpl::WriteAsync(int fd, const void* buf, uint64_t sz,
         });
 }
 
-int NotificationQueueImpl::CloseAsync(int fd, void* tag) {
+int EventQueueImpl::CloseAsync(int fd, void* tag) {
     return GenericAsync(&m_ring, m_logger,
                         [fd, tag](struct io_uring_sqe* sqe) -> void {
                             io_uring_prep_close(sqe, fd);
@@ -163,9 +165,8 @@ int NotificationQueueImpl::CloseAsync(int fd, void* tag) {
                         });
 }
 
-int NotificationQueueImpl::NotifyAsync(NotificationQueue* nq, int res,
-                                       void* tag) {
-    auto impl = static_cast<NotificationQueueImpl*>(nq);
+int EventQueueImpl::NotifyAsync(EventQueue* eq, int res, void* tag) {
+    auto impl = static_cast<EventQueueImpl*>(eq);
     return GenericAsync(&m_ring, m_logger,
                         [impl, res, tag](struct io_uring_sqe* sqe) -> void {
                             io_uring_prep_msg_ring(sqe, impl->m_ring.ring_fd,

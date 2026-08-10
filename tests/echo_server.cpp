@@ -1,4 +1,4 @@
-#include "netkit/iouring/notification_queue_impl.h"
+#include "netkit/iouring/event_queue_impl.h"
 #include "netkit/utils.h"
 #include "logger/stdout_logger.h"
 #include <string.h> // strerror()
@@ -39,7 +39,7 @@ struct EchoSession final : public State {
 };
 
 static State::Value Process(EchoServer* svr, EventResult res, void* tag,
-                            NotificationQueue* nq, Logger* logger) {
+                            EventQueue* eq, Logger* logger) {
     int rc;
 
     auto state = static_cast<State*>(tag);
@@ -60,7 +60,7 @@ static State::Value Process(EchoServer* svr, EventResult res, void* tag,
                         session->endpoint_info.remote_port);
 
             session->value = State::RECV_REQ;
-            rc = nq->ReadAsync(res.val, session->buf, ECHO_BUFFER_SIZE,
+            rc = eq->ReadAsync(res.val, session->buf, ECHO_BUFFER_SIZE,
                                static_cast<State*>(session));
             if (rc != 0) {
                 logger_error(logger, "ReadAsync() failed.");
@@ -79,7 +79,7 @@ static State::Value Process(EchoServer* svr, EventResult res, void* tag,
                             info.remote_addr.c_str(), info.remote_port);
                 delete session;
                 svr->value = State::CLOSED;
-                rc = nq->CloseAsync(svr->fd, static_cast<State*>(svr));
+                rc = eq->CloseAsync(svr->fd, static_cast<State*>(svr));
                 if (rc != 0) {
                     logger_error(logger, "CloseAsync() failed.");
                 }
@@ -91,7 +91,7 @@ static State::Value Process(EchoServer* svr, EventResult res, void* tag,
                     info.local_addr.c_str(), info.local_port, res.val,
                     session->buf);
                 session->value = State::SEND_RES;
-                rc = nq->WriteAsync(session->fd, session->buf, res.val, tag);
+                rc = eq->WriteAsync(session->fd, session->buf, res.val, tag);
                 if (rc != 0) {
                     logger_error(logger, "WriteAsync() failed.");
                 }
@@ -111,7 +111,7 @@ static State::Value Process(EchoServer* svr, EventResult res, void* tag,
                 delete session;
             } else {
                 session->value = State::RECV_REQ;
-                rc = nq->ReadAsync(session->fd, session->buf, ECHO_BUFFER_SIZE,
+                rc = eq->ReadAsync(session->fd, session->buf, ECHO_BUFFER_SIZE,
                                    tag);
                 if (rc != 0) {
                     logger_error(logger, "ReadAsync() failed.");
@@ -147,10 +147,10 @@ int main(int argc, char* argv[]) {
     StdoutLogger logger;
     stdout_logger_init(&logger);
 
-    NotificationQueueImpl nq;
-    auto rc = nq.Init(NotificationQueueImpl::Options(), &logger.l);
+    EventQueueImpl eq;
+    auto rc = eq.Init(EventQueueImpl::Options(), &logger.l);
     if (rc < 0) {
-        logger_error(&logger.l, "init notification queue failed: [%s].",
+        logger_error(&logger.l, "init event queue failed: [%s].",
                      strerror(-rc));
         return -1;
     }
@@ -163,10 +163,9 @@ int main(int argc, char* argv[]) {
     }
 
     svr.value = State::CLIENT_CONNECTED;
-    rc = nq.AcceptAsync(svr.fd, static_cast<State*>(&svr), true);
+    rc = eq.AcceptAsync(svr.fd, static_cast<State*>(&svr), true);
     if (rc != 0) {
-        logger_error(&logger.l,
-                     "register server to notification queue failed: [%s].",
+        logger_error(&logger.l, "register server to event queue failed: [%s].",
                      strerror(-rc));
         return -1;
     }
@@ -175,13 +174,13 @@ int main(int argc, char* argv[]) {
         EventResult res;
         void* tag = nullptr;
 
-        auto rc = nq.Next(&res, &tag, nullptr);
+        auto rc = eq.Next(&res, &tag, nullptr);
         if (rc != 0) {
             logger_error(&logger.l, "get event failed.");
             break;
         }
 
-        auto st = Process(&svr, res, tag, &nq, &logger.l);
+        auto st = Process(&svr, res, tag, &eq, &logger.l);
         if (st == State::END_LOOP) {
             break;
         }

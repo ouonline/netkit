@@ -1,19 +1,19 @@
-#ifndef __NETKIT_NOTIFICATION_QUEUE_H__
-#define __NETKIT_NOTIFICATION_QUEUE_H__
+#ifndef __NETKIT_EVENT_QUEUE_H__
+#define __NETKIT_EVENT_QUEUE_H__
 
 #include "timeval.h"
 #include "event_result.h"
 
 namespace netkit {
 
-class NotificationQueue {
+class EventQueue {
 public:
-    virtual ~NotificationQueue() = default;
+    virtual ~EventQueue() = default;
 
     /**
        @brief accepts one connection. returns 0 or -errno.
     */
-    virtual int AcceptAsync(int svr_fd, void* tag, bool multishot) = 0;
+    virtual int AcceptAsync(int fd, void* tag, bool multishot) = 0;
 
     /**
        @brief reads at most `sz` bytes into `buf` from `fd`. returns 0 or
@@ -32,10 +32,10 @@ public:
     virtual int CloseAsync(int fd, void* tag) = 0;
 
     /**
-       @brief notifies another notification queue about an event. returns 0 or
+       @brief notifies another event queue about an event. returns 0 or
        -errno.
     */
-    virtual int NotifyAsync(NotificationQueue* nq, int res, void* tag) = 0;
+    virtual int NotifyAsync(EventQueue* eq, int res, void* tag) = 0;
 
     /**
        @brief gets next event. returns 0 or -errno.

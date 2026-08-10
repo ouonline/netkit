@@ -1,4 +1,4 @@
-#include "netkit/iouring/notification_queue_impl.h"
+#include "netkit/iouring/event_queue_impl.h"
 #include "netkit/utils.h"
 using namespace netkit;
 using namespace netkit::iouring;
@@ -47,15 +47,15 @@ int main(int argc, char* argv[]) {
     StdoutLogger logger;
     stdout_logger_init(&logger);
 
-    NotificationQueueImpl send_nq;
-    auto rc = send_nq.Init(NotificationQueueImpl::Options(), &logger.l);
+    EventQueueImpl send_eq;
+    auto rc = send_eq.Init(EventQueueImpl::Options(), &logger.l);
     if (rc != 0) {
         logger_error(&logger.l, "init send queue failed.");
         return -1;
     }
 
-    NotificationQueueImpl recv_nq;
-    rc = recv_nq.Init(NotificationQueueImpl::Options(), &logger.l);
+    EventQueueImpl recv_eq;
+    rc = recv_eq.Init(EventQueueImpl::Options(), &logger.l);
     if (rc != 0) {
         logger_error(&logger.l, "init recv queue failed.");
         return -1;
@@ -73,24 +73,24 @@ int main(int argc, char* argv[]) {
     }
     logger_info(&logger.l, "create [%u] clients.", nr_client);
 
-    std::thread recv_thread([l = &logger.l, &client_list, &recv_nq]() -> void {
+    std::thread recv_thread([l = &logger.l, &client_list, &recv_eq]() -> void {
         for (auto it = client_list.begin(); it != client_list.end(); ++it) {
             auto client = &(*it);
-            recv_nq.ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE,
+            recv_eq.ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE,
                               client);
         }
 
         while (true) {
             EventResult res;
             void* tag;
-            auto err = recv_nq.Next(&res, &tag, nullptr);
+            auto err = recv_eq.Next(&res, &tag, nullptr);
             if (err) {
                 logger_error(l, "recv failed: [%s].", strerror(-err));
                 break;
             }
 
             auto client = static_cast<EchoClient*>(tag);
-            recv_nq.ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE,
+            recv_eq.ReadAsync(client->fd, client->buf, ECHO_BUFFER_SIZE,
                               client);
         }
     });
@@ -98,7 +98,7 @@ int main(int argc, char* argv[]) {
     // initial sending
     for (uint32_t i = 0; i < nr_client; ++i) {
         auto client = &client_list[i];
-        rc = send_nq.WriteAsync(client->fd, test_data_buf, lens[0], client);
+        rc = send_eq.WriteAsync(client->fd, test_data_buf, lens[0], client);
         if (rc != 0) {
             logger_error(&logger.l, "send initial request failed.");
             return -1;
@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
     while (true) {
         EventResult res;
         void* tag = nullptr;
-        rc = send_nq.Next(&res, &tag, nullptr);
+        rc = send_eq.Next(&res, &tag, nullptr);
         if (rc != 0) {
             logger_error(&logger.l, "get event failed.");
             break;
@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
         auto client = static_cast<EchoClient*>(tag);
         auto len = lens[client->test_data_idx];
         client->test_data_idx = (client->test_data_idx + 1) % lens.size();
-        send_nq.WriteAsync(client->fd, test_data_buf, len, client);
+        send_eq.WriteAsync(client->fd, test_data_buf, len, client);
     }
 
     stdout_logger_destroy(&logger);

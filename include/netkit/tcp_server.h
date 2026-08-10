@@ -23,8 +23,8 @@ private:
         m_sched = sched;
     }
 
-    int Start(NotificationQueue*);
-    bool Process(EventResult, NotificationQueue*) final;
+    int Start(EventQueue*);
+    bool Process(EventResult, EventQueue*) final;
 
 private:
     int m_fd = -1;

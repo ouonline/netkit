@@ -18,10 +18,10 @@ void TcpClient::DeleteSelf() {
     delete this;
 }
 
-int TcpClient::DoRead(void* buf, uint64_t sz, NotificationQueue* nq) {
+int TcpClient::DoRead(void* buf, uint64_t sz, EventQueue* eq) {
 loop:
     int err =
-        nq->ReadAsync(m_conn->fd, buf, sz, static_cast<EventHandler*>(this));
+        eq->ReadAsync(m_conn->fd, buf, sz, static_cast<EventHandler*>(this));
     if (ShouldRetry(err)) {
         goto loop;
     }
@@ -34,7 +34,7 @@ loop:
     return err;
 }
 
-int TcpClient::Start(NotificationQueue* nq) {
+int TcpClient::Start(EventQueue* eq) {
     int err = m_buf.Reserve(REQ_BUF_EXPAND_SIZE);
     if (err) {
         logger_error(m_logger, "reserve [%lu] bytes for request failed: [%s].",
@@ -42,7 +42,7 @@ int TcpClient::Start(NotificationQueue* nq) {
         return err;
     }
 
-    SendContext ctx(m_conn, nq, m_logger);
+    SendContext ctx(m_conn, eq, m_logger);
     err = OnConnected(&ctx);
     if (err) {
         logger_error(m_logger, "client OnConnected failed: [%s].",
@@ -50,7 +50,7 @@ int TcpClient::Start(NotificationQueue* nq) {
         return err;
     }
 
-    return DoRead(m_buf.data(), REQ_BUF_EXPAND_SIZE, nq);
+    return DoRead(m_buf.data(), REQ_BUF_EXPAND_SIZE, eq);
 }
 
 void TcpClient::HandleInvalidRequest() {
@@ -59,8 +59,7 @@ void TcpClient::HandleInvalidRequest() {
                  info.remote_addr.c_str(), info.remote_port);
 }
 
-int TcpClient::HandleMoreDataRequest(uint32_t req_bytes,
-                                     NotificationQueue* nq) {
+int TcpClient::HandleMoreDataRequest(uint32_t req_bytes, EventQueue* eq) {
     if (req_bytes == 0) {
         req_bytes = REQ_BUF_EXPAND_SIZE;
     } else {
@@ -74,10 +73,10 @@ int TcpClient::HandleMoreDataRequest(uint32_t req_bytes,
         return -ENOMEM;
     }
 
-    return DoRead(m_buf.data() + m_buf.size(), req_bytes, nq);
+    return DoRead(m_buf.data() + m_buf.size(), req_bytes, eq);
 }
 
-int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
+int TcpClient::HandleValidRequest(uint32_t req_bytes, EventQueue* eq) {
     int err;
 
     Buffer req;
@@ -101,7 +100,7 @@ int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
     Task* task = ptr.release();
     task->Init(move(req), m_conn);
 
-    err = m_sched->Schedule(0, static_cast<EventHandler*>(task), nq);
+    err = m_sched->Schedule(0, static_cast<EventHandler*>(task), eq);
     if (err) {
         logger_error(m_logger, "assign task to worker thread failed: [%s].",
                      strerror(-err));
@@ -110,7 +109,7 @@ int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
     }
 
     if (m_buf.IsEmpty()) {
-        err = HandleMoreDataRequest(0, nq);
+        err = HandleMoreDataRequest(0, eq);
         if (err) {
             return -1;
         }
@@ -120,7 +119,7 @@ int TcpClient::HandleValidRequest(uint32_t req_bytes, NotificationQueue* nq) {
     return 1;
 }
 
-bool TcpClient::Process(EventResult res, NotificationQueue* nq) {
+bool TcpClient::Process(EventResult res, EventQueue* eq) {
     if (res.val == 0) {
         return false;
     }
@@ -142,7 +141,7 @@ bool TcpClient::Process(EventResult res, NotificationQueue* nq) {
         m_bytes_needed -= bytes_read;
         if (m_bytes_needed > 0) {
             int err =
-                nq->ReadAsync(m_conn->fd, m_buf.data() + m_buf.size(),
+                eq->ReadAsync(m_conn->fd, m_buf.data() + m_buf.size(),
                               m_bytes_needed, static_cast<EventHandler*>(this));
             if (err) {
                 logger_error(m_logger, "launch read request failed: [%s].",
@@ -163,10 +162,10 @@ bool TcpClient::Process(EventResult res, NotificationQueue* nq) {
         }
 
         if (req_stat == ReqStat::MORE_DATA) {
-            return (HandleMoreDataRequest(req_bytes, nq) == 0);
+            return (HandleMoreDataRequest(req_bytes, eq) == 0);
         }
 
-        int rc = HandleValidRequest(req_bytes, nq);
+        int rc = HandleValidRequest(req_bytes, eq);
         if (rc == -1) {
             return false;
         }

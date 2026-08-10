@@ -1,7 +1,7 @@
 #ifndef __NETKIT_SCHEDULER_H__
 #define __NETKIT_SCHEDULER_H__
 
-#include "notification_queue.h"
+#include "event_queue.h"
 #include <atomic>
 #include <memory>
 #include <vector>
@@ -10,18 +10,18 @@ namespace netkit {
 
 class Scheduler final {
 public:
-    Scheduler(std::vector<std::unique_ptr<NotificationQueue>>* nl)
-        : m_curr_idx(0), m_nq_list(nl) {}
+    Scheduler(std::vector<std::unique_ptr<EventQueue>>* nl)
+        : m_curr_idx(0), m_eq_list(nl) {}
 
-    int Schedule(int32_t res, void* tag, NotificationQueue* nq) {
+    int Schedule(int32_t res, void* tag, EventQueue* eq) {
         uint32_t idx = m_curr_idx.fetch_add(1, std::memory_order_acq_rel) %
-            m_nq_list->size();
-        return nq->NotifyAsync(m_nq_list->at(idx).get(), res, tag);
+            m_eq_list->size();
+        return eq->NotifyAsync(m_eq_list->at(idx).get(), res, tag);
     }
 
 private:
     std::atomic<uint32_t> m_curr_idx;
-    std::vector<std::unique_ptr<NotificationQueue>>* m_nq_list;
+    std::vector<std::unique_ptr<EventQueue>>* m_eq_list;
 };
 
 }

@@ -25,7 +25,7 @@ int SendContext::Emit(Buffer&& b, const function<void(int err)>& on_complete) {
             return -ENOMEM;
         }
 
-        int err = sender->Start(m_nq);
+        int err = sender->Start(m_eq);
         if (err) {
             logger_error(m_logger, "about to send data failed: [%s].",
                          strerror(-err));
@@ -56,7 +56,7 @@ int SendContext::AddTimer(const TimeVal& interval, TimerPtr ptr) {
         return err;
     }
 
-    err = timer->Start(m_nq);
+    err = timer->Start(m_eq);
     if (err) {
         logger_error(m_logger, "start timer failed: [%s].", strerror(-err));
         timer->DeleteSelf();
