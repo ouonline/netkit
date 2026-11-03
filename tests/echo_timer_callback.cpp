@@ -11,7 +11,7 @@ using namespace std;
 
 class EchoTask final : public Task {
 public:
-    EchoTask(Logger* l) : Task(l) {}
+    EchoTask(Buffer&& b, Logger* l) : Task(l), m_buffer(move(b)) {}
     void Run(SendContext* ctx) override {
         const auto& info = ctx->GetEndpointInfo();
         logger_info(m_logger,
@@ -20,6 +20,9 @@ public:
                     info.local_addr.c_str(), info.local_port,
                     static_cast<int>(m_buffer.size()), m_buffer.data());
     }
+
+private:
+    Buffer m_buffer;
 };
 
 class EchoTimer final : public Timer {
@@ -107,8 +110,8 @@ public:
         return ReqStat::VALID;
     }
 
-    TaskPtr CreateTask() override {
-        return TaskPtr(new EchoTask(m_logger));
+    TaskPtr CreateTask(Buffer&& buf) override {
+        return TaskPtr(new EchoTask(move(buf), m_logger));
     }
 
 private:

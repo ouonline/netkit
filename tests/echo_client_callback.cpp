@@ -9,7 +9,7 @@ using namespace std;
 
 class EchoTask final : public Task {
 public:
-    EchoTask(Logger* l) : Task(l) {}
+    EchoTask(Buffer&& buf, Logger* l) : Task(l), m_buffer(move(buf)) {}
     void Run(SendContext* ctx) override {
         auto& info = ctx->GetEndpointInfo();
         logger_info(
@@ -36,6 +36,9 @@ public:
 
         sleep(1);
     }
+
+private:
+    Buffer m_buffer;
 };
 
 class EchoClient final : public TcpClient {
@@ -86,8 +89,8 @@ public:
         return ReqStat::VALID;
     }
 
-    TaskPtr CreateTask() override {
-        return TaskPtr(new EchoTask(m_logger));
+    TaskPtr CreateTask(Buffer&& buf) override {
+        return TaskPtr(new EchoTask(move(buf), m_logger));
     }
 
 private:

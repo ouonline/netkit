@@ -76,6 +76,21 @@ int TcpClient::HandleMoreDataRequest(uint32_t req_bytes, EventQueue* eq) {
     return DoRead(m_buf.data() + m_buf.size(), req_bytes, eq);
 }
 
+bool TcpClient::DeliverTask(TaskPtr ptr, EventQueue* eq) {
+    Task* task = ptr.release();
+    task->Init(m_conn);
+
+    int err = m_sched->Schedule(0, static_cast<EventHandler*>(task), eq);
+    if (err) {
+        logger_error(m_logger, "assign task to worker thread failed: [%s].",
+                     strerror(-err));
+        task->DeleteSelf();
+        return false;
+    }
+
+    return true;
+}
+
 int TcpClient::HandleValidRequest(uint32_t req_bytes, EventQueue* eq) {
     int err;
 
@@ -91,21 +106,11 @@ int TcpClient::HandleValidRequest(uint32_t req_bytes, EventQueue* eq) {
     }
     std::swap(req, m_buf);
 
-    TaskPtr ptr = CreateTask();
-    if (!ptr) {
-        logger_error(m_logger, "allocate Task failed: [%s].", strerror(ENOMEM));
-        return -1;
-    }
-
-    Task* task = ptr.release();
-    task->Init(move(req), m_conn);
-
-    err = m_sched->Schedule(0, static_cast<EventHandler*>(task), eq);
-    if (err) {
-        logger_error(m_logger, "assign task to worker thread failed: [%s].",
-                     strerror(-err));
-        task->DeleteSelf();
-        return -1;
+    TaskPtr ptr = CreateTask(move(req));
+    if (ptr) {
+        if (!DeliverTask(move(ptr), eq)) {
+            return -1;
+        }
     }
 
     if (m_buf.IsEmpty()) {

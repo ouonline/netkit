@@ -14,14 +14,12 @@ protected:
     virtual void Run(SendContext*) = 0;
 
 protected:
-    Buffer m_buffer;
     Logger* m_logger;
 
 private:
     friend class TcpClient;
 
-    void Init(Buffer&& b, const std::shared_ptr<Connection>& c) {
-        m_buffer = std::move(b);
+    void Init(const std::shared_ptr<Connection>& c) {
         m_conn = c;
     }
 

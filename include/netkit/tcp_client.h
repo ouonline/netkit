@@ -30,10 +30,11 @@ protected:
     TcpClient(Logger* l) : m_logger(l) {}
     virtual ~TcpClient() = default;
 
+    // returns 0 or -errno
     virtual int OnConnected(SendContext*) = 0;
     virtual void OnDisconnected() = 0;
     virtual ReqStat Check(const Buffer&, uint32_t* req_bytes) = 0;
-    virtual TaskPtr CreateTask() = 0;
+    virtual TaskPtr CreateTask(Buffer&&) = 0;
 
 protected:
     Logger* m_logger;
@@ -48,6 +49,7 @@ private:
     }
 
     int Start(EventQueue*);
+    bool DeliverTask(TaskPtr, EventQueue*);
     bool Process(EventResult, EventQueue*) final;
     void DeleteSelf() final;
 
