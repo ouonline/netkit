@@ -6,20 +6,20 @@
 
 namespace netkit {
 
-enum ReqStat {
-    /* invalid request */
+enum PacketStat {
+    /* invalid packet */
     INVALID = -1,
 
     /*
-      ok, and `req_bytes` is set to the total size of the request.
-      note that `req_bytes` may be less than the size of buffer.
+      ok, and `packet_bytes` is set to the total size of the packet.
+      note that `packet_bytes` may be less than the size of buffer.
     */
     VALID = 0,
 
     /*
       more data required.
 
-      `req_bytes` is set to the number of bytes left at the current stage,
+      `packet_bytes` is set to the number of bytes left at the current stage,
       or is set to 0 if the number of bytes cannot be determined.
     */
     MORE_DATA = 1,
@@ -33,7 +33,7 @@ protected:
     // returns 0 or -errno
     virtual int OnConnected(SendContext*) = 0;
     virtual void OnDisconnected() = 0;
-    virtual ReqStat Check(const Buffer&, uint32_t* req_bytes) = 0;
+    virtual PacketStat Check(const Buffer&, uint32_t* packet_bytes) = 0;
     virtual TaskPtr CreateTask(Buffer&&) = 0;
 
 protected:
@@ -55,13 +55,13 @@ private:
 
 private:
     int DoRead(void* buf, uint64_t sz, EventQueue*);
-    void HandleInvalidRequest();
-    int HandleMoreDataRequest(uint32_t req_bytes, EventQueue*);
+    void HandleInvalidPacket();
+    int HandleMoreDataPacket(uint32_t packet_bytes, EventQueue*);
 
     // -1: error
     // 0: ok and return
     // 1: ok, and continue next ->Check()
-    int HandleValidRequest(uint32_t req_bytes, EventQueue*);
+    int HandleValidPacket(uint32_t packet_bytes, EventQueue*);
 
 private:
     uint64_t m_bytes_needed = 0;

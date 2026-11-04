@@ -45,9 +45,9 @@ public:
                     m_endpoint_info.remote_port);
     }
 
-    ReqStat Check(const Buffer& req, uint32_t* size) override {
+    PacketStat Check(const Buffer& req, uint32_t* size) override {
         *size = req.size();
-        return ReqStat::VALID;
+        return PacketStat::VALID;
     }
 
     TaskPtr CreateTask(Buffer&& buf) override {

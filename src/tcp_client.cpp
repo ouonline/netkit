@@ -37,7 +37,7 @@ loop:
 int TcpClient::Start(EventQueue* eq) {
     int err = m_buf.Reserve(REQ_BUF_EXPAND_SIZE);
     if (err) {
-        logger_error(m_logger, "reserve [%lu] bytes for request failed: [%s].",
+        logger_error(m_logger, "reserve [%lu] bytes for packet failed: [%s].",
                      REQ_BUF_EXPAND_SIZE, strerror(-err));
         return err;
     }
@@ -53,27 +53,27 @@ int TcpClient::Start(EventQueue* eq) {
     return DoRead(m_buf.data(), REQ_BUF_EXPAND_SIZE, eq);
 }
 
-void TcpClient::HandleInvalidRequest() {
+void TcpClient::HandleInvalidPacket() {
     const EndpointInfo& info = m_conn->GetEndpointInfo();
-    logger_error(m_logger, "invalid request from [%s:%u].",
+    logger_error(m_logger, "invalid packet from [%s:%u].",
                  info.remote_addr.c_str(), info.remote_port);
 }
 
-int TcpClient::HandleMoreDataRequest(uint32_t req_bytes, EventQueue* eq) {
-    if (req_bytes == 0) {
-        req_bytes = REQ_BUF_EXPAND_SIZE;
+int TcpClient::HandleMoreDataPacket(uint32_t packet_bytes, EventQueue* eq) {
+    if (packet_bytes == 0) {
+        packet_bytes = REQ_BUF_EXPAND_SIZE;
     } else {
-        m_bytes_needed = req_bytes;
+        m_bytes_needed = packet_bytes;
     }
 
-    int err = m_buf.Reserve(m_buf.size() + req_bytes);
+    int err = m_buf.Reserve(m_buf.size() + packet_bytes);
     if (err) {
         logger_error(m_logger, "reserve [%lu] bytes failed: [%s].",
                      strerror(ENOMEM));
         return -ENOMEM;
     }
 
-    return DoRead(m_buf.data() + m_buf.size(), req_bytes, eq);
+    return DoRead(m_buf.data() + m_buf.size(), packet_bytes, eq);
 }
 
 bool TcpClient::DeliverTask(TaskPtr ptr, EventQueue* eq) {
@@ -91,30 +91,31 @@ bool TcpClient::DeliverTask(TaskPtr ptr, EventQueue* eq) {
     return true;
 }
 
-int TcpClient::HandleValidRequest(uint32_t req_bytes, EventQueue* eq) {
+int TcpClient::HandleValidPacket(uint32_t packet_bytes, EventQueue* eq) {
     int err;
 
-    Buffer req;
-    if (req_bytes < m_buf.size()) {
-        err = req.Assign(m_buf.data() + req_bytes, m_buf.size() - req_bytes);
+    Buffer pkt;
+    if (packet_bytes < m_buf.size()) {
+        err = pkt.Assign(m_buf.data() + packet_bytes,
+                         m_buf.size() - packet_bytes);
         if (err) {
-            logger_error(m_logger, "move request data failed: [%s].",
+            logger_error(m_logger, "move packet data failed: [%s].",
                          strerror(ENOMEM));
             return -1;
         }
-        m_buf.Resize(req_bytes);
+        m_buf.Resize(packet_bytes);
     }
-    std::swap(req, m_buf);
+    std::swap(pkt, m_buf);
 
-    TaskPtr ptr = CreateTask(move(req));
-    if (ptr) {
-        if (!DeliverTask(move(ptr), eq)) {
+    TaskPtr task = CreateTask(move(pkt));
+    if (task) {
+        if (!DeliverTask(move(task), eq)) {
             return -1;
         }
     }
 
     if (m_buf.IsEmpty()) {
-        err = HandleMoreDataRequest(0, eq);
+        err = HandleMoreDataPacket(0, eq);
         if (err) {
             return -1;
         }
@@ -149,7 +150,7 @@ bool TcpClient::Process(EventResult res, EventQueue* eq) {
                 eq->ReadAsync(m_conn->fd, m_buf.data() + m_buf.size(),
                               m_bytes_needed, static_cast<EventHandler*>(this));
             if (err) {
-                logger_error(m_logger, "launch read request failed: [%s].",
+                logger_error(m_logger, "launch read packet failed: [%s].",
                              strerror(-err));
                 return false;
             }
@@ -158,19 +159,19 @@ bool TcpClient::Process(EventResult res, EventQueue* eq) {
     }
 
     while (true) {
-        uint32_t req_bytes = 0;
-        auto req_stat = Check(m_buf, &req_bytes);
+        uint32_t packet_bytes = 0;
+        auto pkt_stat = Check(m_buf, &packet_bytes);
 
-        if (req_stat == ReqStat::INVALID) {
-            HandleInvalidRequest();
+        if (pkt_stat == PacketStat::INVALID) {
+            HandleInvalidPacket();
             return false;
         }
 
-        if (req_stat == ReqStat::MORE_DATA) {
-            return (HandleMoreDataRequest(req_bytes, eq) == 0);
+        if (pkt_stat == PacketStat::MORE_DATA) {
+            return (HandleMoreDataPacket(packet_bytes, eq) == 0);
         }
 
-        int rc = HandleValidRequest(req_bytes, eq);
+        int rc = HandleValidPacket(packet_bytes, eq);
         if (rc == -1) {
             return false;
         }
