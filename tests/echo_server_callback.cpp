@@ -50,8 +50,8 @@ public:
         return PacketStat::VALID;
     }
 
-    TaskPtr CreateTask(Buffer&& buf) override {
-        return TaskPtr(new EchoTask(move(buf), m_logger));
+    int DeliverTask(Buffer&& buf, ScheduleContext* ctx) override {
+        return ctx->Schedule(TaskPtr(new EchoTask(move(buf), m_logger)));
     }
 
 private:

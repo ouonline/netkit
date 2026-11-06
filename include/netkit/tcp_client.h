@@ -2,7 +2,7 @@
 #define __NETKIT_TCP_CLIENT_H__
 
 #include "task.h"
-#include "scheduler.h"
+#include "schedule_context.h"
 
 namespace netkit {
 
@@ -34,7 +34,7 @@ protected:
     virtual int OnConnected(SendContext*) = 0;
     virtual void OnDisconnected() = 0;
     virtual PacketStat Check(const Buffer&, uint32_t* packet_bytes) = 0;
-    virtual TaskPtr CreateTask(Buffer&&) = 0;
+    virtual int DeliverTask(Buffer&&, ScheduleContext*) = 0;
 
 protected:
     Logger* m_logger;
@@ -49,7 +49,6 @@ private:
     }
 
     int Start(EventQueue*);
-    bool DeliverTask(TaskPtr, EventQueue*);
     bool Process(EventResult, EventQueue*) final;
     void DeleteSelf() final;
 

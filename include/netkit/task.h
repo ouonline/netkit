@@ -17,7 +17,7 @@ protected:
     Logger* m_logger;
 
 private:
-    friend class TcpClient;
+    friend class ScheduleContext;
 
     void Init(const std::shared_ptr<Connection>& c) {
         m_conn = c;

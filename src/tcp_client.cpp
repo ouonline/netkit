@@ -76,21 +76,6 @@ int TcpClient::HandleMoreDataPacket(uint32_t packet_bytes, EventQueue* eq) {
     return DoRead(m_buf.data() + m_buf.size(), packet_bytes, eq);
 }
 
-bool TcpClient::DeliverTask(TaskPtr ptr, EventQueue* eq) {
-    Task* task = ptr.release();
-    task->Init(m_conn);
-
-    int err = m_sched->Schedule(0, static_cast<EventHandler*>(task), eq);
-    if (err) {
-        logger_error(m_logger, "assign task to worker thread failed: [%s].",
-                     strerror(-err));
-        task->DeleteSelf();
-        return false;
-    }
-
-    return true;
-}
-
 int TcpClient::HandleValidPacket(uint32_t packet_bytes, EventQueue* eq) {
     int err;
 
@@ -107,11 +92,12 @@ int TcpClient::HandleValidPacket(uint32_t packet_bytes, EventQueue* eq) {
     }
     std::swap(pkt, m_buf);
 
-    TaskPtr task = CreateTask(move(pkt));
-    if (task) {
-        if (!DeliverTask(move(task), eq)) {
-            return -1;
-        }
+    ScheduleContext sched_ctx(m_sched, eq, m_conn, m_logger);
+    err = DeliverTask(move(pkt), &sched_ctx);
+    if (err) {
+        logger_error(m_logger, "deliver task failed: [%s].",
+                     strerror(-err));
+        return -1;
     }
 
     if (m_buf.IsEmpty()) {
