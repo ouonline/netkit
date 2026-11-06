@@ -1,5 +1,5 @@
 #include "netkit/iouring/event_queue_impl.h"
-#include <string.h> // strerror()
+#include <string.h> // strerror(), memset()
 #include <functional>
 #include <limits>
 using namespace std;
@@ -103,9 +103,14 @@ static int GenericAsync(struct io_uring* ring, Logger* logger,
     } while (ret == -EINTR);
     if (ret < 0) {
         logger_error(logger, "io_uring_submit failed: [%s].", strerror(-ret));
-        // clear sqe's content that are set in func()
+        // the sqe is still in the queue and will be submitted later. the
+        // caller is told that the request fails, so turns it into a nop that
+        // generates no event. clears the whole sqe first: fields set in
+        // func() such as `ioprio` are kept by io_uring_prep_nop() and make
+        // the nop fail with -EINVAL.
+        memset(sqe, 0, sizeof(*sqe));
         io_uring_prep_nop(sqe);
-        io_uring_sqe_set_data(sqe, nullptr);
+        io_uring_sqe_set_flags(sqe, IOSQE_CQE_SKIP_SUCCESS);
         return ret;
     }
 
@@ -171,6 +176,8 @@ int EventQueueImpl::NotifyAsync(EventQueue* eq, int res, void* tag) {
                         [impl, res, tag](struct io_uring_sqe* sqe) -> void {
                             io_uring_prep_msg_ring(sqe, impl->m_ring.ring_fd,
                                                    res, (uint64_t)tag, 0);
+                            // returns `tag` to this ring if delivery fails
+                            io_uring_sqe_set_data(sqe, tag);
                             // skips the successful notification for this ring
                             io_uring_sqe_set_flags(sqe, IOSQE_CQE_SKIP_SUCCESS);
                         });

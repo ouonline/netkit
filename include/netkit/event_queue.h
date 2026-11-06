@@ -34,6 +34,10 @@ public:
     /**
        @brief notifies another event queue about an event. returns 0 or
        -errno.
+
+       if the notification cannot be delivered, an event with `tag` and
+       `res` == -errno is generated in this queue instead. so `res` should not
+       be negative if the receiver needs to tell them apart.
     */
     virtual int NotifyAsync(EventQueue* eq, int res, void* tag) = 0;
 
@@ -45,7 +49,8 @@ public:
        - READ: number of bytes read or -errno.
        - WRITE: number of bytes written or -errno.
        - CLOSE: return value of `close()` or -errno.
-       - NOTIFY: value passed to `NotifyAsync()`.
+       - NOTIFY: value passed to `NotifyAsync()`. or -errno in the sender's
+         queue if the notification cannot be delivered.
 
        @param `tag` is the value passed to `*Async()`.
 

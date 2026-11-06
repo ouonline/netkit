@@ -23,11 +23,7 @@ private:
         m_conn = c;
     }
 
-    bool Process(EventResult, EventQueue* eq) final {
-        SendContext ctx(m_conn, eq, m_logger);
-        Run(&ctx);
-        return false;
-    }
+    bool Process(EventResult, EventQueue*) final;
 
 private:
     std::shared_ptr<Connection> m_conn;
