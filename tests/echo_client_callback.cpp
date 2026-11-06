@@ -84,12 +84,11 @@ public:
                     m_endpoint_info.local_port);
     }
 
-    PacketStat Check(const Buffer& req, uint32_t* size) override {
-        *size = req.size();
-        return PacketStat::VALID;
+    PacketStatus OnDataReady(const Buffer& req) override {
+        return {PacketStatus::VALID, static_cast<uint32_t>(req.size())};
     }
 
-    int DeliverTask(Buffer&& buf, ScheduleContext* ctx) override {
+    int OnPacketReady(Buffer&& buf, ScheduleContext* ctx) override {
         return ctx->Schedule(TaskPtr(new EchoTask(move(buf), m_logger)));
     }
 

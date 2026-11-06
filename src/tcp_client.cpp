@@ -93,9 +93,9 @@ int TcpClient::HandleValidPacket(uint32_t packet_bytes, EventQueue* eq) {
     std::swap(pkt, m_buf);
 
     ScheduleContext sched_ctx(m_sched, eq, m_conn, m_logger);
-    err = DeliverTask(move(pkt), &sched_ctx);
+    err = OnPacketReady(move(pkt), &sched_ctx);
     if (err) {
-        logger_error(m_logger, "deliver task failed: [%s].",
+        logger_error(m_logger, "handle packet failed: [%s].",
                      strerror(-err));
         return -1;
     }
@@ -145,19 +145,18 @@ bool TcpClient::Process(EventResult res, EventQueue* eq) {
     }
 
     while (true) {
-        uint32_t packet_bytes = 0;
-        auto pkt_stat = Check(m_buf, &packet_bytes);
+        PacketStatus pkt_stat = OnDataReady(m_buf);
 
-        if (pkt_stat == PacketStat::INVALID) {
+        if (pkt_stat.status == PacketStatus::INVALID) {
             HandleInvalidPacket();
             return false;
         }
 
-        if (pkt_stat == PacketStat::MORE_DATA) {
-            return (HandleMoreDataPacket(packet_bytes, eq) == 0);
+        if (pkt_stat.status == PacketStatus::MORE_DATA) {
+            return (HandleMoreDataPacket(pkt_stat.bytes, eq) == 0);
         }
 
-        int rc = HandleValidPacket(packet_bytes, eq);
+        int rc = HandleValidPacket(pkt_stat.bytes, eq);
         if (rc == -1) {
             return false;
         }

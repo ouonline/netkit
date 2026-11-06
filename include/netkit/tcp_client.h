@@ -6,23 +6,27 @@
 
 namespace netkit {
 
-enum PacketStat {
-    /* invalid packet */
-    INVALID = -1,
+struct PacketStatus {
+    enum {
+        /* invalid packet */
+        INVALID = -1,
 
-    /*
-      ok, and `packet_bytes` is set to the total size of the packet.
-      note that `packet_bytes` may be less than the size of buffer.
-    */
-    VALID = 0,
+        /*
+          ok, and `bytes` is set to the total size of the packet.
+          note that `bytes` may be less than size of the buffer.
+        */
+        VALID = 0,
 
-    /*
-      more data required.
+        /*
+          more data required.
 
-      `packet_bytes` is set to the number of bytes left at the current stage,
-      or is set to 0 if the number of bytes cannot be determined.
-    */
-    MORE_DATA = 1,
+          `bytes` is set to the number of bytes needed at current stage,
+          or 0 if the number of bytes cannot be determined.
+        */
+        MORE_DATA = 1,
+    } status;
+
+    uint32_t bytes;
 };
 
 class TcpClient : public EventHandler {
@@ -33,8 +37,8 @@ protected:
     // returns 0 or -errno
     virtual int OnConnected(SendContext*) = 0;
     virtual void OnDisconnected() = 0;
-    virtual PacketStat Check(const Buffer&, uint32_t* packet_bytes) = 0;
-    virtual int DeliverTask(Buffer&&, ScheduleContext*) = 0;
+    virtual PacketStatus OnDataReady(const Buffer&) = 0;
+    virtual int OnPacketReady(Buffer&&, ScheduleContext*) = 0;
 
 protected:
     Logger* m_logger;
@@ -59,7 +63,7 @@ private:
 
     // -1: error
     // 0: ok and return
-    // 1: ok, and continue next ->Check()
+    // 1: ok, and continue next ->OnDataReady()
     int HandleValidPacket(uint32_t packet_bytes, EventQueue*);
 
 private:

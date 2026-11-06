@@ -9,7 +9,7 @@ bool Task::Process(EventResult res, EventQueue* eq) {
     if (res.val < 0) {
         logger_error(m_logger, "assign task to worker thread failed: [%s].",
                      strerror(-res.val));
-        // closes the connection as if `TcpClient::DeliverTask()` failed
+        // closes the connection as if `TcpClient::OnPacketReady()` failed
         m_conn->ShutDown(m_logger);
         return false;
     }
