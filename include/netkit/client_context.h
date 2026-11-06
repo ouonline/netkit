@@ -1,14 +1,14 @@
-#ifndef __NETKIT_SEND_CONTEXT_H__
-#define __NETKIT_SEND_CONTEXT_H__
+#ifndef __NETKIT_CLIENT_CONTEXT_H__
+#define __NETKIT_CLIENT_CONTEXT_H__
 
 #include "timer.h"
 #include <functional>
 
 namespace netkit {
 
-class SendContext final {
+class ClientContext final {
 public:
-    SendContext(const std::shared_ptr<Connection>& c, EventQueue* eq, Logger* l)
+    ClientContext(const std::shared_ptr<Connection>& c, EventQueue* eq, Logger* l)
         : m_conn(c), m_eq(eq), m_logger(l) {}
 
     const EndpointInfo& GetEndpointInfo() {
@@ -16,7 +16,7 @@ public:
     }
 
     // returns 0 or -errno
-    int Emit(Buffer&&, const std::function<void(int err)>& on_complete = {});
+    int Emit(Buffer&&, const std::function<void(int err)>& on_sent = {});
 
     // returns -errno or timer fd
     int AddTimer(const TimeVal& interval, TimerPtr);

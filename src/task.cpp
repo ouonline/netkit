@@ -14,8 +14,8 @@ bool Task::Process(EventResult res, EventQueue* eq) {
         return false;
     }
 
-    SendContext ctx(m_conn, eq, m_logger);
-    Run(&ctx);
+    ClientContext ctx(m_conn, eq, m_logger);
+    Execute(&ctx);
     return false;
 }
 

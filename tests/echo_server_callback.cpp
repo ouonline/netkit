@@ -8,7 +8,7 @@ using namespace std;
 class EchoTask final : public Task {
 public:
     EchoTask(Buffer&& buf, Logger* l) : Task(l), m_buffer(move(buf)) {}
-    void Run(SendContext* ctx) override {
+    void Execute(ClientContext* ctx) override {
         auto& info = ctx->GetEndpointInfo();
         logger_info(
             m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
@@ -31,7 +31,7 @@ public:
         logger_info(m_logger, "[server] client [%p] destroyed.", this);
     }
 
-    int OnConnected(SendContext* ctx) override {
+    int OnConnected(ClientContext* ctx) override {
         m_endpoint_info = ctx->GetEndpointInfo();
         logger_info(m_logger, "[server] client [%s:%u] connected.",
                     m_endpoint_info.remote_addr.c_str(),

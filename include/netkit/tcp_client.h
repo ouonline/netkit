@@ -35,7 +35,7 @@ protected:
     virtual ~TcpClient() = default;
 
     // returns 0 or -errno
-    virtual int OnConnected(SendContext*) = 0;
+    virtual int OnConnected(ClientContext*) = 0;
     virtual void OnDisconnected() = 0;
     virtual PacketStatus OnDataReady(const Buffer&) = 0;
     virtual int OnPacketReady(Buffer&&, ScheduleContext*) = 0;

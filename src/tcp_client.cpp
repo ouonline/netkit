@@ -42,7 +42,7 @@ int TcpClient::Start(EventQueue* eq) {
         return err;
     }
 
-    SendContext ctx(m_conn, eq, m_logger);
+    ClientContext ctx(m_conn, eq, m_logger);
     err = OnConnected(&ctx);
     if (err) {
         logger_error(m_logger, "client OnConnected failed: [%s].",

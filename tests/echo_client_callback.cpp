@@ -10,7 +10,7 @@ using namespace std;
 class EchoTask final : public Task {
 public:
     EchoTask(Buffer&& buf, Logger* l) : Task(l), m_buffer(move(buf)) {}
-    void Run(SendContext* ctx) override {
+    void Execute(ClientContext* ctx) override {
         auto& info = ctx->GetEndpointInfo();
         logger_info(
             m_logger, "[client] server [%s:%u] ==> client [%s:%u] data [%.*s]",
@@ -48,7 +48,7 @@ public:
         logger_info(m_logger, "[client] cient destroyed.");
     }
 
-    int OnConnected(SendContext* ctx) override {
+    int OnConnected(ClientContext* ctx) override {
         m_endpoint_info = ctx->GetEndpointInfo();
         logger_info(m_logger, "[client] connect to server [%s:%u].",
                     m_endpoint_info.remote_addr.c_str(),

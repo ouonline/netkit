@@ -1,5 +1,5 @@
-#ifndef __NETKIT_SENDER_H__
-#define __NETKIT_SENDER_H__
+#ifndef __NETKIT_INTERNAL_SENDER_H__
+#define __NETKIT_INTERNAL_SENDER_H__
 
 #include "netkit/event_handler.h"
 #include "netkit/connection.h"
@@ -7,19 +7,18 @@
 
 namespace netkit {
 
-class Sender final : public EventHandler {
+class InternalSender final : public EventHandler {
 protected:
-    ~Sender() = default;
+    ~InternalSender() = default;
 
 private:
-    friend class SendContext;
+    friend class ClientContext;
 
-    Sender(const std::shared_ptr<Connection>& c, Logger* l)
+    InternalSender(const std::shared_ptr<Connection>& c, Logger* l)
         : m_conn(c), m_logger(l) {}
     int Start(EventQueue*);
-    bool Process(EventResult, EventQueue*) override;
-
     int DoWrite(const void* buf, uint64_t sz, EventQueue*);
+    bool Process(EventResult, EventQueue*) override;
 
 private:
     std::shared_ptr<Connection> m_conn;

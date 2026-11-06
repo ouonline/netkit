@@ -8,7 +8,7 @@
 
 namespace netkit {
 
-class SendContext;
+class ClientContext;
 
 class Timer : public EventHandler {
 protected:
@@ -21,13 +21,13 @@ protected:
       `val` == 0: exit normally
       returns true to keep this timer
     */
-    virtual bool OnExpiration(int val, SendContext*) = 0;
+    virtual bool OnExpiration(int val, ClientContext*) = 0;
 
 protected:
     Logger* m_logger;
 
 private:
-    friend class SendContext;
+    friend class ClientContext;
 
     int Init(int fd, const std::shared_ptr<Connection>&);
     int Start(EventQueue*);

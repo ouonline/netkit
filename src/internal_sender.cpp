@@ -1,11 +1,11 @@
 #include "misc.h"
-#include "sender.h"
+#include "internal_sender.h"
 #include <string.h> // strerror()
 using namespace std;
 
 namespace netkit {
 
-int Sender::DoWrite(const void* buf, uint64_t sz, EventQueue* eq) {
+int InternalSender::DoWrite(const void* buf, uint64_t sz, EventQueue* eq) {
 loop:
     int err =
         eq->WriteAsync(m_conn->fd, buf, sz, static_cast<EventHandler*>(this));
@@ -21,7 +21,7 @@ loop:
     return err;
 }
 
-int Sender::Start(EventQueue* eq) {
+int InternalSender::Start(EventQueue* eq) {
     SendItem* item;
     {
         lock_guard<mutex> _l(m_conn->send_lock);
@@ -31,7 +31,7 @@ int Sender::Start(EventQueue* eq) {
     return DoWrite(item->data.data(), item->data.size(), eq);
 }
 
-bool Sender::Process(EventResult res, EventQueue* eq) {
+bool InternalSender::Process(EventResult res, EventQueue* eq) {
     SendItem* item;
     {
         lock_guard<mutex> _l(m_conn->send_lock);
@@ -40,7 +40,7 @@ bool Sender::Process(EventResult res, EventQueue* eq) {
 
     if (res.val < 0) {
         logger_error(m_logger, "send data failed: [%s].", strerror(-res.val));
-        item->on_complete(res.val);
+        item->on_sent(res.val);
         m_conn->ShutDown(m_logger);
         return false;
     }
@@ -51,7 +51,7 @@ bool Sender::Process(EventResult res, EventQueue* eq) {
 
     m_conn->send_offset += static_cast<uint32_t>(res.val);
     if (m_conn->send_offset == item->data.size()) {
-        item->on_complete(0);
+        item->on_sent(0);
         m_conn->send_offset = 0;
         lock_guard<mutex> _l(m_conn->send_lock);
         m_conn->send_queue.pop();

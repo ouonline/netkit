@@ -1,7 +1,7 @@
 #ifndef __NETKIT_TASK_H__
 #define __NETKIT_TASK_H__
 
-#include "send_context.h"
+#include "client_context.h"
 #include "event_handler_ptr.h"
 
 namespace netkit {
@@ -11,7 +11,7 @@ protected:
     Task(Logger* l) : m_logger(l) {}
     virtual ~Task() = default;
 
-    virtual void Run(SendContext*) = 0;
+    virtual void Execute(ClientContext*) = 0;
 
 protected:
     Logger* m_logger;

@@ -8,9 +8,9 @@ namespace netkit {
 
 struct SendItem final {
     SendItem(Buffer&& b, const std::function<void(int err)>& f)
-        : data(std::move(b)), on_complete(f) {}
+        : data(std::move(b)), on_sent(f) {}
     Buffer data;
-    std::function<void(int err)> on_complete;
+    std::function<void(int err)> on_sent;
 };
 
 }

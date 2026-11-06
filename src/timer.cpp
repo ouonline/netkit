@@ -1,5 +1,5 @@
 #include "netkit/timer.h"
-#include "netkit/send_context.h"
+#include "netkit/client_context.h"
 #include "misc.h"
 #include <string.h> // strerror()
 #include <unistd.h> // close()
@@ -47,7 +47,7 @@ loop:
 }
 
 bool Timer::Process(EventResult res, EventQueue* eq) {
-    SendContext ctx(m_conn, eq, m_logger);
+    ClientContext ctx(m_conn, eq, m_logger);
 
     if (!m_conn->IsValid()) {
         OnExpiration(0, &ctx);
