@@ -9,7 +9,7 @@ namespace netkit {
 class Task : public EventHandler {
 protected:
     Task(Logger* l) : m_logger(l) {}
-    virtual ~Task() = default;
+    ~Task() = default;
 
     virtual void Execute(ClientContext*) = 0;
 

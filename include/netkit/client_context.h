@@ -8,7 +8,8 @@ namespace netkit {
 
 class ClientContext final {
 public:
-    ClientContext(const std::shared_ptr<Connection>& c, EventQueue* eq, Logger* l)
+    ClientContext(const std::shared_ptr<Connection>& c, EventQueue* eq,
+                  Logger* l)
         : m_conn(c), m_eq(eq), m_logger(l) {}
 
     const EndpointInfo& GetEndpointInfo() {

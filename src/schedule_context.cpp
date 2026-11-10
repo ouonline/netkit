@@ -25,7 +25,8 @@ int ScheduleContext::Deliver(TaskPtr ptr, uint32_t idx) {
 
     int err = m_sched->Deliver(0, static_cast<EventHandler*>(task), m_eq, idx);
     if (err) {
-        logger_error(m_logger, "assign task to worker thread failed: [%s].",
+        logger_error(m_logger,
+                     "assign task to worker thread [%u] failed: [%s].", idx,
                      strerror(-err));
         task->DeleteSelf();
         return err;

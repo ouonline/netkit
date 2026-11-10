@@ -8,7 +8,7 @@ namespace netkit {
 class TcpServer : public EventHandler {
 protected:
     TcpServer(Logger* l) : m_logger(l) {}
-    virtual ~TcpServer();
+    ~TcpServer();
 
     virtual TcpClientPtr CreateClient() = 0;
 

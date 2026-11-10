@@ -32,7 +32,7 @@ struct PacketStatus {
 class TcpClient : public EventHandler {
 protected:
     TcpClient(Logger* l) : m_logger(l) {}
-    virtual ~TcpClient() = default;
+    ~TcpClient() = default;
 
     // returns 0 or -errno
     virtual int OnConnected(ClientContext*) = 0;

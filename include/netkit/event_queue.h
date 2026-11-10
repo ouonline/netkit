@@ -6,6 +6,7 @@
 
 namespace netkit {
 
+// EventQueue is NOT thread-safe
 class EventQueue {
 public:
     virtual ~EventQueue() = default;

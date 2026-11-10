@@ -9,8 +9,7 @@ namespace netkit {
 class ScheduleContext final {
 public:
     ScheduleContext(Scheduler* s, EventQueue* eq,
-                    const std::shared_ptr<Connection>& c,
-                    Logger* l)
+                    const std::shared_ptr<Connection>& c, Logger* l)
         : m_sched(s), m_eq(eq), m_conn(c), m_logger(l) {}
 
     uint32_t GetWorkerNum() const {

@@ -13,7 +13,7 @@ class ClientContext;
 class Timer : public EventHandler {
 protected:
     Timer(Logger* l) : m_logger(l) {}
-    virtual ~Timer();
+    ~Timer();
 
     /*
       `val` < 0: error occurs and `val` == -errno

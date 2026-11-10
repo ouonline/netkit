@@ -95,8 +95,7 @@ int TcpClient::HandleValidPacket(uint32_t packet_bytes, EventQueue* eq) {
     ScheduleContext sched_ctx(m_sched, eq, m_conn, m_logger);
     err = OnPacketReady(move(pkt), &sched_ctx);
     if (err) {
-        logger_error(m_logger, "handle packet failed: [%s].",
-                     strerror(-err));
+        logger_error(m_logger, "handle packet failed: [%s].", strerror(-err));
         return -1;
     }
 
