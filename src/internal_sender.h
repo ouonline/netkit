@@ -16,7 +16,7 @@ private:
 
     InternalSender(const std::shared_ptr<Connection>& c, Logger* l)
         : m_conn(c), m_logger(l) {}
-    int Start(EventQueue*);
+    int Start(EventQueue* curr, EventQueue* dst = nullptr);
     int DoWrite(const void* buf, uint64_t sz, EventQueue*);
     bool Process(EventResult, EventQueue*) override;
 

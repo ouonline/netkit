@@ -9,32 +9,39 @@ namespace netkit {
 
 static void DummyCallback(int) {}
 
-int ClientContext::Emit(Buffer&& b, const function<void(int err)>& on_sent) {
+void ClientContext::EmitImpl(Buffer&& data, EventQueue* target_eq,
+                             const function<void(int err)>& on_complete) {
+    if (data.IsEmpty()) {
+        if (on_complete) {
+            on_complete(0);
+        }
+        return;
+    }
+
     bool is_empty_before_adding;
     {
         lock_guard<mutex> _l(m_conn->send_lock);
         is_empty_before_adding = m_conn->send_queue.empty();
-        m_conn->send_queue.emplace(move(b), (on_sent) ?: DummyCallback);
+        m_conn->send_queue.emplace(move(data), (on_complete) ?: DummyCallback);
     }
 
     if (is_empty_before_adding) {
-        auto sender = new InternalSender(m_conn, m_logger);
+        auto sender = new (nothrow) InternalSender(m_conn, m_logger);
         if (!sender) {
             logger_error(m_logger, "allocate sender failed: [%s].",
                          strerror(ENOMEM));
-            return -ENOMEM;
+            m_conn->ShutDown(m_logger);
+            m_conn->ClearSendQueue(-ENOMEM);
+            return;
         }
 
-        int err = sender->Start(m_eq);
+        int err = sender->Start(m_eq, target_eq);
         if (err) {
             logger_error(m_logger, "about to send data failed: [%s].",
                          strerror(-err));
             sender->DeleteSelf();
-            return err;
         }
     }
-
-    return 0;
 }
 
 int ClientContext::AddTimer(const TimeVal& interval, TimerPtr ptr) {

@@ -27,6 +27,8 @@ public:
         return m_is_valid.load(std::memory_order_relaxed);
     }
 
+    void ClearSendQueue(int err);
+
     const int fd;
     std::mutex timer_lock;
     std::set<int> timer_fds;

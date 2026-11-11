@@ -29,10 +29,11 @@ public:
         auto len = snprintf(m_buffer.data(), 10, "%ld", num + 1);
         m_buffer.Resize(len);
 
-        err = ctx->Emit(move(m_buffer));
-        if (err) {
-            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
-        }
+        ctx->Emit(move(m_buffer), [logger = m_logger](int err) -> void {
+            if (err) {
+                logger_error(logger, "send data failed: [%s].", strerror(-err));
+            }
+        });
 
         sleep(1);
     }
@@ -68,11 +69,11 @@ public:
             m_endpoint_info.remote_addr.c_str(), m_endpoint_info.remote_port,
             buf.size(), buf.data());
 
-        err = ctx->Emit(move(buf));
-        if (err) {
-            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
-            return err;
-        }
+        ctx->Emit(move(buf), [logger = m_logger](int err) -> void {
+            if (err) {
+                logger_error(logger, "send data failed: [%s].", strerror(-err));
+            }
+        });
 
         sleep(1);
         return 0;

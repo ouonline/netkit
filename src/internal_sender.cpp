@@ -1,34 +1,48 @@
 #include "misc.h"
 #include "internal_sender.h"
 #include <string.h> // strerror()
+#include <limits>
 using namespace std;
 
 namespace netkit {
 
 int InternalSender::DoWrite(const void* buf, uint64_t sz, EventQueue* eq) {
-loop:
-    int err =
-        eq->WriteAsync(m_conn->fd, buf, sz, static_cast<EventHandler*>(this));
-    if (ShouldRetry(err)) {
-        goto loop;
+    int err;
+    while (true) {
+        err = eq->WriteAsync(m_conn->fd, buf, sz,
+                             static_cast<EventHandler*>(this));
+        if (!ShouldRetry(err)) {
+            break;
+        }
     }
 
     if (err) {
-        logger_error(m_logger, "writing data failed: [%s].", strerror(-err));
-        // fall through
+        logger_error(m_logger, "send data failed: [%s].", strerror(-err));
+        m_conn->ShutDown(m_logger);
+        m_conn->ClearSendQueue(err);
     }
-
     return err;
 }
 
-int InternalSender::Start(EventQueue* eq) {
+int InternalSender::Start(EventQueue* curr, EventQueue* dst) {
+    if (dst) {
+        int err = curr->NotifyAsync(dst, numeric_limits<int32_t>::max(),
+                                    static_cast<EventHandler*>(this));
+        if (err) {
+            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
+            m_conn->ShutDown(m_logger);
+            m_conn->ClearSendQueue(err);
+        }
+        return err;
+    }
+
     SendItem* item;
     {
         lock_guard<mutex> _l(m_conn->send_lock);
         item = &m_conn->send_queue.front();
     }
 
-    return DoWrite(item->data.data(), item->data.size(), eq);
+    return DoWrite(item->buffer.data(), item->buffer.size(), curr);
 }
 
 bool InternalSender::Process(EventResult res, EventQueue* eq) {
@@ -40,18 +54,25 @@ bool InternalSender::Process(EventResult res, EventQueue* eq) {
 
     if (res.val < 0) {
         logger_error(m_logger, "send data failed: [%s].", strerror(-res.val));
-        item->on_sent(res.val);
         m_conn->ShutDown(m_logger);
+        m_conn->ClearSendQueue(res.val);
         return false;
     }
     if (res.val == 0) {
         logger_info(m_logger, "peer disconnected.");
+        m_conn->ShutDown(m_logger);
+        m_conn->ClearSendQueue(-ECONNRESET);
         return false;
     }
 
+    // special value for notification
+    if (res.val == numeric_limits<decltype(res.val)>::max()) {
+        res.val = 0;
+    }
+
     m_conn->send_offset += static_cast<uint32_t>(res.val);
-    if (m_conn->send_offset == item->data.size()) {
-        item->on_sent(0);
+    if (m_conn->send_offset == item->buffer.size()) {
+        item->on_complete(0);
         m_conn->send_offset = 0;
         lock_guard<mutex> _l(m_conn->send_lock);
         m_conn->send_queue.pop();
@@ -61,8 +82,8 @@ bool InternalSender::Process(EventResult res, EventQueue* eq) {
         item = &m_conn->send_queue.front();
     }
 
-    int err = DoWrite(item->data.data() + m_conn->send_offset,
-                      item->data.size() - m_conn->send_offset, eq);
+    int err = DoWrite(item->buffer.data() + m_conn->send_offset,
+                      item->buffer.size() - m_conn->send_offset, eq);
     return (err == 0);
 }
 

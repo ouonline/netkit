@@ -43,9 +43,7 @@ bool TcpServer::Process(EventResult res, EventQueue* eq) {
     }
 
     TcpClient* client = ptr.release();
-    client->Init(fd, m_sched);
-
-    int err = client->Start(eq);
+    int err = client->Start(fd, m_sched, eq);
     if (err) {
         logger_error(m_logger, "TcpClient start failed: [%s].", strerror(-err));
         client->DeleteSelf();

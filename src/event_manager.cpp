@@ -65,7 +65,7 @@ int EventManager::Init(const Options& options) {
 
     m_worker_eq_list.resize(worker_num);
     for (uint32_t i = 0; i < worker_num; ++i) {
-        auto impl = new EventQueueImpl();
+        auto impl = new (nothrow) EventQueueImpl();
         if (!impl) {
             logger_error(m_logger, "allocate event queue failed: [%s].",
                          strerror(ENOMEM));
@@ -81,7 +81,7 @@ int EventManager::Init(const Options& options) {
         }
     }
 
-    auto impl = new EventQueueImpl();
+    auto impl = new (nothrow) EventQueueImpl();
     if (!impl) {
         logger_error(m_logger, "allocate event queue failed: [%s].",
                      strerror(ENOMEM));
@@ -146,9 +146,7 @@ int EventManager::AddTcpClient(const char* addr, uint16_t port,
     }
 
     TcpClient* client = ptr.release();
-    client->Init(fd, &m_sched);
-
-    int err = client->Start(m_eq.get());
+    int err = client->Start(fd, &m_sched, m_eq.get());
     if (err) {
         logger_error(m_logger, "TcpClient start failed: [%s].", strerror(-err));
         client->DeleteSelf();

@@ -41,4 +41,17 @@ void Connection::ShutDown(Logger* logger) {
     }
 }
 
+void Connection::ClearSendQueue(int err) {
+    queue<SendItem> tmp_queue;
+    {
+        lock_guard<mutex> _l(send_lock);
+        send_offset = 0;
+        tmp_queue = move(send_queue);
+    }
+    while (!tmp_queue.empty()) {
+        tmp_queue.front().on_complete(err);
+        tmp_queue.pop();
+    }
+}
+
 }

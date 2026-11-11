@@ -1,6 +1,7 @@
 #include "misc.h"
 #include "netkit/tcp_client.h"
 #include <string.h> // strerror()
+#include <unistd.h> // close()
 using namespace std;
 
 #define REQ_BUF_EXPAND_SIZE 1024
@@ -9,13 +10,40 @@ namespace netkit {
 
 void TcpClient::DeleteSelf() {
     if (m_conn) {
-        bool connected = (m_conn->fd >= 0);
         m_conn->ShutDown(m_logger);
-        if (connected) {
-            OnDisconnected();
-        }
+        OnDisconnected();
     }
     delete this;
+}
+
+int TcpClient::Start(int fd, Scheduler* sched, EventQueue* eq) {
+    int err = m_buf.Reserve(REQ_BUF_EXPAND_SIZE);
+    if (err) {
+        logger_error(m_logger, "reserve [%lu] bytes for packet failed: [%s].",
+                     REQ_BUF_EXPAND_SIZE, strerror(-err));
+        close(fd);
+        return err;
+    }
+
+    m_conn.reset(new (nothrow) Connection(fd));
+    if (!m_conn) {
+        logger_error(m_logger, "allocate Connection failed: [%s].",
+                     strerror(ENOMEM));
+        close(fd);
+        return -ENOMEM;
+    }
+
+    m_sched = sched;
+
+    ClientContext ctx(m_conn, eq, m_logger);
+    err = OnConnected(&ctx);
+    if (err) {
+        logger_error(m_logger, "client OnConnected failed: [%s].",
+                     strerror(-err));
+        return err;
+    }
+
+    return DoRead(m_buf.data(), REQ_BUF_EXPAND_SIZE, eq);
 }
 
 int TcpClient::DoRead(void* buf, uint64_t sz, EventQueue* eq) {
@@ -32,25 +60,6 @@ loop:
     }
 
     return err;
-}
-
-int TcpClient::Start(EventQueue* eq) {
-    int err = m_buf.Reserve(REQ_BUF_EXPAND_SIZE);
-    if (err) {
-        logger_error(m_logger, "reserve [%lu] bytes for packet failed: [%s].",
-                     REQ_BUF_EXPAND_SIZE, strerror(-err));
-        return err;
-    }
-
-    ClientContext ctx(m_conn, eq, m_logger);
-    err = OnConnected(&ctx);
-    if (err) {
-        logger_error(m_logger, "client OnConnected failed: [%s].",
-                     strerror(-err));
-        return err;
-    }
-
-    return DoRead(m_buf.data(), REQ_BUF_EXPAND_SIZE, eq);
 }
 
 void TcpClient::HandleInvalidPacket() {
@@ -120,7 +129,6 @@ bool TcpClient::Process(EventResult res, EventQueue* eq) {
         if (!ShouldRetry(res.val)) {
             logger_error(m_logger, "read data failed: [%s].",
                          strerror(-res.val));
-            m_conn->ShutDown(m_logger);
             return false;
         }
     } else {

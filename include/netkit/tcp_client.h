@@ -40,6 +40,13 @@ protected:
     virtual PacketStatus OnDataReady(const Buffer&) = 0;
     virtual int OnPacketReady(Buffer&&, ScheduleContext*) = 0;
 
+    void Emit(EventQueue* src_eq, Buffer&& data,
+              const std::function<void(int err)>& on_complete = {}) {
+        ClientContext ctx(m_conn, src_eq, m_logger);
+        ctx.EmitImpl(std::move(data), m_sched->PickNextWorkerQueue(),
+                     on_complete);
+    }
+
 protected:
     Logger* m_logger;
 
@@ -47,12 +54,7 @@ private:
     friend class TcpServer;
     friend class EventManager;
 
-    void Init(int fd, Scheduler* sched) {
-        m_conn = std::make_shared<Connection>(fd);
-        m_sched = sched;
-    }
-
-    int Start(EventQueue*);
+    int Start(int fd, Scheduler*, EventQueue*);
     bool Process(EventResult, EventQueue*) final;
     void DeleteSelf() final;
 

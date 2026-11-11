@@ -55,11 +55,11 @@ private:
             info.local_addr.c_str(), info.local_port, info.remote_addr.c_str(),
             info.remote_port, static_cast<int>(buf.size()), buf.data());
 
-        err = ctx->Emit(move(buf));
-        if (err) {
-            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
-            return false;
-        }
+        ctx->Emit(move(buf), [logger = m_logger](int err) -> void {
+            if (err) {
+                logger_error(logger, "send data failed: [%s].", strerror(-err));
+            }
+        });
 
         return true;
     }

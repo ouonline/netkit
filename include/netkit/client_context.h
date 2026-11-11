@@ -16,11 +16,19 @@ public:
         return m_conn->GetEndpointInfo();
     }
 
-    // returns 0 or -errno
-    int Emit(Buffer&&, const std::function<void(int err)>& on_sent = {});
+    void Emit(Buffer&& data,
+              const std::function<void(int err)>& on_complete = {}) {
+        EmitImpl(std::move(data), nullptr, on_complete);
+    }
 
     // returns -errno or timer fd
     int AddTimer(const TimeVal& interval, TimerPtr);
+
+private:
+    friend class TcpClient;
+
+    void EmitImpl(Buffer&&, EventQueue* target_eq = nullptr,
+                  const std::function<void(int err)>& on_complete = {});
 
 private:
     const std::shared_ptr<Connection>& m_conn;

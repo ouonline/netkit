@@ -14,10 +14,11 @@ public:
             m_logger, "[server] client[%s:%u] ==> server[%s:%u] data[%.*s]",
             info.local_addr.c_str(), info.local_port, info.remote_addr.c_str(),
             info.remote_port, m_buffer.size(), m_buffer.data());
-        int err = ctx->Emit(move(m_buffer));
-        if (err) {
-            logger_error(m_logger, "send data failed: [%s].", strerror(-err));
-        }
+        ctx->Emit(move(m_buffer), [logger = m_logger](int err) -> void {
+            if (err) {
+                logger_error(logger, "send data failed: [%s].", strerror(-err));
+            }
+        });
     }
 
 private:
