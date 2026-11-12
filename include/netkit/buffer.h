@@ -1,78 +1,116 @@
 #ifndef __NETKIT_BUFFER_H__
 #define __NETKIT_BUFFER_H__
 
-#include "cutils/qbuf.h"
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 namespace netkit {
 
 class Buffer final {
 public:
-    Buffer() {
-        qbuf_init(&m_data);
-    }
+    Buffer() = default;
     ~Buffer() {
-        qbuf_destroy(&m_data);
+        free(m_data);
     }
 
     Buffer(Buffer&& b) {
-        qbuf_move_construct(&b.m_data, &m_data);
-    }
-    Buffer(QBuf&& b) {
-        qbuf_move_construct(&b, &m_data);
+        MoveConstruct(&b);
     }
 
     void operator=(Buffer&& b) {
-        qbuf_move(&b.m_data, &m_data);
-    }
-    void operator=(QBuf&& b) {
-        qbuf_move(&b, &m_data);
+        if (this != &b) {
+            free(m_data);
+            MoveConstruct(&b);
+        }
     }
 
     char* data() {
-        return (char*)qbuf_data(&m_data);
+        return (char*)m_data;
     }
     const char* data() const {
-        return (const char*)qbuf_data(&m_data);
+        return (const char*)m_data;
     }
 
     uint64_t size() const {
-        return qbuf_size(&m_data);
+        return m_size;
     }
 
     bool IsEmpty() const {
-        return qbuf_empty(&m_data);
+        return (m_size == 0);
     }
 
     int Reserve(uint64_t new_size) {
-        return qbuf_reserve(&m_data, new_size);
+        if (new_size <= m_capacity) {
+            return 0;
+        }
+
+        uint64_t real_capacity = m_capacity == 0 ? 4 : m_capacity;
+        do {
+            real_capacity <<= 1;
+        } while (real_capacity < new_size);
+
+        void* new_data = realloc(m_data, real_capacity);
+        if (!new_data) {
+            return -1;
+        }
+
+        m_data = new_data;
+        m_capacity = real_capacity;
+        return 0;
     }
 
     int Resize(uint64_t new_size) {
-        return qbuf_resize(&m_data, new_size);
+        if (Reserve(new_size) != 0) {
+            return -1;
+        }
+
+        m_size = new_size;
+        return 0;
     }
 
     int Assign(const char* data, uint64_t len) {
-        return qbuf_assign(&m_data, data, len);
+        m_size = 0;
+        return Append(data, len);
     }
 
     int Append(const char* data, uint64_t len) {
-        return qbuf_append(&m_data, data, len);
+        const uint64_t new_size = m_size + len;
+        if (Reserve(new_size) != 0) {
+            return -1;
+        }
+
+        memcpy((char*)m_data + m_size, data, len);
+        m_size = new_size;
+        return 0;
     }
 
     int Append(const Buffer& b) {
         if (!b.IsEmpty()) {
-            return qbuf_append(&m_data, b.data(), b.size());
+            return Append(b.data(), b.size());
         }
         return 0;
     }
 
     void Clear() {
-        qbuf_clear(&m_data);
+        m_size = 0;
     }
 
 private:
-    QBuf m_data;
+    void MoveConstruct(Buffer* b) {
+        m_data = b->m_data;
+        m_size = b->m_size;
+        m_capacity = b->m_capacity;
+
+        b->m_data = nullptr;
+        b->m_size = 0;
+        b->m_capacity = 0;
+    }
+
+private:
+    void* m_data = nullptr;
+    uint64_t m_size = 0;
+    uint64_t m_capacity = 0;
 
 private:
     Buffer(const Buffer&) = delete;
