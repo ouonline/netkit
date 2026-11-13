@@ -31,11 +31,14 @@ int Timer::Init(int fd, const shared_ptr<Connection>& conn) {
 }
 
 int Timer::Start(EventQueue* eq) {
-loop:
-    int err = eq->ReadAsync(m_fd, &m_nr_expiration, sizeof(m_nr_expiration),
+    int err;
+
+    while (true) {
+        err = eq->ReadAsync(m_fd, &m_nr_expiration, sizeof(m_nr_expiration),
                             static_cast<EventHandler*>(this));
-    if (ShouldRetry(err)) {
-        goto loop;
+        if (!ShouldRetry(err)) {
+            break;
+        }
     }
 
     if (err) {

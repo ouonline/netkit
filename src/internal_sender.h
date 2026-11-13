@@ -8,15 +8,13 @@
 namespace netkit {
 
 class InternalSender final : public EventHandler {
-protected:
-    ~InternalSender() = default;
-
-private:
-    friend class ClientContext;
-
+public:
     InternalSender(const std::shared_ptr<Connection>& c, Logger* l)
         : m_conn(c), m_logger(l) {}
+
     int Start(EventQueue* curr, EventQueue* dst = nullptr);
+
+private:
     int DoWrite(const void* buf, uint64_t sz, EventQueue*);
     bool Process(EventResult, EventQueue*) override;
 

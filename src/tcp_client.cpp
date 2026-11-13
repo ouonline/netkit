@@ -1,4 +1,5 @@
 #include "misc.h"
+#include "emit_impl.h"
 #include "netkit/tcp_client.h"
 #include <string.h> // strerror()
 #include <unistd.h> // close()
@@ -46,12 +47,21 @@ int TcpClient::Start(int fd, Scheduler* sched, EventQueue* eq) {
     return DoRead(m_buf.data(), REQ_BUF_EXPAND_SIZE, eq);
 }
 
+void TcpClient::Emit(EventQueue* curr_eq, Buffer&& data,
+                     const function<void(int err)>& on_complete) {
+    EmitImpl(move(data), m_conn, curr_eq, m_sched->PickNextWorkerQueue(),
+             on_complete, m_logger);
+}
+
 int TcpClient::DoRead(void* buf, uint64_t sz, EventQueue* eq) {
-loop:
-    int err =
-        eq->ReadAsync(m_conn->fd, buf, sz, static_cast<EventHandler*>(this));
-    if (ShouldRetry(err)) {
-        goto loop;
+    int err;
+
+    while (true) {
+        err = eq->ReadAsync(m_conn->fd, buf, sz,
+                            static_cast<EventHandler*>(this));
+        if (!ShouldRetry(err)) {
+            break;
+        }
     }
 
     if (err) {
