@@ -8,6 +8,7 @@ namespace netkit {
 
 int InternalSender::DoWrite(const void* buf, uint64_t sz, EventQueue* eq) {
     int err;
+
     while (true) {
         err = eq->WriteAsync(m_conn->fd, buf, sz,
                              static_cast<EventHandler*>(this));
@@ -21,6 +22,7 @@ int InternalSender::DoWrite(const void* buf, uint64_t sz, EventQueue* eq) {
         m_conn->ShutDown(m_logger);
         m_conn->ClearSendQueue(err);
     }
+
     return err;
 }
 

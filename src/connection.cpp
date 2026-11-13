@@ -25,7 +25,7 @@ const EndpointInfo& Connection::GetEndpointInfo() {
 }
 
 void Connection::ShutDown(Logger* logger) {
-    if (!m_is_valid.exchange(0, memory_order_acq_rel)) {
+    if (!m_is_valid.exchange(false, memory_order_acq_rel)) {
         return;
     }
 

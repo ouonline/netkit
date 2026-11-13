@@ -13,7 +13,7 @@ namespace netkit {
 
 class Connection final {
 private:
-    std::atomic<uint32_t> m_is_valid = {1};
+    std::atomic<bool> m_is_valid = {true};
     EndpointInfo m_info;
 
 public:

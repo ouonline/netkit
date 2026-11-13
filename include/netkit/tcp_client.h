@@ -1,12 +1,12 @@
 #ifndef __NETKIT_TCP_CLIENT_H__
 #define __NETKIT_TCP_CLIENT_H__
 
-#include "task.h"
+#include "client_context.h"
 #include "schedule_context.h"
 
 namespace netkit {
 
-struct PacketStatus {
+struct PacketStatus final {
     enum {
         /* invalid packet */
         INVALID = -1,
@@ -40,12 +40,8 @@ protected:
     virtual PacketStatus OnDataReady(const Buffer&) = 0;
     virtual int OnPacketReady(Buffer&&, ScheduleContext*) = 0;
 
-    void Emit(EventQueue* src_eq, Buffer&& data,
-              const std::function<void(int err)>& on_complete = {}) {
-        ClientContext ctx(m_conn, src_eq, m_logger);
-        ctx.EmitImpl(std::move(data), m_sched->PickNextWorkerQueue(),
-                     on_complete);
-    }
+    void Emit(EventQueue* curr_eq, Buffer&& data,
+              const std::function<void(int err)>& on_complete = {});
 
 protected:
     Logger* m_logger;

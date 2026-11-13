@@ -13,10 +13,13 @@ TcpServer::~TcpServer() {
 }
 
 int TcpServer::Start(EventQueue* eq) {
-loop:
-    int err = eq->AcceptAsync(m_fd, static_cast<EventHandler*>(this), true);
-    if (ShouldRetry(err)) {
-        goto loop;
+    int err;
+
+    while (true) {
+        err = eq->AcceptAsync(m_fd, static_cast<EventHandler*>(this), true);
+        if (!ShouldRetry(err)) {
+            break;
+        }
     }
 
     if (err) {
