@@ -1,47 +1,15 @@
+#include "emit_impl.h"
 #include "netkit/client_context.h"
 #include "netkit/timer.h"
 #include "netkit/utils.h"
-#include "internal_sender.h"
 #include <string.h> // strerror()
 using namespace std;
 
 namespace netkit {
 
-static void DummyCallback(int) {}
-
-void ClientContext::EmitImpl(Buffer&& data, EventQueue* target_eq,
-                             const function<void(int err)>& on_complete) {
-    if (data.IsEmpty()) {
-        if (on_complete) {
-            on_complete(0);
-        }
-        return;
-    }
-
-    bool is_empty_before_adding;
-    {
-        lock_guard<mutex> _l(m_conn->send_lock);
-        is_empty_before_adding = m_conn->send_queue.empty();
-        m_conn->send_queue.emplace(move(data), (on_complete) ?: DummyCallback);
-    }
-
-    if (is_empty_before_adding) {
-        auto sender = new (nothrow) InternalSender(m_conn, m_logger);
-        if (!sender) {
-            logger_error(m_logger, "allocate sender failed: [%s].",
-                         strerror(ENOMEM));
-            m_conn->ShutDown(m_logger);
-            m_conn->ClearSendQueue(-ENOMEM);
-            return;
-        }
-
-        int err = sender->Start(m_eq, target_eq);
-        if (err) {
-            logger_error(m_logger, "about to send data failed: [%s].",
-                         strerror(-err));
-            sender->DeleteSelf();
-        }
-    }
+void ClientContext::Emit(Buffer&& data,
+                         const function<void(int err)>& on_complete) {
+    EmitImpl(move(data), m_conn, m_eq, nullptr, on_complete, m_logger);
 }
 
 int ClientContext::AddTimer(const TimeVal& interval, TimerPtr ptr) {

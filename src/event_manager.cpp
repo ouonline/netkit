@@ -120,9 +120,7 @@ int EventManager::AddTcpServer(const char* addr, uint16_t port,
     }
 
     TcpServer* svr = ptr.release();
-    svr->Init(fd, &m_sched);
-
-    int err = svr->Start(m_eq.get());
+    int err = svr->Start(fd, &m_sched, m_eq.get());
     if (err) {
         logger_error(m_logger, "start server failed: [%s].", strerror(-err));
         svr->DeleteSelf();

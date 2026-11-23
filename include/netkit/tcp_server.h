@@ -18,12 +18,7 @@ protected:
 private:
     friend class EventManager;
 
-    void Init(int fd, Scheduler* sched) {
-        m_fd = fd;
-        m_sched = sched;
-    }
-
-    int Start(EventQueue*);
+    int Start(int fd, Scheduler* sched, EventQueue*);
     bool Process(EventResult, EventQueue*) final;
 
 private:
